@@ -1,0 +1,16 @@
+.env
+APIDEEPSEEK.TXT
+PYANNOTEAPI.TXT
+ps_list.txt
+ps_output.txt
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+data/
+backups/
+*.sqlite3
