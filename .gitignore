@@ -6,6 +6,8 @@ ps_output.txt
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
+backend/venv/
+backend/staticfiles/
 __pycache__/
 *.pyc
 .pytest_cache/
