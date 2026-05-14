@@ -9,6 +9,7 @@ psycopg2-binary>=2.9
 celery>=5.4
 redis>=5.0
 python-decouple>=3.8
+python-dotenv>=1.0.1
 gunicorn>=22.0
 requests>=2.31
 pgvector>=0.2.5

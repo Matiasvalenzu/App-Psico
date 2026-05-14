@@ -1,6 +1,13 @@
 #!/usr/bin/env python
 import os
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR.parent / ".env", override=True)
 
 
 def main():
