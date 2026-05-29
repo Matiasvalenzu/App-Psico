@@ -3,10 +3,22 @@ from .models import VoiceProfile
 
 
 class VoiceProfileSerializer(serializers.ModelSerializer):
+    compatible = serializers.BooleanField(source="is_compatible", read_only=True)
+
     class Meta:
         model = VoiceProfile
-        fields = ["id", "fecha_creacion", "activo"]
-        read_only_fields = ["id", "fecha_creacion"]
+        fields = [
+            "id",
+            "fecha_creacion",
+            "updated_at",
+            "activo",
+            "embedding_model",
+            "embedding_dim",
+            "sample_count",
+            "sample_duration_seconds",
+            "compatible",
+        ]
+        read_only_fields = fields
 
 
 class VoiceEnrollSerializer(serializers.Serializer):

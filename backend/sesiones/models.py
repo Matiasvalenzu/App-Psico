@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from pgvector.django import VectorField
 from pacientes.models import Paciente
@@ -17,6 +18,13 @@ class Sesion(models.Model):
 
     paciente = models.ForeignKey(
         Paciente, on_delete=models.CASCADE, related_name="sesiones"
+    )
+    psicologo = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sesiones_psicologo",
     )
     fecha_hora_inicio = models.DateTimeField(default=timezone.now)
     duracion_segundos = models.PositiveIntegerField(null=True, blank=True)
@@ -53,6 +61,10 @@ class TranscripcionSegmento(models.Model):
     inicio_segundo = models.FloatField()
     fin_segundo = models.FloatField()
     hablante = models.CharField(max_length=20, choices=Hablante.choices)
+    speaker_label = models.CharField(max_length=80, blank=True, default="")
+    speaker_match_score = models.FloatField(null=True, blank=True)
+    speaker_match_threshold = models.FloatField(null=True, blank=True)
+    speaker_match_model = models.CharField(max_length=120, blank=True, default="")
     texto = models.TextField()
     texto_original = models.TextField(blank=True, default="")
     embedding = VectorField(dimensions=1024, null=True, blank=True)
@@ -63,3 +75,31 @@ class TranscripcionSegmento(models.Model):
 
     def __str__(self):
         return f"[{self.inicio_segundo:.1f}s-{self.fin_segundo:.1f}s] {self.hablante}: {self.texto[:60]}"
+
+
+class SpeakerIdentificationResult(models.Model):
+    sesion = models.ForeignKey(
+        Sesion, on_delete=models.CASCADE, related_name="speaker_results"
+    )
+    pyannote_label = models.CharField(max_length=80, blank=True, default="")
+    matched_profile = models.ForeignKey(
+        "voz.VoiceProfile", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    score = models.FloatField(null=True, blank=True)
+    threshold = models.FloatField()
+    assigned_hablante = models.CharField(
+        max_length=20,
+        choices=TranscripcionSegmento.Hablante.choices,
+        default=TranscripcionSegmento.Hablante.PACIENTE,
+    )
+    total_duration_seconds = models.FloatField(default=0)
+    turn_count = models.PositiveIntegerField(default=0)
+    model_name = models.CharField(max_length=120, blank=True, default="")
+    reason = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sesion", "pyannote_label"]
+
+    def __str__(self):
+        return f"{self.sesion_id} {self.pyannote_label}: {self.assigned_hablante} ({self.score})"

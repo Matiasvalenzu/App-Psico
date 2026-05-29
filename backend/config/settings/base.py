@@ -146,6 +146,20 @@ PYANNOTE_PIPELINE_MODEL = os.environ.get(
     "PYANNOTE_PIPELINE_MODEL", "pyannote/speaker-diarization-3.1"
 )
 VOICE_MATCH_THRESHOLD = float(os.environ.get("VOICE_MATCH_THRESHOLD", "0.65"))
+SPEAKER_EMBEDDING_MODEL = os.environ.get(
+    "SPEAKER_EMBEDDING_MODEL", "speechbrain/spkrec-ecapa-voxceleb"
+)
+SPEAKER_EMBEDDING_CACHE_DIR = os.environ.get(
+    "SPEAKER_EMBEDDING_CACHE_DIR", "/data/models/speechbrain"
+)
+SPEAKER_EMBEDDING_DEVICE = os.environ.get("SPEAKER_EMBEDDING_DEVICE", "cpu")
+SPEAKER_MATCH_THRESHOLD = float(os.environ.get("SPEAKER_MATCH_THRESHOLD", "0.35"))
+SPEAKER_MATCH_MARGIN = float(os.environ.get("SPEAKER_MATCH_MARGIN", "0.05"))
+SPEAKER_MIN_TURN_SECONDS = float(os.environ.get("SPEAKER_MIN_TURN_SECONDS", "1.0"))
+SPEAKER_MIN_TOTAL_SECONDS = float(os.environ.get("SPEAKER_MIN_TOTAL_SECONDS", "3.0"))
+SPEAKER_MAX_SECONDS_PER_LABEL = float(
+    os.environ.get("SPEAKER_MAX_SECONDS_PER_LABEL", "30.0")
+)
 EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1024"))
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
 EMBEDDING_USE_MODEL = os.environ.get("EMBEDDING_USE_MODEL", "False").lower() == "true"

@@ -2,6 +2,9 @@ import math
 import os
 import subprocess
 import tempfile
+from functools import lru_cache
+
+from django.conf import settings
 
 
 def _normalize(values):
@@ -37,6 +40,21 @@ def average_embeddings(embeddings):
     size = min(len(embedding) for embedding in valid)
     averaged = [sum(embedding[index] for embedding in valid) / len(valid) for index in range(size)]
     return _normalize(averaged)
+
+
+@lru_cache(maxsize=1)
+def get_speaker_encoder():
+    try:
+        from speechbrain.inference.speaker import EncoderClassifier
+    except ImportError:
+        from speechbrain.pretrained import EncoderClassifier
+
+    os.makedirs(settings.SPEAKER_EMBEDDING_CACHE_DIR, exist_ok=True)
+    return EncoderClassifier.from_hparams(
+        source=settings.SPEAKER_EMBEDDING_MODEL,
+        savedir=settings.SPEAKER_EMBEDDING_CACHE_DIR,
+        run_opts={"device": settings.SPEAKER_EMBEDDING_DEVICE},
+    )
 
 
 def decode_audio_mono(audio_path, start_second=None, end_second=None, sample_rate=16000):
@@ -83,68 +101,49 @@ def decode_audio_for_pyannote(audio_path):
     return {"waveform": waveform, "sample_rate": sample_rate}
 
 
+def get_audio_duration_seconds(audio_path):
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        audio_path,
+    ]
+    result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        return float(result.stdout.decode("utf-8").strip() or 0)
+    except ValueError:
+        return 0.0
+
+
 def extract_voice_embedding_from_path(audio_path, start_second=None, end_second=None):
-    import numpy as np
+    import torch
 
     y, sample_rate = decode_audio_mono(audio_path, start_second, end_second)
-    if y.size < sample_rate // 4:
+    if y.size < int(sample_rate * settings.SPEAKER_MIN_TURN_SECONDS):
         return []
 
-    frame_size = 400
-    hop = 160
-    if y.size < frame_size:
-        y = np.pad(y, (0, frame_size - y.size))
-
-    frames = []
-    for start in range(0, max(y.size - frame_size + 1, 1), hop):
-        frames.append(y[start : start + frame_size])
-    frames = np.array(frames, dtype=np.float32)
-
-    rms = np.sqrt(np.mean(frames * frames, axis=1) + 1e-12)
-    zcr = np.mean(np.abs(np.diff(np.signbit(frames), axis=1)), axis=1)
-
-    windowed = y[: min(y.size, sample_rate * 10)]
-    spectrum = np.abs(np.fft.rfft(windowed * np.hanning(windowed.size)))
-    spectrum = spectrum / (np.sum(spectrum) + 1e-12)
-    bands = np.array_split(spectrum, 32)
-    band_energy = np.array([band.sum() for band in bands], dtype=np.float32)
-
-    features = np.concatenate(
-        [
-            np.array(
-                [
-                    float(np.mean(y)),
-                    float(np.std(y)),
-                    float(np.sqrt(np.mean(y * y) + 1e-12)),
-                    float(np.max(np.abs(y))),
-                ],
-                dtype=np.float32,
-            ),
-            np.array(
-                [
-                    float(np.mean(rms)),
-                    float(np.std(rms)),
-                    float(np.percentile(rms, 25)),
-                    float(np.percentile(rms, 75)),
-                ],
-                dtype=np.float32,
-            ),
-            np.array(
-                [
-                    float(np.mean(zcr)),
-                    float(np.std(zcr)),
-                    float(np.percentile(zcr, 25)),
-                    float(np.percentile(zcr, 75)),
-                ],
-                dtype=np.float32,
-            ),
-            band_energy,
-        ]
-    )
-    return _normalize(features.tolist())
+    classifier = get_speaker_encoder()
+    device = torch.device(settings.SPEAKER_EMBEDDING_DEVICE)
+    waveform = torch.from_numpy(y).float().unsqueeze(0).to(device)
+    wav_lens = torch.ones(waveform.shape[0], device=waveform.device)
+    with torch.no_grad():
+        embedding = classifier.encode_batch(waveform, wav_lens=wav_lens)
+    values = embedding.squeeze().detach().cpu().tolist()
+    if isinstance(values, float):
+        values = [values]
+    return _normalize(values)
 
 
 def extract_voice_embedding_from_upload(uploaded_file):
+    embedding, _duration = extract_voice_embedding_and_duration_from_upload(uploaded_file)
+    return embedding
+
+
+def extract_voice_embedding_and_duration_from_upload(uploaded_file):
     suffix = os.path.splitext(getattr(uploaded_file, "name", "sample.webm"))[1] or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         for chunk in uploaded_file.chunks():
@@ -152,7 +151,7 @@ def extract_voice_embedding_from_upload(uploaded_file):
         tmp_path = tmp.name
 
     try:
-        return extract_voice_embedding_from_path(tmp_path)
+        return extract_voice_embedding_from_path(tmp_path), get_audio_duration_seconds(tmp_path)
     finally:
         try:
             os.unlink(tmp_path)

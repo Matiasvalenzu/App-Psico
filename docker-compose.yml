@@ -38,6 +38,7 @@ services:
     volumes:
       - ./backend:/app
       - audio_data:/data/audio
+      - model_cache:/data/models
     ports:
       - "8000:8000"
     environment:
@@ -58,6 +59,14 @@ services:
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
       - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE:-int8}
       - PYANNOTE_AUTH_TOKEN=${PYANNOTE_AUTH_TOKEN:-}
+      - SPEAKER_EMBEDDING_MODEL=${SPEAKER_EMBEDDING_MODEL:-speechbrain/spkrec-ecapa-voxceleb}
+      - SPEAKER_EMBEDDING_CACHE_DIR=${SPEAKER_EMBEDDING_CACHE_DIR:-/data/models/speechbrain}
+      - SPEAKER_EMBEDDING_DEVICE=${SPEAKER_EMBEDDING_DEVICE:-cpu}
+      - SPEAKER_MATCH_THRESHOLD=${SPEAKER_MATCH_THRESHOLD:-0.35}
+      - SPEAKER_MATCH_MARGIN=${SPEAKER_MATCH_MARGIN:-0.05}
+      - SPEAKER_MIN_TURN_SECONDS=${SPEAKER_MIN_TURN_SECONDS:-1.0}
+      - SPEAKER_MIN_TOTAL_SECONDS=${SPEAKER_MIN_TOTAL_SECONDS:-3.0}
+      - SPEAKER_MAX_SECONDS_PER_LABEL=${SPEAKER_MAX_SECONDS_PER_LABEL:-30.0}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
       - EMBEDDING_USE_MODEL=${EMBEDDING_USE_MODEL:-False}
     depends_on:
@@ -71,10 +80,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: psicologo-celery
-    command: celery -A config.celery_app worker --loglevel=info
+    command: celery -A config.celery_app worker --loglevel=info --concurrency=1
     volumes:
       - ./backend:/app
       - audio_data:/data/audio
+      - model_cache:/data/models
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-change-me-minimum-32-characters}
@@ -93,6 +103,14 @@ services:
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
       - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE:-int8}
       - PYANNOTE_AUTH_TOKEN=${PYANNOTE_AUTH_TOKEN:-}
+      - SPEAKER_EMBEDDING_MODEL=${SPEAKER_EMBEDDING_MODEL:-speechbrain/spkrec-ecapa-voxceleb}
+      - SPEAKER_EMBEDDING_CACHE_DIR=${SPEAKER_EMBEDDING_CACHE_DIR:-/data/models/speechbrain}
+      - SPEAKER_EMBEDDING_DEVICE=${SPEAKER_EMBEDDING_DEVICE:-cpu}
+      - SPEAKER_MATCH_THRESHOLD=${SPEAKER_MATCH_THRESHOLD:-0.35}
+      - SPEAKER_MATCH_MARGIN=${SPEAKER_MATCH_MARGIN:-0.05}
+      - SPEAKER_MIN_TURN_SECONDS=${SPEAKER_MIN_TURN_SECONDS:-1.0}
+      - SPEAKER_MIN_TOTAL_SECONDS=${SPEAKER_MIN_TOTAL_SECONDS:-3.0}
+      - SPEAKER_MAX_SECONDS_PER_LABEL=${SPEAKER_MAX_SECONDS_PER_LABEL:-30.0}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
       - EMBEDDING_USE_MODEL=${EMBEDDING_USE_MODEL:-False}
     depends_on:
@@ -121,3 +139,4 @@ services:
 volumes:
   postgres_data:
   audio_data:
+  model_cache:

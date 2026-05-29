@@ -24,7 +24,10 @@ from .serializers import (
 
 
 class SesionViewSet(viewsets.ModelViewSet):
-    queryset = Sesion.objects.select_related("paciente").prefetch_related("segmentos")
+    queryset = Sesion.objects.select_related("paciente", "psicologo").prefetch_related(
+        "segmentos",
+        "speaker_results",
+    )
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -37,6 +40,9 @@ class SesionViewSet(viewsets.ModelViewSet):
         if paciente_id:
             qs = qs.filter(paciente_id=paciente_id)
         return qs
+
+    def perform_create(self, serializer):
+        serializer.save(psicologo=self.request.user)
 
     @action(detail=True, methods=["post"])
     def upload_audio(self, request, pk=None):
@@ -72,6 +78,8 @@ class SesionViewSet(viewsets.ModelViewSet):
         sesion.audio_path = filepath
         sesion.duracion_segundos = duracion
         sesion.estado = Sesion.Estado.PROCESANDO
+        if sesion.psicologo_id is None:
+            sesion.psicologo = request.user
         sesion.save()
 
         # Disparamos la tarea de procesamiento en segundo plano
@@ -109,6 +117,7 @@ class SesionViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             sesion = Sesion.objects.create(
                 paciente=serializer.validated_data["paciente"],
+                psicologo=request.user,
                 fecha_hora_inicio=serializer.validated_data["fecha_hora_inicio"],
                 origen=Sesion.Origen.DOCUMENTO_EXTERNO,
                 estado=Sesion.Estado.COMPLETADO,
