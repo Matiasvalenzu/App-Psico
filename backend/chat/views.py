@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from pacientes.models import Paciente
 from sesiones.embeddings import cosine_similarity, generate_text_embedding
-from sesiones.models import TranscripcionSegmento
+from sesiones.models import Sesion, TranscripcionSegmento
 from .models import ChatConversacion, ChatMensaje
 from .serializers import (
     ChatConversacionSerializer,
@@ -90,14 +90,22 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         fuentes = []
         for seg in segmentos:
             fecha = seg.sesion.fecha_hora_inicio.strftime("%d/%m/%Y")
-            contexto.append(
-                f"[Sesión {fecha} - {seg.hablante}]: {seg.texto}"
-            )
+            if seg.sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
+                etiqueta = f"Documento externo {fecha}"
+                if seg.sesion.documento_nombre_original:
+                    etiqueta = f"{etiqueta} - {seg.sesion.documento_nombre_original}"
+                contexto.append(f"[{etiqueta}]: {seg.texto}")
+            else:
+                contexto.append(
+                    f"[Sesión {fecha} - {seg.hablante}]: {seg.texto}"
+                )
             fuentes.append(
                 {
                     "segmento_id": seg.id,
                     "sesion_id": seg.sesion_id,
                     "fecha": fecha,
+                    "origen": seg.sesion.origen,
+                    "documento_nombre_original": seg.sesion.documento_nombre_original,
                     "hablante": seg.hablante,
                     "texto": seg.texto[:240],
                 }

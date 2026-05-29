@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration } from "@/lib/utils";
-import { ArrowLeft, Calendar, Clock, MessageCircle, Play, Send } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  FileText,
+  Loader2,
+  MessageCircle,
+  Play,
+  Send,
+  Upload,
+} from "lucide-react";
 
 interface Paciente {
   id: number;
@@ -22,6 +32,8 @@ interface Sesion {
   id: number;
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
+  origen: "AUDIO" | "DOCUMENTO_EXTERNO";
+  documento_nombre_original: string;
   estado: string;
 }
 
@@ -38,6 +50,20 @@ interface ChatConversacion {
   mensajes?: ChatMensaje[];
 }
 
+function getDateTimeInputValue(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function getApiErrorMessage(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+  const entries = Object.values(data as Record<string, unknown>);
+  const first = entries[0];
+  if (Array.isArray(first) && typeof first[0] === "string") return first[0];
+  if (typeof first === "string") return first;
+  return fallback;
+}
+
 export default function PacienteDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -49,6 +75,11 @@ export default function PacienteDetailPage() {
   const [messages, setMessages] = useState<ChatMensaje[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
+  const [documentModalOpen, setDocumentModalOpen] = useState(false);
+  const [documentDateTime, setDocumentDateTime] = useState(getDateTimeInputValue());
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [documentError, setDocumentError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -153,6 +184,61 @@ export default function PacienteDetailPage() {
     }
   }
 
+  function openDocumentModal() {
+    setDocumentDateTime(getDateTimeInputValue());
+    setDocumentFile(null);
+    setDocumentError("");
+    setDocumentModalOpen(true);
+  }
+
+  async function handleDocumentUpload(e: React.FormEvent) {
+    e.preventDefault();
+    setDocumentError("");
+
+    if (!documentFile) {
+      setDocumentError("Selecciona un archivo TXT, DOCX o PDF.");
+      return;
+    }
+
+    if (!documentDateTime) {
+      setDocumentError("Selecciona fecha y hora para el documento.");
+      return;
+    }
+
+    setUploadingDocument(true);
+    try {
+      const formData = new FormData();
+      formData.append("paciente", id);
+      formData.append("fecha_hora_inicio", new Date(documentDateTime).toISOString());
+      formData.append("archivo", documentFile);
+
+      const res = await apiFetch("/sesiones/upload_documento/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        let message = "No se pudo cargar el documento.";
+        try {
+          message = getApiErrorMessage(await res.json(), message);
+        } catch {
+          // Keep generic message.
+        }
+        setDocumentError(message);
+        return;
+      }
+
+      setDocumentModalOpen(false);
+      setDocumentFile(null);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setDocumentError("No se pudo cargar el documento.");
+    } finally {
+      setUploadingDocument(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-muted-foreground">Cargando...</p>;
   }
@@ -190,67 +276,178 @@ export default function PacienteDetailPage() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Sesiones ({sesiones.length})</h2>
-        <button
-          onClick={handleNewSession}
-          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Play className="h-4 w-4" />
-          Nueva sesión
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openDocumentModal}
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <Upload className="h-4 w-4" />
+            Cargar documento
+          </button>
+          <button
+            onClick={handleNewSession}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Play className="h-4 w-4" />
+            Nueva sesión
+          </button>
+        </div>
       </div>
+
+      {documentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={handleDocumentUpload}
+            className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-lg"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Cargar documento externo</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Se guardará como una sesión completada dentro del historial del paciente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocumentModalOpen(false)}
+                className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Fecha y hora</span>
+                <input
+                  type="datetime-local"
+                  value={documentDateTime}
+                  onChange={(event) => setDocumentDateTime(event.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Archivo</span>
+                <input
+                  type="file"
+                  accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(event) =>
+                    setDocumentFile(event.target.files?.[0] ?? null)
+                  }
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <span className="block text-xs text-muted-foreground">
+                  Formatos permitidos: TXT, DOCX y PDF con texto seleccionable.
+                </span>
+              </label>
+            </div>
+
+            {documentError && (
+              <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {documentError}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDocumentModalOpen(false)}
+                className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={uploadingDocument}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {uploadingDocument && <Loader2 className="h-4 w-4 animate-spin" />}
+                {uploadingDocument ? "Cargando..." : "Cargar documento"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {sesiones.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
           <Calendar className="mx-auto h-10 w-10 mb-3 opacity-50" />
           <p>Sin sesiones registradas</p>
           <p className="text-xs mt-1">
-            Presiona &ldquo;Nueva sesión&rdquo; para comenzar
+            Presiona &ldquo;Nueva sesión&rdquo; o carga un documento externo para comenzar
           </p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {sesiones.map((sesion) => (
-            <button
-              key={sesion.id}
-              onClick={() =>
-                router.push(
-                  `/dashboard/pacientes/${id}/sesiones/${sesion.id}`
-                )
-              }
-              className="flex items-center gap-4 rounded-lg border bg-card p-4 text-left hover:border-primary/50 transition-colors"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium">
-                  {formatDate(sesion.fecha_hora_inicio)}
-                </p>
-                <div className="flex gap-4 text-xs text-muted-foreground mt-0.5">
-                  <span className="inline-flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatTime(sesion.fecha_hora_inicio)}
-                  </span>
-                  {sesion.duracion_segundos ? (
-                    <span>{formatDuration(sesion.duracion_segundos)}</span>
-                  ) : null}
-                </div>
-              </div>
-              <div>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    sesion.estado === "COMPLETADO"
-                      ? "bg-green-50 text-green-700"
-                      : sesion.estado === "PROCESANDO"
-                      ? "bg-yellow-50 text-yellow-700"
-                      : "bg-muted text-muted-foreground"
+          {sesiones.map((sesion) => {
+            const isExternalDocument = sesion.origen === "DOCUMENTO_EXTERNO";
+            return (
+              <button
+                key={sesion.id}
+                onClick={() =>
+                  router.push(
+                    `/dashboard/pacientes/${id}/sesiones/${sesion.id}`
+                  )
+                }
+                className="flex items-center gap-4 rounded-lg border bg-card p-4 text-left hover:border-primary/50 transition-colors"
+              >
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                    isExternalDocument
+                      ? "bg-violet-50 text-violet-600"
+                      : "bg-blue-50 text-blue-600"
                   }`}
                 >
-                  {sesion.estado}
-                </span>
-              </div>
-            </button>
-          ))}
+                  {isExternalDocument ? (
+                    <FileText className="h-5 w-5" />
+                  ) : (
+                    <Calendar className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {formatDate(sesion.fecha_hora_inicio)}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatTime(sesion.fecha_hora_inicio)}
+                    </span>
+                    {isExternalDocument && (
+                      <span className="inline-flex min-w-0 items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        <span className="truncate">
+                          {sesion.documento_nombre_original || "Documento externo"}
+                        </span>
+                      </span>
+                    )}
+                    {!isExternalDocument && sesion.duracion_segundos ? (
+                      <span>{formatDuration(sesion.duracion_segundos)}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  {isExternalDocument && (
+                    <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+                      DOCUMENTO EXTERNO
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      sesion.estado === "COMPLETADO"
+                        ? "bg-green-50 text-green-700"
+                        : sesion.estado === "PROCESANDO"
+                        ? "bg-yellow-50 text-yellow-700"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {sesion.estado}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -273,7 +470,7 @@ export default function PacienteDetailPage() {
         <div className="max-h-80 space-y-3 overflow-y-auto rounded-md border bg-background p-3">
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Haz una pregunta sobre las sesiones transcritas de este paciente.
+              Haz una pregunta sobre las sesiones transcritas y documentos de este paciente.
             </p>
           ) : (
             messages.map((message) => (

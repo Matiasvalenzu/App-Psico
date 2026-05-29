@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
-import { ArrowLeft, Download, Loader2, Mic, Save, Square } from "lucide-react";
+import { ArrowLeft, Download, FileText, Loader2, Mic, Save, Square } from "lucide-react";
 
 interface Sesion {
   id: number;
@@ -13,6 +13,8 @@ interface Sesion {
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
   audio_path: string;
+  origen: "AUDIO" | "DOCUMENTO_EXTERNO";
+  documento_nombre_original: string;
   estado: string;
   notas_sesion: string;
   segmentos: Segmento[];
@@ -26,6 +28,33 @@ interface Segmento {
   hablante: string;
   texto: string;
   texto_original: string;
+}
+
+function getSpeakerLabel(hablante: string) {
+  if (hablante === "PSICOLOGO") return "Psicólogo";
+  if (hablante === "PACIENTE") return "Paciente";
+  return "Documento";
+}
+
+function getSegmentTone(hablante: string) {
+  if (hablante === "PSICOLOGO") {
+    return {
+      box: "bg-blue-50 border-l-4 border-blue-400",
+      label: "text-blue-700",
+    };
+  }
+
+  if (hablante === "PACIENTE") {
+    return {
+      box: "bg-green-50 border-l-4 border-green-400",
+      label: "text-green-700",
+    };
+  }
+
+  return {
+    box: "bg-violet-50 border-l-4 border-violet-400",
+    label: "text-violet-700",
+  };
 }
 
 function getSupportedAudioMimeType() {
@@ -306,6 +335,8 @@ export default function SesionDetailPage() {
     return <p className="text-destructive">Sesión no encontrada</p>;
   }
 
+  const isExternalDocument = sesion.origen === "DOCUMENTO_EXTERNO";
+
   return (
     <div className="space-y-6">
       <button
@@ -320,11 +351,11 @@ export default function SesionDetailPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">
-              Sesión — {formatDate(sesion.fecha_hora_inicio)}
+              {isExternalDocument ? "Documento externo" : "Sesión"} — {formatDate(sesion.fecha_hora_inicio)}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {formatTime(sesion.fecha_hora_inicio)}
-              {sesion.duracion_segundos
+              {!isExternalDocument && sesion.duracion_segundos
                 ? ` · ${formatDuration(sesion.duracion_segundos)}`
                 : ""}
               {" · "}
@@ -340,6 +371,12 @@ export default function SesionDetailPage() {
                 {sesion.estado}
               </span>
             </p>
+            {isExternalDocument && (
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <FileText className="h-4 w-4" />
+                {sesion.documento_nombre_original || "Documento externo cargado"}
+              </p>
+            )}
           </div>
 
           <button
@@ -350,7 +387,7 @@ export default function SesionDetailPage() {
             Exportar PDF
           </button>
 
-          {!sesion.audio_path && sesion.estado === "PENDIENTE" && (
+          {!isExternalDocument && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
             <div className="flex items-center gap-3">
               {uploading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -390,7 +427,7 @@ export default function SesionDetailPage() {
         </div>
       )}
 
-      {sesion.audio_path && ["PENDIENTE", "PROCESANDO"].includes(sesion.estado) && (
+      {!isExternalDocument && sesion.audio_path && ["PENDIENTE", "PROCESANDO"].includes(sesion.estado) && (
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-start gap-3">
             <Loader2 className="mt-0.5 h-5 w-5 animate-spin text-primary" />
@@ -434,73 +471,77 @@ export default function SesionDetailPage() {
 
       {sesion.segmentos && sesion.segmentos.length > 0 && (
         <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-lg font-semibold mb-4">Transcripción editable</h2>
+          <h2 className="text-lg font-semibold mb-4">
+            {isExternalDocument ? "Contenido extraído editable" : "Transcripción editable"}
+          </h2>
           <div className="space-y-3">
-            {sesion.segmentos.map((seg) => (
-              <div
-                key={seg.id}
-                className={`rounded-lg p-3 text-sm ${
-                  seg.hablante === "PSICOLOGO"
-                    ? "bg-blue-50 border-l-4 border-blue-400"
-                    : "bg-green-50 border-l-4 border-green-400"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`text-xs font-semibold uppercase ${
-                      seg.hablante === "PSICOLOGO"
-                        ? "text-blue-700"
-                        : "text-green-700"
-                    }`}
-                  >
-                    {seg.hablante === "PSICOLOGO" ? "Psicólogo" : "Paciente"}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {formatSeconds(seg.inicio_segundo)} –{" "}
-                    {formatSeconds(seg.fin_segundo)}
-                  </span>
-                  <select
-                    value={seg.hablante}
-                    onChange={(event) =>
-                      updateLocalSegment(seg.id, { hablante: event.target.value })
-                    }
-                    className="ml-auto rounded-md border bg-background px-2 py-1 text-xs"
-                  >
-                    <option value="PSICOLOGO">Psicólogo</option>
-                    <option value="PACIENTE">Paciente</option>
-                  </select>
-                </div>
-                <textarea
-                  value={seg.texto}
-                  onChange={(event) =>
-                    updateLocalSegment(seg.id, { texto: event.target.value })
-                  }
-                  rows={3}
-                  className="w-full rounded-md border bg-background px-3 py-2 leading-relaxed"
-                />
-                <div className="mt-2 flex justify-end">
-                  {savedSegmentId === seg.id && (
-                    <span className="mr-3 self-center text-xs font-medium text-green-700">
-                      Segmento guardado
+            {sesion.segmentos.map((seg) => {
+              const tone = getSegmentTone(seg.hablante);
+              return (
+                <div
+                  key={seg.id}
+                  className={`rounded-lg p-3 text-sm ${tone.box}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-xs font-semibold uppercase ${tone.label}`}>
+                      {getSpeakerLabel(seg.hablante)}
                     </span>
-                  )}
-                  <button
-                    onClick={() => saveSegment(seg)}
-                    disabled={savingSegmentId === seg.id}
-                    className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-                  >
-                    {savingSegmentId === seg.id ? "Guardando..." : "Guardar segmento"}
-                  </button>
+                    {!isExternalDocument && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {formatSeconds(seg.inicio_segundo)} –{" "}
+                        {formatSeconds(seg.fin_segundo)}
+                      </span>
+                    )}
+                    <select
+                      value={seg.hablante}
+                      onChange={(event) =>
+                        updateLocalSegment(seg.id, { hablante: event.target.value })
+                      }
+                      className="ml-auto rounded-md border bg-background px-2 py-1 text-xs"
+                    >
+                      {(isExternalDocument || seg.hablante === "DOCUMENTO") && (
+                        <option value="DOCUMENTO">Documento</option>
+                      )}
+                      <option value="PSICOLOGO">Psicólogo</option>
+                      <option value="PACIENTE">Paciente</option>
+                    </select>
+                  </div>
+                  <textarea
+                    value={seg.texto}
+                    onChange={(event) =>
+                      updateLocalSegment(seg.id, { texto: event.target.value })
+                    }
+                    rows={isExternalDocument ? 5 : 3}
+                    className="w-full rounded-md border bg-background px-3 py-2 leading-relaxed"
+                  />
+                  <div className="mt-2 flex justify-end">
+                    {savedSegmentId === seg.id && (
+                      <span className="mr-3 self-center text-xs font-medium text-green-700">
+                        Segmento guardado
+                      </span>
+                    )}
+                    <button
+                      onClick={() => saveSegment(seg)}
+                      disabled={savingSegmentId === seg.id}
+                      className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    >
+                      {savingSegmentId === seg.id ? "Guardando..." : "Guardar segmento"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {sesion.estado === "COMPLETADO" && (!sesion.segmentos || sesion.segmentos.length === 0) && (
         <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
-          <p>Transcripción completada sin segmentos detectados.</p>
+          <p>
+            {isExternalDocument
+              ? "Documento cargado sin texto extraído."
+              : "Transcripción completada sin segmentos detectados."}
+          </p>
         </div>
       )}
     </div>

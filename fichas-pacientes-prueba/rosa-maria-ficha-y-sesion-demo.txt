@@ -1,0 +1,75 @@
+FICHA DE PACIENTE DE PRUEBA
+
+Nombre: Rosa Maria
+Edad: 38 anos
+Ocupacion: Coordinadora administrativa en una empresa de servicios
+Estado civil: Separada
+Red de apoyo: Hermana mayor, una amiga cercana y contacto cordial con su madre
+Motivo de consulta: Ansiedad persistente, dificultad para dormir y sensacion de sobrecarga desde su separacion reciente.
+
+Perfil general:
+Rosa Maria consulta por un aumento de sintomas ansiosos durante los ultimos cuatro meses. Refiere preocupacion constante por temas economicos, crianza compartida y desempeno laboral. Describe episodios de opresion en el pecho, irritabilidad, cansancio matinal y tendencia a anticipar escenarios negativos. Senala que historicamente ha intentado resolver los problemas sola y le cuesta pedir ayuda.
+
+Antecedentes relevantes inventados:
+- Separacion de pareja hace seis meses, luego de doce anos de convivencia.
+- Tiene un hijo de 9 anos llamado Tomas.
+- No reporta consumo problematico de alcohol u otras sustancias.
+- No refiere antecedentes de hospitalizacion psiquiatrica.
+- Recibio psicoterapia breve hace ocho anos por duelo familiar.
+- Actualmente no usa medicacion psicotropica.
+
+Hipotesis clinica inicial:
+Sintomatologia ansiosa asociada a estres adaptativo por separacion, reorganizacion familiar y sobrecarga laboral. Conviene explorar patrones de autoexigencia, dificultad para delegar, manejo de limites y calidad del sueno.
+
+Objetivos terapeuticos iniciales:
+1. Disminuir la frecuencia e intensidad de la ansiedad anticipatoria.
+2. Identificar pensamientos automaticos vinculados a culpa, control y autoexigencia.
+3. Construir rutinas basicas de regulacion emocional y descanso.
+4. Fortalecer habilidades de comunicacion y limites en la crianza compartida.
+5. Aumentar conductas de autocuidado y apoyo social.
+
+
+SESION DE PRUEBA
+
+Fecha sugerida para carga: 2026-05-29 10:30
+Tipo de documento: Documento externo cargado como sesion transcrita
+
+Psicologo: Rosa Maria, la vez pasada comentaste que las noches estaban siendo especialmente dificiles. Como estuvo esta semana?
+
+Paciente: Me costo dormir casi todos los dias. Me acuesto cansada, pero apenas apago la luz empiezo a pensar en todo lo que falta. Pienso en las cuentas, en Tomas, en si estoy haciendo bien las cosas.
+
+Psicologo: Cuando aparecen esos pensamientos, que notas en el cuerpo?
+
+Paciente: Siento el pecho apretado y como si no pudiera respirar profundo. A veces me levanto a revisar el celular o hago listas para el dia siguiente. En el momento siento que me ayuda, pero despues quedo mas despierta.
+
+Psicologo: Parece que la estrategia de revisar o planificar te da una sensacion breve de control, pero tambien mantiene activo el estado de alerta.
+
+Paciente: Si, eso me pasa. Si no lo hago siento que algo se me va a olvidar. Pero si lo hago no descanso. Me siento atrapada.
+
+Psicologo: Probemos distinguir entre preocupaciones que requieren accion inmediata y preocupaciones que pueden esperar. Que pensamiento se repitio mas esta semana?
+
+Paciente: Que si me equivoco con Tomas, le voy a arruinar la vida. Me da miedo que la separacion lo marque demasiado.
+
+Psicologo: Ese pensamiento suena muy exigente contigo. Que evidencia tienes de que Tomas esta totalmente desprotegido o de que una equivocacion tuya determinaria todo su futuro?
+
+Paciente: Cuando lo dices asi, no tanta. El esta carinoso conmigo. A veces pregunta por su papa, pero tambien juega, se rie, me cuenta cosas del colegio. Creo que soy yo la que se queda pegada en la culpa.
+
+Psicologo: Esa observacion es importante. Podriamos trabajar la diferencia entre responsabilidad y culpa. Ser responsable implica estar disponible, reparar cuando sea necesario y pedir apoyo. La culpa, en cambio, parece exigirte control total.
+
+Paciente: Me hace sentido. Yo siento que tengo que compensar todo. Entonces termino agotada y despues me enojo por cosas chicas.
+
+Psicologo: Para esta semana te propongo una tarea breve. Antes de dormir, escribir durante diez minutos una lista de pendientes y al lado marcar si cada punto es accionable manana, delegable o no controlable por ahora. Despues de esos diez minutos, cerrar la libreta y hacer una respiracion lenta de tres minutos.
+
+Paciente: Puedo intentarlo. Me cuesta soltar, pero tener una estructura me ayuda.
+
+Psicologo: Tambien seria util registrar una frase alternativa para el pensamiento de culpa. Por ejemplo: "No necesito resolver todo perfecto para cuidar bien a Tomas; puedo estar presente y reparar cuando me equivoque".
+
+Paciente: Me gusta. Suena mas realista que decirme que todo esta bien, porque no siempre lo siento asi.
+
+Psicologo: Exacto. No buscamos negar la dificultad, sino responderle de una forma menos castigadora. La proxima sesion revisamos como resulto la rutina nocturna y que situaciones activaron mas culpa o ansiedad.
+
+Paciente: Ya. Me voy un poco mas tranquila con eso. Al menos tengo algo concreto para probar.
+
+
+Notas del psicologo:
+Paciente orientada, colaboradora y con buen nivel de insight. Afecto ansioso congruente con el relato. Se observa autoexigencia elevada, culpa parental y necesidad de control como estrategias de afrontamiento. No se pesquisan indicadores de riesgo suicida en esta sesion inventada. Mantener seguimiento de sueno, ansiedad somatica y red de apoyo.

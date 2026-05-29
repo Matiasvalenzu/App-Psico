@@ -1,16 +1,24 @@
 import os
 from io import BytesIO
 from django.conf import settings
+from django.db import transaction
 from django.http import FileResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from .documentos import (
+    DocumentTextExtractionError,
+    UnsupportedDocumentType,
+    extract_text_from_uploaded_document,
+    split_text_into_segments,
+)
 from .embeddings import generate_text_embedding
 from .models import Sesion, TranscripcionSegmento
 from .serializers import (
     SesionSerializer,
     SesionListSerializer,
     AudioUploadSerializer,
+    DocumentoUploadSerializer,
     TranscripcionSegmentoSerializer,
 )
 
@@ -33,6 +41,12 @@ class SesionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def upload_audio(self, request, pk=None):
         sesion = self.get_object()
+        if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
+            return Response(
+                {"error": "No se puede agregar audio a un documento externo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = AudioUploadSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -65,6 +79,57 @@ class SesionViewSet(viewsets.ModelViewSet):
         procesar_audio_sesion.delay(sesion.id)
 
         return Response(SesionSerializer(sesion).data)
+
+    @action(detail=False, methods=["post"], url_path="upload_documento")
+    def upload_documento(self, request):
+        serializer = DocumentoUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        archivo = serializer.validated_data["archivo"]
+        try:
+            texto = extract_text_from_uploaded_document(archivo)
+        except (UnsupportedDocumentType, DocumentTextExtractionError) as exc:
+            return Response(
+                {"archivo": [str(exc)]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not texto.strip():
+            return Response(
+                {
+                    "archivo": [
+                        "No se encontró texto seleccionable en el documento."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        segmentos_texto = split_text_into_segments(texto)
+        with transaction.atomic():
+            sesion = Sesion.objects.create(
+                paciente=serializer.validated_data["paciente"],
+                fecha_hora_inicio=serializer.validated_data["fecha_hora_inicio"],
+                origen=Sesion.Origen.DOCUMENTO_EXTERNO,
+                estado=Sesion.Estado.COMPLETADO,
+                documento_nombre_original=getattr(archivo, "name", ""),
+                documento_mime_type=getattr(archivo, "content_type", ""),
+            )
+
+            for index, segmento_texto in enumerate(segmentos_texto, start=1):
+                TranscripcionSegmento.objects.create(
+                    sesion=sesion,
+                    orden=index,
+                    inicio_segundo=index - 1,
+                    fin_segundo=index,
+                    hablante=TranscripcionSegmento.Hablante.DOCUMENTO,
+                    texto=segmento_texto,
+                    texto_original=segmento_texto,
+                    embedding=generate_text_embedding(segmento_texto),
+                )
+
+        sesion = self.get_queryset().get(id=sesion.id)
+        return Response(SesionSerializer(sesion).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["patch"], url_path=r"segmentos/(?P<segmento_id>[^/.]+)")
     def actualizar_segmento(self, request, pk=None, segmento_id=None):
@@ -118,10 +183,17 @@ class SesionViewSet(viewsets.ModelViewSet):
             pdf.drawString(48, y, str(text)[:120])
             y -= leading
 
-        draw_line("Reporte de sesión psicológica", "Helvetica-Bold", 16, 22)
+        title = (
+            "Documento externo cargado"
+            if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Reporte de sesión psicológica"
+        )
+        draw_line(title, "Helvetica-Bold", 16, 22)
         draw_line(f"Paciente: {sesion.paciente.nombre_completo}")
         draw_line(f"Fecha: {sesion.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}")
         draw_line(f"Estado: {sesion.estado}")
+        if sesion.documento_nombre_original:
+            draw_line(f"Archivo: {sesion.documento_nombre_original}")
         if sesion.duracion_segundos:
             draw_line(f"Duración: {sesion.duracion_segundos} segundos")
 
@@ -132,12 +204,20 @@ class SesionViewSet(viewsets.ModelViewSet):
                 draw_line(line)
 
         y -= 8
-        draw_line("Transcripción", "Helvetica-Bold", 12, 18)
+        section_title = (
+            "Contenido extraído"
+            if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Transcripción"
+        )
+        draw_line(section_title, "Helvetica-Bold", 12, 18)
         for segmento in sesion.segmentos.all():
-            draw_line(
-                f"[{segmento.inicio_segundo:.1f}s-{segmento.fin_segundo:.1f}s] {segmento.hablante}",
-                "Helvetica-Bold",
-            )
+            if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
+                draw_line(f"Parte {segmento.orden}", "Helvetica-Bold")
+            else:
+                draw_line(
+                    f"[{segmento.inicio_segundo:.1f}s-{segmento.fin_segundo:.1f}s] {segmento.hablante}",
+                    "Helvetica-Bold",
+                )
             words = segmento.texto.split()
             line = ""
             for word in words:

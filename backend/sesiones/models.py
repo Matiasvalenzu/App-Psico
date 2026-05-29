@@ -1,9 +1,14 @@
 from django.db import models
+from django.utils import timezone
 from pgvector.django import VectorField
 from pacientes.models import Paciente
 
 
 class Sesion(models.Model):
+    class Origen(models.TextChoices):
+        AUDIO = "AUDIO", "Audio"
+        DOCUMENTO_EXTERNO = "DOCUMENTO_EXTERNO", "Documento externo"
+
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
         PROCESANDO = "PROCESANDO", "Procesando"
@@ -13,9 +18,14 @@ class Sesion(models.Model):
     paciente = models.ForeignKey(
         Paciente, on_delete=models.CASCADE, related_name="sesiones"
     )
-    fecha_hora_inicio = models.DateTimeField(auto_now_add=True)
+    fecha_hora_inicio = models.DateTimeField(default=timezone.now)
     duracion_segundos = models.PositiveIntegerField(null=True, blank=True)
     audio_path = models.CharField(max_length=500, blank=True, default="")
+    origen = models.CharField(
+        max_length=30, choices=Origen.choices, default=Origen.AUDIO
+    )
+    documento_nombre_original = models.CharField(max_length=255, blank=True, default="")
+    documento_mime_type = models.CharField(max_length=120, blank=True, default="")
     estado = models.CharField(
         max_length=20, choices=Estado.choices, default=Estado.PENDIENTE
     )
@@ -34,6 +44,7 @@ class TranscripcionSegmento(models.Model):
     class Hablante(models.TextChoices):
         PSICOLOGO = "PSICOLOGO", "Psicólogo"
         PACIENTE = "PACIENTE", "Paciente"
+        DOCUMENTO = "DOCUMENTO", "Documento"
 
     sesion = models.ForeignKey(
         Sesion, on_delete=models.CASCADE, related_name="segmentos"

@@ -128,6 +128,11 @@ CELERY_TIMEZONE = "America/Santiago"
 # Audio storage
 AUDIO_STORAGE_PATH = os.environ.get("AUDIO_STORAGE_PATH", "/data/audio")
 
+# Document upload
+DOCUMENT_UPLOAD_MAX_BYTES = int(
+    os.environ.get("DOCUMENT_UPLOAD_MAX_BYTES", str(10 * 1024 * 1024))
+)
+
 # DeepSeek
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
