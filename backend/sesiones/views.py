@@ -90,7 +90,10 @@ class SesionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="upload_documento")
     def upload_documento(self, request):
-        serializer = DocumentoUploadSerializer(data=request.data)
+        serializer = DocumentoUploadSerializer(
+            data=request.data,
+            context=self.get_serializer_context(),
+        )
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

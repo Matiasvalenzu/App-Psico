@@ -1,7 +1,13 @@
 from django.db import models
+from django.conf import settings
 
 
 class Paciente(models.Model):
+    psicologo = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pacientes",
+    )
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     fecha_nacimiento = models.DateField(null=True, blank=True)

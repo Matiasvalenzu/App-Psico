@@ -20,3 +20,9 @@ class PacienteViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return PacienteListSerializer
         return PacienteSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().filter(psicologo=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(psicologo=self.request.user)

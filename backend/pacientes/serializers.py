@@ -7,6 +7,7 @@ class PacienteSerializer(serializers.ModelSerializer):
         model = Paciente
         fields = [
             "id",
+            "psicologo",
             "nombre",
             "apellido",
             "nombre_completo",
@@ -17,7 +18,7 @@ class PacienteSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "nombre_completo", "created_at", "updated_at"]
+        read_only_fields = ["id", "psicologo", "nombre_completo", "created_at", "updated_at"]
 
 
 class PacienteListSerializer(serializers.ModelSerializer):
@@ -25,6 +26,7 @@ class PacienteListSerializer(serializers.ModelSerializer):
         model = Paciente
         fields = [
             "id",
+            "psicologo",
             "nombre",
             "apellido",
             "nombre_completo",
@@ -32,4 +34,4 @@ class PacienteListSerializer(serializers.ModelSerializer):
             "activo",
             "updated_at",
         ]
-        read_only_fields = ["id", "nombre_completo", "updated_at"]
+        read_only_fields = ["id", "psicologo", "nombre_completo", "updated_at"]

@@ -85,6 +85,12 @@ class SesionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate_paciente(self, paciente):
+        request = self.context.get("request")
+        if request and paciente.psicologo_id != request.user.id:
+            raise serializers.ValidationError("Paciente no encontrado.")
+        return paciente
+
 
 class SesionListSerializer(serializers.ModelSerializer):
     paciente_nombre = serializers.CharField(source="paciente.nombre_completo", read_only=True)
@@ -126,6 +132,14 @@ class DocumentoUploadSerializer(serializers.Serializer):
     paciente = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.all())
     fecha_hora_inicio = serializers.DateTimeField()
     archivo = serializers.FileField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request:
+            self.fields["paciente"].queryset = Paciente.objects.filter(
+                psicologo=request.user
+            )
 
     def validate_archivo(self, archivo):
         max_bytes = getattr(settings, "DOCUMENT_UPLOAD_MAX_BYTES", 10 * 1024 * 1024)

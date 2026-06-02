@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from pacientes.models import Paciente
 from .models import ChatConversacion, ChatMensaje
 
 
@@ -15,6 +16,14 @@ class ChatConversacionSerializer(serializers.ModelSerializer):
         source="paciente.nombre_completo", read_only=True
     )
     psicologo_username = serializers.CharField(source="psicologo.username", read_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request:
+            self.fields["paciente"].queryset = Paciente.objects.filter(
+                psicologo=request.user
+            )
 
     class Meta:
         model = ChatConversacion
