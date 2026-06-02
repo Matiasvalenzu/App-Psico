@@ -4,8 +4,14 @@ from .models import ChatConversacion, ChatMensaje
 
 @admin.register(ChatConversacion)
 class ChatConversacionAdmin(admin.ModelAdmin):
-    list_display = ["paciente", "titulo", "created_at", "updated_at"]
-    search_fields = ["paciente__nombre", "paciente__apellido", "titulo"]
+    list_display = ["paciente", "psicologo", "titulo", "created_at", "updated_at"]
+    list_filter = ["psicologo"]
+    search_fields = [
+        "paciente__nombre",
+        "paciente__apellido",
+        "psicologo__username",
+        "titulo",
+    ]
 
 
 @admin.register(ChatMensaje)

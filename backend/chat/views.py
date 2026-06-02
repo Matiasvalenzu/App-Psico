@@ -1,5 +1,6 @@
 import requests
 from django.conf import settings
+from django.db.models import Count
 from pgvector.django import CosineDistance
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -25,11 +26,23 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         return ChatConversacionSerializer
 
     def get_queryset(self):
-        qs = ChatConversacion.objects.prefetch_related("mensajes")
+        qs = (
+            ChatConversacion.objects.filter(psicologo=self.request.user)
+            .select_related("paciente", "psicologo")
+            .prefetch_related("mensajes")
+            .annotate(mensajes_count=Count("mensajes"))
+        )
         paciente_id = self.request.query_params.get("paciente")
         if paciente_id:
             qs = qs.filter(paciente_id=paciente_id)
         return qs
+
+    def perform_create(self, serializer):
+        titulo = (serializer.validated_data.get("titulo") or "").strip()
+        serializer.save(
+            psicologo=self.request.user,
+            titulo=titulo or "Nueva conversación",
+        )
 
     @action(detail=True, methods=["post"])
     def enviar_mensaje(self, request, pk=None):
@@ -48,6 +61,12 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
             contenido=contenido,
         )
 
+        if conversacion.titulo in {"", "Nueva conversación"}:
+            conversacion.titulo = self._titulo_desde_mensaje(contenido)
+            conversacion.save(update_fields=["titulo", "updated_at"])
+        else:
+            conversacion.save(update_fields=["updated_at"])
+
         contexto, fuentes = self._buscar_contexto(conversacion.paciente, contenido)
         respuesta = self._consultar_deepseek(contenido, contexto)
 
@@ -59,6 +78,12 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         )
 
         return Response(ChatMensajeSerializer(mensaje_asistente).data)
+
+    def _titulo_desde_mensaje(self, contenido):
+        titulo = " ".join(contenido.split())[:80].strip()
+        if not titulo:
+            return "Nueva conversación"
+        return f"{titulo}..." if len(contenido) > 80 else titulo
 
     def _buscar_contexto(self, paciente, consulta, top_k=15):
         query_embedding = generate_text_embedding(consulta)

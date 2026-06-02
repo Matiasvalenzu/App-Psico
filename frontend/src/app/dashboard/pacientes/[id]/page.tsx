@@ -12,6 +12,8 @@ import {
   Loader2,
   MessageCircle,
   Play,
+  Plus,
+  Save,
   Send,
   Upload,
 } from "lucide-react";
@@ -46,8 +48,12 @@ interface ChatMensaje {
 
 interface ChatConversacion {
   id: number;
+  paciente: number;
   titulo: string;
+  mensajes_count?: number;
   mensajes?: ChatMensaje[];
+  created_at: string;
+  updated_at: string;
 }
 
 function getDateTimeInputValue(date = new Date()) {
@@ -64,6 +70,12 @@ function getApiErrorMessage(data: unknown, fallback: string) {
   return fallback;
 }
 
+function formatChatOption(conversation: ChatConversacion) {
+  const title = conversation.titulo || "Nueva conversación";
+  const count = conversation.mensajes_count ?? 0;
+  return `${title} (${count} mensajes)`;
+}
+
 export default function PacienteDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -71,9 +83,15 @@ export default function PacienteDetailPage() {
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [sesiones, setSesiones] = useState<Sesion[]>([]);
+  const [chatConversations, setChatConversations] = useState<ChatConversacion[]>([]);
   const [chatId, setChatId] = useState<number | null>(null);
+  const [chatTitle, setChatTitle] = useState("");
   const [messages, setMessages] = useState<ChatMensaje[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [loadingChat, setLoadingChat] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
+  const [savingChatTitle, setSavingChatTitle] = useState(false);
   const [sendingChat, setSendingChat] = useState(false);
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
   const [documentDateTime, setDocumentDateTime] = useState(getDateTimeInputValue());
@@ -96,7 +114,7 @@ export default function PacienteDetailPage() {
       const sesData = await sesRes.json();
       setPaciente(pacData);
       setSesiones(sesData.results || sesData);
-      await loadChat();
+      await loadChatConversations();
     } catch (err) {
       console.error(err);
     } finally {
@@ -104,31 +122,133 @@ export default function PacienteDetailPage() {
     }
   }
 
-  async function loadChat() {
+  function getChatTitle(conversation: ChatConversacion | null) {
+    if (!conversation) return "Nueva conversación";
+    return conversation.titulo || "Nueva conversación";
+  }
+
+  async function loadChatConversations(preferredChatId?: number) {
+    setLoadingChat(true);
+    setChatError("");
+    try {
     const listRes = await apiFetch(`/chat/?paciente=${id}`);
     const listData = await listRes.json();
     const conversations: ChatConversacion[] = listData.results || listData;
-    if (!conversations.length) return;
+      setChatConversations(conversations);
 
-    const detailRes = await apiFetch(`/chat/${conversations[0].id}/`);
-    const detailData: ChatConversacion = await detailRes.json();
-    setChatId(detailData.id);
-    setMessages(detailData.mensajes || []);
+      if (!conversations.length) {
+        setChatId(null);
+        setChatTitle("");
+        setMessages([]);
+        return;
+      }
+
+      const selected =
+        conversations.find((conversation) => conversation.id === preferredChatId) ||
+        conversations.find((conversation) => conversation.id === chatId) ||
+        conversations[0];
+
+      await loadChatConversation(selected.id, conversations);
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudieron cargar las conversaciones IA.");
+    } finally {
+      setLoadingChat(false);
+    }
+  }
+
+  async function loadChatConversation(
+    conversationId: number,
+    knownConversations = chatConversations
+  ) {
+    setLoadingChat(true);
+    setChatError("");
+    try {
+      const detailRes = await apiFetch(`/chat/${conversationId}/`);
+      if (!detailRes.ok) {
+        setChatError("No se pudo cargar la conversación seleccionada.");
+        return;
+      }
+
+      const detailData: ChatConversacion = await detailRes.json();
+      setChatId(detailData.id);
+      setChatTitle(getChatTitle(detailData));
+      setMessages(detailData.mensajes || []);
+      setChatConversations((prev) => {
+        const base = knownConversations.length ? knownConversations : prev;
+        return base.map((conversation) =>
+          conversation.id === detailData.id
+            ? {
+                ...conversation,
+                titulo: detailData.titulo,
+                updated_at: detailData.updated_at,
+                mensajes_count: detailData.mensajes?.length ?? conversation.mensajes_count,
+              }
+            : conversation
+        );
+      });
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudo cargar la conversación seleccionada.");
+    } finally {
+      setLoadingChat(false);
+    }
+  }
+
+  async function createChatConversation() {
+    setCreatingChat(true);
+    setChatError("");
+    try {
+      const res = await apiFetch("/chat/", {
+        method: "POST",
+        body: JSON.stringify({ paciente: parseInt(id), titulo: "" }),
+      });
+      if (!res.ok) {
+        setChatError("No se pudo crear una nueva conversación.");
+        return null;
+      }
+
+      const data: ChatConversacion = await res.json();
+      await loadChatConversations(data.id);
+      return data.id;
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudo crear una nueva conversación.");
+      return null;
+    } finally {
+      setCreatingChat(false);
+    }
   }
 
   async function ensureChatConversation() {
     if (chatId) return chatId;
+    return createChatConversation();
+  }
 
-    const res = await apiFetch("/chat/", {
-      method: "POST",
-      body: JSON.stringify({
-        paciente: parseInt(id),
-        titulo: paciente ? `Chat ${paciente.nombre_completo}` : "Chat del paciente",
-      }),
-    });
-    const data: ChatConversacion = await res.json();
-    setChatId(data.id);
-    return data.id;
+  async function saveChatTitle() {
+    if (!chatId) return;
+
+    setSavingChatTitle(true);
+    setChatError("");
+    try {
+      const res = await apiFetch(`/chat/${chatId}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ titulo: chatTitle.trim() || "Nueva conversación" }),
+      });
+      if (!res.ok) {
+        setChatError("No se pudo guardar el nombre de la conversación.");
+        return;
+      }
+
+      const data: ChatConversacion = await res.json();
+      setChatTitle(getChatTitle(data));
+      await loadChatConversations(data.id);
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudo guardar el nombre de la conversación.");
+    } finally {
+      setSavingChatTitle(false);
+    }
   }
 
   async function sendChatMessage(e: React.FormEvent) {
@@ -145,12 +265,25 @@ export default function PacienteDetailPage() {
 
     try {
       const conversationId = await ensureChatConversation();
+      if (!conversationId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            rol: "ASSISTANT",
+            contenido: "No se pudo crear una conversación para enviar el mensaje.",
+            fuentes_json: [],
+          },
+        ]);
+        return;
+      }
       const res = await apiFetch(`/chat/${conversationId}/enviar_mensaje/`, {
         method: "POST",
         body: JSON.stringify({ contenido: content }),
       });
       const assistantMessage = await res.json();
       setMessages((prev) => [...prev, assistantMessage]);
+      await loadChatConversations(conversationId);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [
@@ -463,14 +596,104 @@ export default function PacienteDetailPage() {
       )}
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Chat IA del paciente</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Chat IA del paciente</h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cada conversación es privada para tu usuario y queda separada por paciente.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={createChatConversation}
+            disabled={creatingChat}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {creatingChat ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            Nueva conversación
+          </button>
         </div>
+
+        {chatError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {chatError}
+          </div>
+        )}
+
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <label className="space-y-1">
+            <span className="text-xs font-medium uppercase text-muted-foreground">
+              Conversación
+            </span>
+            <select
+              value={chatId ?? ""}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (value) loadChatConversation(value);
+              }}
+              disabled={loadingChat || chatConversations.length === 0}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {chatConversations.length === 0 ? (
+                <option value="">Sin conversaciones</option>
+              ) : (
+                chatConversations.map((conversation) => (
+                  <option key={conversation.id} value={conversation.id}>
+                    {formatChatOption(conversation)}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-medium uppercase text-muted-foreground">
+              Nombre
+            </span>
+            <input
+              value={chatTitle}
+              onChange={(event) => setChatTitle(event.target.value)}
+              disabled={!chatId}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              placeholder="Ej: Hipótesis inicial, seguimiento ansiedad..."
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={saveChatTitle}
+            disabled={!chatId || savingChatTitle}
+            className="inline-flex items-center justify-center gap-2 self-end rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {savingChatTitle ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Guardar nombre
+          </button>
+        </div>
+
         <div className="max-h-80 space-y-3 overflow-y-auto rounded-md border bg-background p-3">
-          {messages.length === 0 ? (
+          {loadingChat ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando conversación...
+            </div>
+          ) : !chatId ? (
+            <div className="rounded-md bg-muted/50 p-4 text-sm text-muted-foreground">
+              Crea una conversación para consultar la ficha de este paciente con IA.
+            </div>
+          ) : messages.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Haz una pregunta sobre las sesiones transcritas y documentos de este paciente.
+              Esta conversación está vacía. Haz una pregunta sobre las sesiones transcritas y documentos de este paciente.
             </p>
           ) : (
             messages.map((message) => (
@@ -496,11 +719,15 @@ export default function PacienteDetailPage() {
           />
           <button
             type="submit"
-            disabled={sendingChat}
+            disabled={sendingChat || creatingChat}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            <Send className="h-4 w-4" />
-            Enviar
+            {sendingChat ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {sendingChat ? "Enviando..." : "Enviar"}
           </button>
         </form>
       </div>

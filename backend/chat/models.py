@@ -9,6 +9,13 @@ class ChatConversacion(models.Model):
     paciente = models.ForeignKey(
         Paciente, on_delete=models.CASCADE, related_name="conversaciones"
     )
+    psicologo = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="chat_conversaciones",
+    )
     titulo = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
