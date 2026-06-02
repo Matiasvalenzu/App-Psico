@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAccessToken } from "@/lib/api";
+import { getAccessToken, getCurrentUser } from "@/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -11,13 +11,26 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login");
-    } else {
-      setReady(true);
+    async function verifySession() {
+      if (!getAccessToken()) {
+        router.replace("/login");
+        return;
+      }
+
+      try {
+        const user = await getCurrentUser();
+        setIsAdmin(user.username === "Admin" || user.is_admin === true);
+        setReady(true);
+      } catch {
+        localStorage.clear();
+        router.replace("/login");
+      }
     }
+
+    verifySession();
   }, [router]);
 
   if (!ready) return null;
@@ -36,6 +49,11 @@ export default function DashboardLayout({
             <a href="/dashboard/voz" className="hover:text-foreground transition-colors">
               Voz
             </a>
+            {isAdmin && (
+              <a href="/dashboard/usuarios/crear" className="hover:text-foreground transition-colors">
+                Crear Usuario
+              </a>
+            )}
           </nav>
           <div className="ml-auto">
             <button

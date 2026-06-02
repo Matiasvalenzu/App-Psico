@@ -107,6 +107,36 @@ export async function login(username: string, password: string) {
   return data;
 }
 
+export async function getCurrentUser() {
+  const res = await apiFetch("/auth/me/");
+  if (!res.ok) throw new Error("No se pudo obtener el usuario actual");
+  return res.json();
+}
+
+export async function createUser(input: {
+  username: string;
+  password: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}) {
+  const res = await apiFetch("/auth/users/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    let message = "No se pudo crear el usuario.";
+    try {
+      const data = await res.json();
+      message = data.detail || message;
+    } catch {
+      // Keep generic message when backend does not return JSON.
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export async function logout() {
   clearTokens();
 }
