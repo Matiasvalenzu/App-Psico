@@ -1,0 +1,22 @@
+{
+  "language": "es",
+  "autoCompactEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose *)",
+      "Bash(docker ps*)",
+      "Bash(docker logs*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git fetch*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(ls *)"
+    ]
+  }
+}
