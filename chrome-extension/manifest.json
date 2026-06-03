@@ -19,6 +19,11 @@
       "matches": ["https://*.zoom.us/wc/*", "https://*.zoom.us/j/*"],
       "js": ["src/content-zoom.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:3000/*"],
+      "js": ["src/content-app.js"],
+      "run_at": "document_idle"
     }
   ],
   "background": {
