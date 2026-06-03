@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
-import { Brain, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,15 +37,19 @@ export default function LoginPage() {
       </div>
 
       <div className="relative w-full max-w-sm space-y-6 rounded-2xl border border-border/60 bg-card p-8 shadow-card">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 shadow-glow">
-            <Brain className="h-7 w-7 text-primary" />
+        <div className="space-y-3 text-center">
+          <div className="mx-auto w-52 rounded-xl bg-white p-3 shadow-sm">
+            <Image
+              src="/logo-wordmark.jpg"
+              alt="DatnexiA"
+              width={1600}
+              height={471}
+              className="h-auto w-full object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Asistente Psicológico
-          </h1>
           <p className="text-sm text-muted-foreground">
-            Ingresa tus credenciales para acceder
+            Asistente Psicológico — Ingresa tus credenciales para acceder
           </p>
         </div>
 

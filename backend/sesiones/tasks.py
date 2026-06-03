@@ -19,20 +19,51 @@ logger = logging.getLogger(__name__)
 
 FULL_AUDIO_LABEL = "AUDIO_COMPLETO"
 
+# Cached models — loaded once per worker process, reused across tasks.
+_whisper_model = None
+_pyannote_pipeline = None
+
+
+def _get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        logger.info("Cargando modelo Whisper '%s'…", settings.WHISPER_MODEL)
+        _whisper_model = WhisperModel(
+            settings.WHISPER_MODEL,
+            device=settings.WHISPER_DEVICE,
+            compute_type=settings.WHISPER_COMPUTE_TYPE,
+        )
+        logger.info("Modelo Whisper cargado.")
+    return _whisper_model
+
+
+def _get_pyannote_pipeline():
+    global _pyannote_pipeline
+    if _pyannote_pipeline is None:
+        from pyannote.audio import Pipeline
+        logger.info("Cargando pipeline Pyannote '%s'…", settings.PYANNOTE_PIPELINE_MODEL)
+        try:
+            _pyannote_pipeline = Pipeline.from_pretrained(
+                settings.PYANNOTE_PIPELINE_MODEL,
+                token=settings.PYANNOTE_AUTH_TOKEN,
+            )
+        except TypeError:
+            _pyannote_pipeline = Pipeline.from_pretrained(
+                settings.PYANNOTE_PIPELINE_MODEL,
+                use_auth_token=settings.PYANNOTE_AUTH_TOKEN,
+            )
+        logger.info("Pipeline Pyannote cargado.")
+    return _pyannote_pipeline
+
 
 def _run_whisper(audio_path):
-    from faster_whisper import WhisperModel
-
-    model = WhisperModel(
-        settings.WHISPER_MODEL,
-        device=settings.WHISPER_DEVICE,
-        compute_type=settings.WHISPER_COMPUTE_TYPE,
-    )
+    model = _get_whisper_model()
     segments, _info = model.transcribe(
         audio_path,
         language="es",
         vad_filter=True,
-        beam_size=5,
+        beam_size=1,
     )
     return [
         {
@@ -50,20 +81,11 @@ def _run_diarization(audio_path):
         logger.info("PYANNOTE_AUTH_TOKEN no configurado; se omite diarización.")
         return []
 
-    from pyannote.audio import Pipeline
+    pipeline = _get_pyannote_pipeline()
 
-    try:
-        pipeline = Pipeline.from_pretrained(
-            settings.PYANNOTE_PIPELINE_MODEL,
-            token=settings.PYANNOTE_AUTH_TOKEN,
-        )
-    except TypeError:
-        pipeline = Pipeline.from_pretrained(
-            settings.PYANNOTE_PIPELINE_MODEL,
-            use_auth_token=settings.PYANNOTE_AUTH_TOKEN,
-        )
-
-    diarization_output = pipeline(decode_audio_for_pyannote(audio_path))
+    # Acotar a max 2 speakers (psicólogo + paciente) acelera el clustering;
+    # min=1 permite que grabaciones de un solo hablante no se dividan artificialmente.
+    diarization_output = pipeline(decode_audio_for_pyannote(audio_path), min_speakers=1, max_speakers=2)
     diarization = getattr(
         diarization_output,
         "exclusive_speaker_diarization",

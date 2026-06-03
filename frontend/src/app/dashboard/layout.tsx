@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
-import { Brain, LogOut, Mic, Users } from "lucide-react";
+import { LogOut, Mic, Users } from "lucide-react";
+import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DashboardLayout({
@@ -47,14 +48,29 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-muted/40 dark:bg-background">
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4">
-          <a
-            href="/dashboard"
-            className="mr-4 flex items-center gap-2 font-semibold text-sm tracking-tight"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-              <Brain className="h-4 w-4 text-primary" />
-            </span>
-            <span className="hidden sm:inline">Asistente Psicológico</span>
+          <a href="/dashboard" className="mr-4 flex items-center">
+            {/* Desktop: wordmark completo */}
+            <div className="hidden sm:block rounded-lg bg-white px-2 py-1 shadow-sm">
+              <Image
+                src="/logo-wordmark.jpg"
+                alt="DatnexiA"
+                width={1600}
+                height={471}
+                className="h-7 w-auto object-contain"
+                priority
+              />
+            </div>
+            {/* Mobile: solo el ícono */}
+            <div className="sm:hidden rounded-lg bg-white p-1 shadow-sm">
+              <Image
+                src="/logo-icon.jpg"
+                alt="DatnexiA"
+                width={1455}
+                height={1600}
+                className="h-7 w-7 object-contain"
+                priority
+              />
+            </div>
           </a>
 
           <nav className="flex items-center gap-1 text-sm">
