@@ -3,6 +3,13 @@ from django.conf import settings
 
 
 class Paciente(models.Model):
+    SEXO_CHOICES = [
+        ("M", "Masculino"),
+        ("F", "Femenino"),
+        ("O", "Otro"),
+        ("N", "No especifica"),
+    ]
+
     psicologo = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -11,6 +18,15 @@ class Paciente(models.Model):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     fecha_nacimiento = models.DateField(null=True, blank=True)
+    rut = models.CharField(max_length=12, blank=True, default="")
+    edad = models.IntegerField(null=True, blank=True)
+    sexo = models.CharField(
+        max_length=1,
+        choices=SEXO_CHOICES,
+        blank=True,
+        default="N",
+    )
+    ocupacion_laboral = models.CharField(max_length=200, blank=True, default="")
     motivo_consulta = models.TextField(blank=True, default="")
     notas_privadas = models.TextField(blank=True, default="")
     activo = models.BooleanField(default=True)

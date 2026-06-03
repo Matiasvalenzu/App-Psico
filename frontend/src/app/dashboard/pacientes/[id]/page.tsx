@@ -29,6 +29,10 @@ interface Paciente {
   apellido: string;
   nombre_completo: string;
   fecha_nacimiento: string | null;
+  rut: string;
+  edad: number | null;
+  sexo: string;
+  ocupacion_laboral: string;
   motivo_consulta: string;
   notas_privadas: string;
   activo: boolean;
@@ -111,6 +115,33 @@ function formatRelativeTime(dateString: string) {
   return `hace ${Math.floor(diff / 86400)} d`;
 }
 
+function calcularEdad(fecha: string): number | null {
+  if (!fecha) return null;
+  const hoy = new Date();
+  const nac = new Date(fecha);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const mes = hoy.getMonth() - nac.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) {
+    edad--;
+  }
+  return edad >= 0 ? edad : null;
+}
+
+function getSexoLabel(sexo: string) {
+  const map: Record<string, string> = {
+    M: "Masculino",
+    F: "Femenino",
+    O: "Otro",
+    N: "No especifica",
+  };
+  return map[sexo] || sexo;
+}
+
+function formatDateInputValue(dateStr: string | null) {
+  if (!dateStr) return "";
+  return dateStr.split("T")[0];
+}
+
 function getStatusBadge(status: string) {
   if (status === "COMPLETADO") {
     return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300";
@@ -161,6 +192,20 @@ export default function PacienteDetailPage() {
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [documentError, setDocumentError] = useState("");
 
+  // Edit modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editNombre, setEditNombre] = useState("");
+  const [editApellido, setEditApellido] = useState("");
+  const [editFechaNacimiento, setEditFechaNacimiento] = useState("");
+  const [editRut, setEditRut] = useState("");
+  const [editEdad, setEditEdad] = useState("");
+  const [editSexo, setEditSexo] = useState("N");
+  const [editOcupacion, setEditOcupacion] = useState("");
+  const [editMotivo, setEditMotivo] = useState("");
+  const [editNotas, setEditNotas] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+
   const [loading, setLoading] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -169,6 +214,11 @@ export default function PacienteDetailPage() {
   useEffect(() => {
     loadData();
   }, [id]);
+
+  useEffect(() => {
+    const calc = calcularEdad(editFechaNacimiento);
+    if (calc !== null) setEditEdad(calc.toString());
+  }, [editFechaNacimiento]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -474,6 +524,51 @@ export default function PacienteDetailPage() {
     }
   }
 
+  function openEditModal() {
+    if (!paciente) return;
+    setEditNombre(paciente.nombre);
+    setEditApellido(paciente.apellido);
+    setEditFechaNacimiento(formatDateInputValue(paciente.fecha_nacimiento));
+    setEditRut(paciente.rut || "");
+    setEditEdad(paciente.edad?.toString() || "");
+    setEditSexo(paciente.sexo || "N");
+    setEditOcupacion(paciente.ocupacion_laboral || "");
+    setEditMotivo(paciente.motivo_consulta || "");
+    setEditNotas(paciente.notas_privadas || "");
+    setEditError("");
+    setEditModalOpen(true);
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setEditError("");
+    setSavingEdit(true);
+    try {
+      const res = await apiFetch(`/pacientes/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          nombre: editNombre,
+          apellido: editApellido,
+          fecha_nacimiento: editFechaNacimiento || null,
+          rut: editRut,
+          edad: editEdad ? parseInt(editEdad) : null,
+          sexo: editSexo,
+          ocupacion_laboral: editOcupacion,
+          motivo_consulta: editMotivo,
+          notas_privadas: editNotas,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      setPaciente(updated);
+      setEditModalOpen(false);
+    } catch {
+      setEditError("No se pudieron guardar los cambios.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground">
@@ -499,24 +594,224 @@ export default function PacienteDetailPage() {
       </button>
 
       {/* Patient header */}
-      <div className="rounded-xl border border-border/60 bg-card p-6 shadow-card">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {paciente.nombre_completo}
-        </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          {paciente.fecha_nacimiento && (
-            <span>Nacimiento: {formatDate(paciente.fecha_nacimiento)}</span>
-          )}
+      <div className="rounded-xl border border-border/60 bg-card shadow-card overflow-hidden">
+        <div className="flex items-start gap-5 p-6">
+          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary shadow-sm">
+            {paciente.nombre.charAt(0).toUpperCase()}
+            {paciente.apellido.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {paciente.nombre_completo}
+                </h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {paciente.rut && <span>{paciente.rut}</span>}
+                  {paciente.rut && (paciente.edad || paciente.sexo !== "N") && <span className="mx-2">·</span>}
+                  {paciente.edad && <span>{paciente.edad} años</span>}
+                  {(paciente.edad || paciente.rut) && paciente.sexo && paciente.sexo !== "N" && <span className="mx-2">·</span>}
+                  {paciente.sexo && paciente.sexo !== "N" && <span>{getSexoLabel(paciente.sexo)}</span>}
+                </p>
+              </div>
+              <button
+                onClick={openEditModal}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-border/60 px-6 py-4">
+          <div className="grid grid-cols-2 gap-y-5 gap-x-8 sm:grid-cols-4">
+            {paciente.rut && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">RUT</p>
+                <p className="mt-1 text-sm font-medium">{paciente.rut}</p>
+              </div>
+            )}
+            {paciente.edad && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Edad</p>
+                <p className="mt-1 text-sm font-medium">{paciente.edad} años</p>
+              </div>
+            )}
+            {paciente.sexo && paciente.sexo !== "N" && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Sexo</p>
+                <p className="mt-1 text-sm font-medium">{getSexoLabel(paciente.sexo)}</p>
+              </div>
+            )}
+            {paciente.fecha_nacimiento && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Fecha de nacimiento</p>
+                <p className="mt-1 text-sm font-medium">{formatDate(paciente.fecha_nacimiento)}</p>
+              </div>
+            )}
+            {paciente.ocupacion_laboral && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ocupación</p>
+                <p className="mt-1 text-sm font-medium">{paciente.ocupacion_laboral}</p>
+              </div>
+            )}
+          </div>
         </div>
         {paciente.motivo_consulta && (
-          <div className="mt-4 rounded-lg bg-muted/50 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="border-t border-border/60 bg-muted/30 px-6 py-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Motivo de consulta
             </p>
-            <p className="mt-1 text-sm">{paciente.motivo_consulta}</p>
+            <p className="mt-1.5 text-sm leading-relaxed">{paciente.motivo_consulta}</p>
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={handleEdit}
+            className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Editar datos del paciente</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Actualiza la información básica del paciente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mt-5 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Nombre</span>
+                  <input
+                    value={editNombre}
+                    onChange={(e) => setEditNombre(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    required
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Apellido</span>
+                  <input
+                    value={editApellido}
+                    onChange={(e) => setEditApellido(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    required
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">RUT</span>
+                  <input
+                    value={editRut}
+                    onChange={(e) => setEditRut(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    placeholder="Ej: 12.345.678-9"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Edad</span>
+                  <input
+                    type="number"
+                    value={editEdad}
+                    readOnly
+                    className="w-full rounded-lg border border-input bg-muted px-3 py-2.5 text-sm text-muted-foreground"
+                    min={0}
+                    max={150}
+                  />
+                  <span className="block text-xs text-muted-foreground">Se calcula desde la fecha de nacimiento</span>
+                </label>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Fecha de nacimiento</span>
+                  <input
+                    type="date"
+                    value={editFechaNacimiento}
+                    onChange={(e) => setEditFechaNacimiento(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Sexo</span>
+                  <select
+                    value={editSexo}
+                    onChange={(e) => setEditSexo(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                  >
+                    <option value="N">No especifica</option>
+                    <option value="M">Masculino</option>
+                    <option value="F">Femenino</option>
+                    <option value="O">Otro</option>
+                  </select>
+                </label>
+              </div>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Ocupación laboral</span>
+                <input
+                  value={editOcupacion}
+                  onChange={(e) => setEditOcupacion(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                  placeholder="Ej: Ingeniero, Docente, Estudiante..."
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Motivo de consulta</span>
+                <input
+                  value={editMotivo}
+                  onChange={(e) => setEditMotivo(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Notas privadas</span>
+                <textarea
+                  value={editNotas}
+                  onChange={(e) => setEditNotas(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
+                  rows={3}
+                />
+              </label>
+            </div>
+            {editError && (
+              <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {editError}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
+              >
+                {savingEdit && <Loader2 className="h-4 w-4 animate-spin" />}
+                {savingEdit ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Sessions header */}
       <div className="flex items-center justify-between">

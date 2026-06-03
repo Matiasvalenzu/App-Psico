@@ -15,6 +15,18 @@ interface Paciente {
   updated_at: string;
 }
 
+function calcularEdad(fecha: string): number | null {
+  if (!fecha) return null;
+  const hoy = new Date();
+  const nac = new Date(fecha);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const mes = hoy.getMonth() - nac.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) {
+    edad--;
+  }
+  return edad >= 0 ? edad : null;
+}
+
 function getInitials(nombre: string, apellido: string) {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
 }
@@ -45,10 +57,20 @@ export default function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [rut, setRut] = useState("");
+  const [edad, setEdad] = useState("");
+  const [sexo, setSexo] = useState("N");
+  const [ocupacion, setOcupacion] = useState("");
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    const calc = calcularEdad(fechaNacimiento);
+    if (calc !== null) setEdad(calc.toString());
+  }, [fechaNacimiento]);
 
   useEffect(() => {
     loadPacientes();
@@ -75,7 +97,16 @@ export default function DashboardPage() {
     try {
       const res = await apiFetch("/pacientes/", {
         method: "POST",
-        body: JSON.stringify({ nombre, apellido, motivo_consulta: motivo }),
+        body: JSON.stringify({
+          nombre,
+          apellido,
+          fecha_nacimiento: fechaNacimiento || null,
+          rut,
+          edad: edad ? parseInt(edad) : null,
+          sexo,
+          ocupacion_laboral: ocupacion,
+          motivo_consulta: motivo,
+        }),
       });
       if (!res.ok) throw new Error();
       const nuevo = await res.json();
@@ -83,6 +114,11 @@ export default function DashboardPage() {
       setShowForm(false);
       setNombre("");
       setApellido("");
+      setFechaNacimiento("");
+      setRut("");
+      setEdad("");
+      setSexo("N");
+      setOcupacion("");
       setMotivo("");
       setSuccess("Paciente creado correctamente.");
       setTimeout(() => setSuccess(""), 3000);
@@ -167,6 +203,56 @@ export default function DashboardPage() {
                   required
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">
+                RUT
+              </label>
+              <input
+                value={rut}
+                onChange={(e) => setRut(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="Ej: 12.345.678-9"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">
+                  Fecha de nacimiento
+                </label>
+                <input
+                  type="date"
+                  value={fechaNacimiento}
+                  onChange={(e) => setFechaNacimiento(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">
+                  Sexo
+                </label>
+                <select
+                  value={sexo}
+                  onChange={(e) => setSexo(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="N">No especifica</option>
+                  <option value="M">Masculino</option>
+                  <option value="F">Femenino</option>
+                  <option value="O">Otro</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">
+                Ocupación laboral
+              </label>
+              <input
+                value={ocupacion}
+                onChange={(e) => setOcupacion(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="Ej: Ingeniero, Docente, Estudiante..."
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">
