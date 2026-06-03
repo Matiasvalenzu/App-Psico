@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
-import { ArrowLeft, Download, FileText, Loader2, Mic, MicOff, Save, Square } from "lucide-react";
+import { ArrowLeft, Download, FileText, Loader2, Mic, MicOff, Save, Square, Video } from "lucide-react";
 
 interface Sesion {
   id: number;
@@ -318,6 +318,7 @@ export default function SesionDetailPage() {
   if (!sesion) return <p className="text-destructive">Sesión no encontrada</p>;
 
   const isExternalDoc = sesion.origen === "DOCUMENTO_EXTERNO";
+  const isVirtual = sesion.origen === "VIRTUAL";
 
   return (
     <div className="space-y-6">
@@ -329,8 +330,14 @@ export default function SesionDetailPage() {
       <div className="rounded-xl border border-border/60 bg-card p-6 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">
-              {isExternalDoc ? "Documento externo" : "Sesión"} — {formatDate(sesion.fecha_hora_inicio)}
+            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              {isExternalDoc ? "Documento externo" : isVirtual ? (
+                <>
+                  <Video className="h-5 w-5 text-sky-500" />
+                  Sesión virtual
+                </>
+              ) : "Sesión"}
+              {" "}— {formatDate(sesion.fecha_hora_inicio)}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <span>{formatTime(sesion.fecha_hora_inicio)}</span>
@@ -351,7 +358,13 @@ export default function SesionDetailPage() {
             <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent">
               <Download className="h-4 w-4" /> Exportar PDF
             </button>
-            {!isExternalDoc && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
+            {isVirtual && sesion.estado === "PENDIENTE" && (
+              <div className="flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                <Video className="h-4 w-4 flex-shrink-0" />
+                Sesión virtual pendiente — activa la extensión Chrome durante la reunión
+              </div>
+            )}
+            {!isExternalDoc && !isVirtual && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
               <div className="flex items-center gap-3">
                 {uploading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Subiendo audio...</div>
@@ -388,7 +401,7 @@ export default function SesionDetailPage() {
       )}
 
       {/* Speaker recognition */}
-      {!isExternalDoc && sesion.speaker_results && sesion.speaker_results.length > 0 && (
+      {!isExternalDoc && !isVirtual && sesion.speaker_results && sesion.speaker_results.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card p-6 space-y-4 shadow-card">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Reconocimiento de voz</h2>

@@ -21,6 +21,7 @@ import {
   Save,
   Sparkles,
   Upload,
+  Video,
 } from "lucide-react";
 
 interface Paciente {
@@ -184,6 +185,20 @@ export default function PacienteDetailPage() {
   const [iaTyping, setIaTyping] = useState(false);
   const [showChatControls, setShowChatControls] = useState(false);
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
+
+  // Virtual session modal
+  const [virtualModalOpen, setVirtualModalOpen] = useState(false);
+  const [virtualStep, setVirtualStep] = useState<1 | 2>(1);
+  const [virtualPlatform, setVirtualPlatform] = useState<"GOOGLE_MEET" | "ZOOM">("GOOGLE_MEET");
+  const [virtualUrl, setVirtualUrl] = useState("");
+  const [virtualDateTime, setVirtualDateTime] = useState(getDateTimeInputValue());
+  const [virtualSesionId, setVirtualSesionId] = useState<number | null>(null);
+  const [virtualSpeakers, setVirtualSpeakers] = useState<string[]>([]);
+  const [virtualPsicologo, setVirtualPsicologo] = useState("");
+  const [virtualPaciente, setVirtualPaciente] = useState("");
+  const [creatingVirtual, setCreatingVirtual] = useState(false);
+  const [finalizingVirtual, setFinalizingVirtual] = useState(false);
+  const [virtualError, setVirtualError] = useState("");
 
   // Document modal
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
@@ -457,6 +472,92 @@ export default function PacienteDetailPage() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendChatMessage(e as unknown as React.FormEvent);
+    }
+  }
+
+  // ---------- Virtual sessions ----------
+
+  function openVirtualModal() {
+    setVirtualStep(1);
+    setVirtualPlatform("GOOGLE_MEET");
+    setVirtualUrl("");
+    setVirtualDateTime(getDateTimeInputValue());
+    setVirtualSesionId(null);
+    setVirtualSpeakers([]);
+    setVirtualPsicologo("");
+    setVirtualPaciente("");
+    setVirtualError("");
+    setVirtualModalOpen(true);
+  }
+
+  async function handleCreateVirtual(e: React.FormEvent) {
+    e.preventDefault();
+    setVirtualError("");
+    setCreatingVirtual(true);
+    try {
+      const res = await apiFetch("/sesiones/crear_virtual/", {
+        method: "POST",
+        body: JSON.stringify({
+          paciente: parseInt(id),
+          plataforma: virtualPlatform,
+          url_reunion: virtualUrl || undefined,
+          fecha_hora_inicio: new Date(virtualDateTime).toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setVirtualError(getApiErrorMessage(data, "No se pudo crear la sesión virtual."));
+        return;
+      }
+      const sesion = await res.json();
+      setVirtualSesionId(sesion.id);
+      sessionStorage.setItem("virtual_session_id", String(sesion.id));
+      sessionStorage.setItem("virtual_session_paciente", paciente?.nombre_completo || "");
+      setVirtualStep(2);
+      await loadData();
+    } catch {
+      setVirtualError("No se pudo crear la sesión virtual.");
+    } finally {
+      setCreatingVirtual(false);
+    }
+  }
+
+  async function pollVirtualSpeakers(sesId: number) {
+    try {
+      const res = await apiFetch(`/sesiones/${sesId}/caption_count/`);
+      const data = await res.json();
+      if (data.speakers?.length) setVirtualSpeakers(data.speakers);
+    } catch {}
+  }
+
+  async function handleFinalizeVirtual(e: React.FormEvent) {
+    e.preventDefault();
+    if (!virtualSesionId) return;
+    setVirtualError("");
+    setFinalizingVirtual(true);
+    try {
+      const res = await apiFetch(`/sesiones/${virtualSesionId}/finalizar_virtual/`, {
+        method: "POST",
+        body: JSON.stringify({
+          nombre_psicologo: virtualPsicologo.trim(),
+          nombre_paciente: virtualPaciente.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setVirtualError(getApiErrorMessage(data, "No se pudo finalizar la sesión virtual."));
+        return;
+      }
+      sessionStorage.removeItem("virtual_session_id");
+      sessionStorage.removeItem("virtual_session_paciente");
+      setVirtualModalOpen(false);
+      await loadData();
+      const sesion = await res.json();
+      router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`);
+    } catch {
+      setVirtualError("No se pudo finalizar la sesión virtual.");
+    } finally {
+      setFinalizingVirtual(false);
     }
   }
 
@@ -827,6 +928,13 @@ export default function PacienteDetailPage() {
             Cargar documento
           </button>
           <button
+            onClick={openVirtualModal}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-50 px-3.5 py-2 text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50"
+          >
+            <Video className="h-4 w-4" />
+            Sesión virtual
+          </button>
+          <button
             onClick={handleNewSession}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card"
           >
@@ -835,6 +943,147 @@ export default function PacienteDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Virtual session modal */}
+      {virtualModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-6 shadow-elevated">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Video className="h-5 w-5 text-sky-500" />
+                  {virtualStep === 1 ? "Nueva sesión virtual" : "Finalizar sesión virtual"}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {virtualStep === 1
+                    ? "Crea la sesión y luego conecta la extensión Chrome durante la reunión."
+                    : "Indica qué nombre usaste en Meet/Zoom para asignar los hablantes."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVirtualModalOpen(false)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {virtualStep === 1 ? (
+              <form onSubmit={handleCreateVirtual} className="mt-5 space-y-4">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Plataforma</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["GOOGLE_MEET", "ZOOM"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setVirtualPlatform(p)}
+                        className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
+                          virtualPlatform === p
+                            ? "border-sky-500 bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+                            : "border-border bg-card hover:bg-accent"
+                        }`}
+                      >
+                        {p === "GOOGLE_MEET" ? "Google Meet" : "Zoom"}
+                      </button>
+                    ))}
+                  </div>
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">URL de la reunión <span className="text-muted-foreground font-normal">(opcional)</span></span>
+                  <input
+                    type="url"
+                    value={virtualUrl}
+                    onChange={(e) => setVirtualUrl(e.target.value)}
+                    placeholder={virtualPlatform === "GOOGLE_MEET" ? "https://meet.google.com/abc-defg-hij" : "https://zoom.us/j/123456789"}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Fecha y hora</span>
+                  <input
+                    type="datetime-local"
+                    value={virtualDateTime}
+                    onChange={(e) => setVirtualDateTime(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+                <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">
+                  <strong>Cómo funciona:</strong> Instala la extensión Chrome de DatnexiA, inicia la reunión y la extensión capturará los subtítulos automáticamente. Al terminar, vuelve aquí para finalizar la sesión.
+                </div>
+                {virtualError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{virtualError}</div>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => setVirtualModalOpen(false)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={creatingVirtual} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white shadow-subtle transition-all hover:bg-sky-700 disabled:opacity-50">
+                    {creatingVirtual && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {creatingVirtual ? "Creando..." : "Crear sesión virtual"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleFinalizeVirtual} className="mt-5 space-y-4">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  <strong>Sesión creada.</strong> Conecta la extensión Chrome durante la reunión. Cuando termines, vuelve aquí y completa los campos para asignar hablantes.
+                </div>
+                {virtualSpeakers.length > 0 && (
+                  <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                    <span className="font-medium">Hablantes detectados: </span>
+                    {virtualSpeakers.join(", ")}
+                  </div>
+                )}
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Tu nombre en {virtualPlatform === "GOOGLE_MEET" ? "Google Meet" : "Zoom"} <span className="text-muted-foreground">(psicólogo)</span></span>
+                  <input
+                    value={virtualPsicologo}
+                    onChange={(e) => setVirtualPsicologo(e.target.value)}
+                    placeholder="Ej: Paulo Valenzuela"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    required
+                  />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Nombre del paciente en la llamada</span>
+                  <input
+                    value={virtualPaciente}
+                    onChange={(e) => setVirtualPaciente(e.target.value)}
+                    placeholder={`Ej: ${paciente?.nombre || "Matias"} ${paciente?.apellido || ""}`}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    required
+                  />
+                </label>
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => virtualSesionId && pollVirtualSpeakers(virtualSesionId)}
+                    className="text-sm text-sky-600 hover:underline dark:text-sky-400"
+                  >
+                    Actualizar hablantes detectados
+                  </button>
+                </div>
+                {virtualError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{virtualError}</div>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => setVirtualModalOpen(false)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent">
+                    Cerrar
+                  </button>
+                  <button type="submit" disabled={finalizingVirtual} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50">
+                    {finalizingVirtual && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {finalizingVirtual ? "Finalizando..." : "Finalizar sesión"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Document modal */}
       {documentModalOpen && (

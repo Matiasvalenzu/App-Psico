@@ -9,6 +9,11 @@ class Sesion(models.Model):
     class Origen(models.TextChoices):
         AUDIO = "AUDIO", "Audio"
         DOCUMENTO_EXTERNO = "DOCUMENTO_EXTERNO", "Documento externo"
+        VIRTUAL = "VIRTUAL", "Sesión virtual"
+
+    class Plataforma(models.TextChoices):
+        GOOGLE_MEET = "GOOGLE_MEET", "Google Meet"
+        ZOOM = "ZOOM", "Zoom"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
@@ -38,6 +43,11 @@ class Sesion(models.Model):
         max_length=20, choices=Estado.choices, default=Estado.PENDIENTE
     )
     notas_sesion = models.TextField(blank=True, default="")
+    plataforma_virtual = models.CharField(
+        max_length=20, choices=Plataforma.choices, null=True, blank=True
+    )
+    url_reunion = models.URLField(null=True, blank=True)
+    captions_buffer = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

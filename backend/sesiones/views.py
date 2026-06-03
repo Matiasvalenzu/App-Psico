@@ -175,6 +175,148 @@ class SesionViewSet(viewsets.ModelViewSet):
         segmento.save()
         return Response(TranscripcionSegmentoSerializer(segmento).data)
 
+    @action(detail=False, methods=["post"], url_path="crear_virtual")
+    def crear_virtual(self, request):
+        paciente_id = request.data.get("paciente")
+        plataforma = request.data.get("plataforma")
+        url_reunion = request.data.get("url_reunion", "")
+        fecha_hora_inicio = request.data.get("fecha_hora_inicio")
+
+        if not paciente_id:
+            return Response({"error": "El campo paciente es requerido."}, status=status.HTTP_400_BAD_REQUEST)
+        if plataforma not in [Sesion.Plataforma.GOOGLE_MEET, Sesion.Plataforma.ZOOM]:
+            return Response({"error": "Plataforma inválida. Usa GOOGLE_MEET o ZOOM."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from pacientes.models import Paciente
+        try:
+            paciente = Paciente.objects.get(id=paciente_id, psicologo=request.user)
+        except Paciente.DoesNotExist:
+            return Response({"error": "Paciente no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        create_kwargs = dict(
+            paciente=paciente,
+            psicologo=request.user,
+            origen=Sesion.Origen.VIRTUAL,
+            plataforma_virtual=plataforma,
+            url_reunion=url_reunion or None,
+            estado=Sesion.Estado.PENDIENTE,
+        )
+        if fecha_hora_inicio:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(fecha_hora_inicio)
+            if dt:
+                create_kwargs["fecha_hora_inicio"] = dt
+
+        sesion = Sesion.objects.create(**create_kwargs)
+        return Response(SesionSerializer(self.get_queryset().get(id=sesion.id)).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="caption")
+    def caption(self, request, pk=None):
+        chunks = request.data if isinstance(request.data, list) else request.data.get("chunks", [])
+        if not isinstance(chunks, list) or not chunks:
+            return Response({"error": "Se esperaba una lista de chunks."}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid = []
+        for chunk in chunks:
+            if isinstance(chunk, dict) and chunk.get("speaker_name") and chunk.get("texto"):
+                valid.append({
+                    "speaker_name": str(chunk["speaker_name"])[:200],
+                    "texto": str(chunk["texto"])[:2000],
+                    "timestamp_seconds": float(chunk.get("timestamp_seconds", 0)),
+                })
+        if not valid:
+            return Response({"received": 0})
+
+        with transaction.atomic():
+            sesion = Sesion.objects.select_for_update().filter(
+                pk=pk, psicologo=request.user, origen=Sesion.Origen.VIRTUAL
+            ).first()
+            if not sesion:
+                return Response({"error": "Sesión virtual no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+            if sesion.estado == Sesion.Estado.COMPLETADO:
+                return Response({"error": "La sesión ya fue finalizada."}, status=status.HTTP_400_BAD_REQUEST)
+
+            buffer = sesion.captions_buffer or []
+            buffer.extend(valid)
+            sesion.captions_buffer = buffer
+            sesion.save(update_fields=["captions_buffer", "updated_at"])
+
+        return Response({"received": len(valid), "total": len(buffer)})
+
+    @action(detail=True, methods=["get"], url_path="caption_count")
+    def caption_count(self, request, pk=None):
+        sesion = self.get_object()
+        buffer = sesion.captions_buffer or []
+        speakers = list({c["speaker_name"] for c in buffer if isinstance(c, dict) and c.get("speaker_name")})
+        return Response({"count": len(buffer), "speakers": speakers, "estado": sesion.estado})
+
+    @action(detail=True, methods=["post"], url_path="finalizar_virtual")
+    def finalizar_virtual(self, request, pk=None):
+        nombre_psicologo = request.data.get("nombre_psicologo", "").strip()
+        nombre_paciente = request.data.get("nombre_paciente", "").strip()
+
+        with transaction.atomic():
+            sesion = Sesion.objects.select_for_update().filter(
+                pk=pk, psicologo=request.user, origen=Sesion.Origen.VIRTUAL
+            ).first()
+            if not sesion:
+                return Response({"error": "Sesión virtual no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+            if sesion.estado == Sesion.Estado.COMPLETADO:
+                return Response({"error": "La sesión ya fue finalizada."}, status=status.HTTP_400_BAD_REQUEST)
+
+            buffer = sesion.captions_buffer or []
+            if not buffer:
+                return Response({"error": "No hay captions capturados aún."}, status=status.HTTP_400_BAD_REQUEST)
+
+            def resolver_hablante(speaker_name):
+                name_lower = speaker_name.lower()
+                if nombre_psicologo and nombre_psicologo.lower() in name_lower:
+                    return TranscripcionSegmento.Hablante.PSICOLOGO
+                if nombre_paciente and nombre_paciente.lower() in name_lower:
+                    return TranscripcionSegmento.Hablante.PACIENTE
+                return TranscripcionSegmento.Hablante.PACIENTE
+
+            TranscripcionSegmento.objects.filter(sesion=sesion).delete()
+
+            # Fusionar chunks consecutivos del mismo hablante
+            merged = []
+            for chunk in sorted(buffer, key=lambda c: c.get("timestamp_seconds", 0)):
+                hablante = resolver_hablante(chunk["speaker_name"])
+                if merged and merged[-1]["hablante"] == hablante and merged[-1]["speaker_name"] == chunk["speaker_name"]:
+                    merged[-1]["texto"] += " " + chunk["texto"]
+                    merged[-1]["fin"] = chunk["timestamp_seconds"] + 5
+                else:
+                    merged.append({
+                        "speaker_name": chunk["speaker_name"],
+                        "hablante": hablante,
+                        "texto": chunk["texto"],
+                        "inicio": chunk["timestamp_seconds"],
+                        "fin": chunk["timestamp_seconds"] + 5,
+                    })
+
+            for index, seg in enumerate(merged, start=1):
+                TranscripcionSegmento.objects.create(
+                    sesion=sesion,
+                    orden=index,
+                    inicio_segundo=seg["inicio"],
+                    fin_segundo=seg["fin"],
+                    hablante=seg["hablante"],
+                    speaker_label=seg["speaker_name"],
+                    texto=seg["texto"],
+                    texto_original=seg["texto"],
+                    embedding=generate_text_embedding(seg["texto"]),
+                )
+
+            duracion = max(
+                (c.get("timestamp_seconds", 0) for c in buffer), default=0
+            )
+            sesion.estado = Sesion.Estado.COMPLETADO
+            sesion.duracion_segundos = int(duracion) + 5
+            sesion.captions_buffer = []
+            sesion.save(update_fields=["estado", "duracion_segundos", "captions_buffer", "updated_at"])
+
+        return Response(SesionSerializer(self.get_queryset().get(id=sesion.id)).data)
+
     @action(detail=True, methods=["get"])
     def exportar_pdf(self, request, pk=None):
         from reportlab.lib.pagesizes import A4

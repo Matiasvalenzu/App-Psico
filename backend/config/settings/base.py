@@ -117,6 +117,14 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:3000"
 ).split(",")
 
+# Orígenes adicionales para la extensión Chrome (Meet y Zoom)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://meet\.google\.com$",
+    r"^https://.*\.zoom\.us$",
+    r"^https://zoom\.us$",
+    r"^chrome-extension://.*$",
+]
+
 # Celery
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://redis:6379/0")
