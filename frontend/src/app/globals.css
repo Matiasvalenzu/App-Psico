@@ -4,44 +4,67 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --background: 255 10% 93%;
+    --foreground: 250 25% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --card-foreground: 250 25% 14%;
+    --primary: 255 80% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 255 20% 90%;
+    --secondary-foreground: 255 30% 22%;
+    --muted: 255 12% 88%;
+    --muted-foreground: 255 6% 42%;
+    --accent: 255 15% 90%;
+    --accent-foreground: 255 30% 22%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 84% 5%;
-    --radius: 0.5rem;
+    --destructive-foreground: 0 0% 100%;
+    --border: 255 12% 85%;
+    --input: 255 12% 85%;
+    --ring: 255 80% 56%;
+    --success: 162 82% 34%;
+    --success-foreground: 0 0% 100%;
+    --info: 200 90% 46%;
+    --info-foreground: 0 0% 100%;
+    --warning: 28 92% 52%;
+    --warning-foreground: 0 0% 100%;
+    --radius: 0.75rem;
+    --radius-sm: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --shadow-subtle: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    --shadow-card: 0 4px 12px -2px rgb(0 0 0 / 0.06), 0 2px 6px -3px rgb(0 0 0 / 0.04);
+    --shadow-elevated: 0 12px 24px -6px rgb(0 0 0 / 0.1), 0 6px 12px -6px rgb(0 0 0 / 0.05);
+    --shadow-glow: 0 0 20px -4px rgb(139 92 246 / 0.3);
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 213 27% 84%;
+    --background: 248 20% 5%;
+    --foreground: 250 18% 93%;
+    --card: 248 18% 9%;
+    --card-foreground: 250 18% 93%;
+    --primary: 255 75% 64%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 18% 15%;
+    --secondary-foreground: 250 18% 85%;
+    --muted: 250 18% 14%;
+    --muted-foreground: 250 12% 56%;
+    --accent: 250 18% 17%;
+    --accent-foreground: 250 18% 85%;
+    --destructive: 0 70% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 250 18% 18%;
+    --input: 250 18% 18%;
+    --ring: 255 75% 64%;
+    --success: 162 82% 34%;
+    --success-foreground: 0 0% 100%;
+    --info: 200 90% 46%;
+    --info-foreground: 0 0% 100%;
+    --warning: 28 92% 52%;
+    --warning-foreground: 0 0% 100%;
+    --shadow-subtle: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.2);
+    --shadow-card: 0 4px 12px -2px rgb(0 0 0 / 0.25), 0 2px 6px -3px rgb(0 0 0 / 0.2);
+    --shadow-elevated: 0 12px 24px -6px rgb(0 0 0 / 0.4), 0 6px 12px -6px rgb(0 0 0 / 0.3);
+    --shadow-glow: 0 0 24px -4px rgb(139 92 246 / 0.25);
   }
 }
 
@@ -51,6 +74,115 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
+}
+
+@layer utilities {
+  .shadow-subtle {
+    box-shadow: var(--shadow-subtle);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes typing-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-typing-dot:nth-child(1) {
+  animation: typing-dot 1.4s infinite 0s;
+}
+.animate-typing-dot:nth-child(2) {
+  animation: typing-dot 1.4s infinite 0.2s;
+}
+.animate-typing-dot:nth-child(3) {
+  animation: typing-dot 1.4s infinite 0.4s;
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, hsl(255 80% 58%), hsl(262 83% 62%));
+}
+
+.gradient-primary-subtle {
+  background: linear-gradient(135deg, hsl(255 35% 97%), hsl(255 20% 94%));
+}
+
+.dark .gradient-primary-subtle {
+  background: linear-gradient(135deg, hsl(250 18% 12%), hsl(250 18% 9%));
+}
+
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, hsl(255 80% 58% / 0.5), hsl(200 90% 46% / 0.3));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.chat-glow {
+  box-shadow: 0 0 30px -8px hsl(255 80% 58% / 0.12), 0 4px 16px -2px rgb(0 0 0 / 0.06);
+}
+
+.dark .chat-glow {
+  box-shadow: 0 0 30px -8px hsl(255 75% 64% / 0.15), 0 4px 16px -2px rgb(0 0 0 / 0.3);
 }

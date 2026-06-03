@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
+import { Brain, LogOut, Mic, Users } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DashboardLayout({
   children,
@@ -10,6 +12,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -35,40 +38,66 @@ export default function DashboardLayout({
 
   if (!ready) return null;
 
+  const isActive = (path: string) =>
+    pathname === path
+      ? "bg-accent text-foreground"
+      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
+
   return (
-    <div className="min-h-screen bg-muted/20">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-14 items-center px-6 gap-4">
-          <a href="/dashboard" className="font-semibold text-sm">
-            Asistente Psicológico
+    <div className="min-h-screen bg-muted/40 dark:bg-background">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4">
+          <a
+            href="/dashboard"
+            className="mr-4 flex items-center gap-2 font-semibold text-sm tracking-tight"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+              <Brain className="h-4 w-4 text-primary" />
+            </span>
+            <span className="hidden sm:inline">Asistente Psicológico</span>
           </a>
-          <nav className="flex items-center gap-4 text-sm text-muted-foreground ml-6">
-            <a href="/dashboard" className="hover:text-foreground transition-colors">
+
+          <nav className="flex items-center gap-1 text-sm">
+            <a
+              href="/dashboard"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${isActive("/dashboard")}`}
+            >
+              <Users className="h-4 w-4" />
               Pacientes
             </a>
-            <a href="/dashboard/voz" className="hover:text-foreground transition-colors">
+            <a
+              href="/dashboard/voz"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${isActive("/dashboard/voz")}`}
+            >
+              <Mic className="h-4 w-4" />
               Voz
             </a>
             {isAdmin && (
-              <a href="/dashboard/usuarios/crear" className="hover:text-foreground transition-colors">
+              <a
+                href="/dashboard/usuarios/crear"
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors hover:bg-accent/50 hover:text-foreground text-muted-foreground`}
+              >
                 Crear Usuario
               </a>
             )}
           </nav>
-          <div className="ml-auto">
+
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <button
               onClick={() => {
                 localStorage.clear();
                 router.replace("/login");
               }}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             >
-              Salir
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Salir</span>
             </button>
           </div>
         </div>
       </header>
-      <main className="max-w-5xl mx-auto px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
     </div>
   );
 }

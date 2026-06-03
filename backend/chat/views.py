@@ -95,7 +95,7 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
             segmentos = list(
                 base_qs.exclude(embedding__isnull=True)
                 .annotate(distance=CosineDistance("embedding", query_embedding))
-                .order_by("distance")[:top_k]
+                .order_by("distance")[: top_k * 5]
             )
         except Exception:
             segmentos = []
@@ -106,14 +106,32 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
                 key=lambda seg: cosine_similarity(query_embedding, seg.embedding or []),
                 reverse=True,
             )
-            segmentos = candidatos[:top_k]
+            segmentos = candidatos[: top_k * 5]
 
         if not segmentos:
-            segmentos = list(base_qs[:top_k])
+            segmentos = list(base_qs[: top_k * 5])
+
+        seen_sessions = {}
+        diversified = []
+        for seg in segmentos:
+            sid = seg.sesion_id
+            if sid not in seen_sessions:
+                seen_sessions[sid] = seg
+                diversified.append(seg)
+                if len(diversified) >= top_k:
+                    break
+
+        remaining = top_k - len(diversified)
+        if remaining > 0:
+            for seg in segmentos:
+                if seg not in diversified:
+                    diversified.append(seg)
+                    if len(diversified) >= top_k:
+                        break
 
         contexto = []
         fuentes = []
-        for seg in segmentos:
+        for seg in diversified:
             fecha = seg.sesion.fecha_hora_inicio.strftime("%d/%m/%Y")
             if seg.sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
                 etiqueta = f"Documento externo {fecha}"
