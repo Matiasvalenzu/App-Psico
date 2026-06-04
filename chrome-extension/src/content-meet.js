@@ -1,8 +1,9 @@
-// Content script para Google Meet — versión ligera (sin MutationObserver agresivo)
+// Content script para Google Meet — selectores actualizados Junio 2026
 
 const CAPTION_POLL_MS = 1500;
 
 let lastText = "";
+let lastSpeaker = "";
 let startTime = Date.now();
 let sessionConfigured = false;
 
@@ -10,28 +11,24 @@ function timestampSeconds() {
   return Math.round((Date.now() - startTime) / 1000);
 }
 
+// Estructura de Meet 2026:
+// .nMcdL              → fila de caption (cada turno)
+//   .iOzk7            → contiene "SpeakerNameTextoDelCaption" pegado
+//     .ygicle.VbkSUe  → solo el texto del caption
 function readCurrentCaption() {
-  // Selectores conocidos de Google Meet (orden de prioridad)
-  const selectors = [
-    { speaker: '[jsname="PzHuGe"]', text: '[jsname="tgaKEf"]' },
-    { speaker: ".a4cQT", text: ".iTTPOb" },
-    { speaker: "[data-sender-name]", text: "[data-message-text]" },
-  ];
+  const rows = document.querySelectorAll(".nMcdL");
+  if (!rows.length) return null;
 
-  for (const sel of selectors) {
-    const speakerEl = document.querySelector(sel.speaker);
-    const textEl = document.querySelector(sel.text);
-    if (speakerEl && textEl) {
-      const text = textEl.textContent?.trim() || "";
-      if (text) {
-        return {
-          speaker: speakerEl.textContent?.trim() || "Desconocido",
-          text,
-        };
-      }
-    }
-  }
-  return null;
+  const lastRow = rows[rows.length - 1];
+  const textEl = lastRow.querySelector(".ygicle, .VbkSUe");
+  const text = textEl?.textContent?.trim() || "";
+  if (!text) return null;
+
+  // El speaker es lo que está en el row pero NO en el .ygicle
+  const fullText = lastRow.textContent?.trim() || "";
+  const speaker = fullText.replace(text, "").trim() || "Desconocido";
+
+  return { speaker, text };
 }
 
 async function loadSessionFromStorage() {
@@ -46,35 +43,56 @@ async function loadSessionFromStorage() {
       sessionConfigured = true;
       console.log("[DatnexiA] Sesión virtual cargada:", stored.sessionId);
     } else {
-      console.log("[DatnexiA] Sin sesión virtual configurada. Abre el popup para configurarla.");
+      console.log("[DatnexiA] Sin sesión virtual configurada.");
     }
   } catch (err) {
     console.warn("[DatnexiA] Error cargando sesión:", err);
   }
 }
 
-// Re-leer storage cuando cambie (cuando el popup actualice los valores)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && (changes.sessionId || changes.token)) {
     loadSessionFromStorage();
   }
 });
 
-// Polling ligero — solo si hay sesión configurada
 function startPolling() {
-  setInterval(() => {
+  const pollId = setInterval(() => {
     if (!sessionConfigured) return;
     const caption = readCurrentCaption();
-    if (!caption || caption.text === lastText) return;
+    if (!caption) return;
+
+    let toSend = "";
+    if (caption.speaker !== lastSpeaker) {
+      // Speaker cambió: enviar el texto completo del nuevo turno
+      toSend = caption.text;
+    } else if (caption.text.startsWith(lastText) && lastText) {
+      // Mismo speaker, texto creció: enviar solo el delta nuevo
+      toSend = caption.text.substring(lastText.length).trim();
+    } else if (caption.text !== lastText) {
+      // Caption distinto (corregido o nuevo): enviar todo
+      toSend = caption.text;
+    }
+
+    if (!toSend) return;
+
     lastText = caption.text;
-    chrome.runtime.sendMessage({
-      type: "CAPTION",
-      speaker: caption.speaker,
-      text: caption.text,
-      timestamp: timestampSeconds(),
-    }).catch(() => {});
+    lastSpeaker = caption.speaker;
+
+    try {
+      chrome.runtime.sendMessage({
+        type: "CAPTION",
+        speaker: caption.speaker,
+        text: toSend,
+        timestamp: timestampSeconds(),
+      }).catch(() => {});
+    } catch (err) {
+      if (err.message?.includes("Extension context invalidated")) {
+        clearInterval(pollId);
+        console.log("[DatnexiA] Extensión recargada — recarga esta pestaña.");
+      }
+    }
   }, CAPTION_POLL_MS);
 }
 
-// Inicialización única, sin observadores agresivos
 loadSessionFromStorage().then(startPolling);
