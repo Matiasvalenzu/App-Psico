@@ -278,9 +278,31 @@ class SesionViewSet(viewsets.ModelViewSet):
 
             TranscripcionSegmento.objects.filter(sesion=sesion).delete()
 
+            # Deduplicación: la extensión envía deltas + texto acumulado.
+            # Para cada speaker, descartar chunks contenidos en otros más largos.
+            sorted_buffer = sorted(buffer, key=lambda c: c.get("timestamp_seconds", 0))
+            by_speaker = {}
+            for chunk in sorted_buffer:
+                by_speaker.setdefault(chunk["speaker_name"], []).append(chunk)
+
+            keep_indices = set()
+            for speaker, chunks in by_speaker.items():
+                # Ordenar por largo de texto descendente: los más completos primero
+                ordered = sorted(chunks, key=lambda c: -len(c["texto"]))
+                kept_texts = []
+                for chunk in ordered:
+                    t = chunk["texto"].strip().lower()
+                    # Si este texto ya está contenido en algún kept_text, descartar
+                    if any(t in kt for kt in kept_texts):
+                        continue
+                    kept_texts.append(t)
+                    keep_indices.add(id(chunk))
+
+            cleaned = [c for c in sorted_buffer if id(c) in keep_indices]
+
             # Fusionar chunks consecutivos del mismo hablante
             merged = []
-            for chunk in sorted(buffer, key=lambda c: c.get("timestamp_seconds", 0)):
+            for chunk in cleaned:
                 hablante = resolver_hablante(chunk["speaker_name"])
                 if merged and merged[-1]["hablante"] == hablante and merged[-1]["speaker_name"] == chunk["speaker_name"]:
                     merged[-1]["texto"] += " " + chunk["texto"]
