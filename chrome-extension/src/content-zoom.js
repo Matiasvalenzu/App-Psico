@@ -5,6 +5,9 @@ const CAPTION_POLL_MS = 1500;
 let lastText = "";
 let startTime = Date.now();
 let sessionConfigured = false;
+let backendUrl = "http://localhost:8000";
+let sessionId = null;
+let token = null;
 
 function timestampSeconds() {
   return Math.round((Date.now() - startTime) / 1000);
@@ -35,15 +38,18 @@ function readCurrentCaption() {
 
 async function loadSessionFromStorage() {
   try {
-    const stored = await chrome.storage.local.get(["sessionId", "token"]);
+    const stored = await chrome.storage.local.get(["sessionId", "token", "backendUrl"]);
+    if (stored.backendUrl) backendUrl = stored.backendUrl;
     if (stored.sessionId && stored.token) {
+      sessionId = stored.sessionId;
+      token = stored.token;
       await chrome.runtime.sendMessage({
         type: "SET_SESSION",
-        sessionId: stored.sessionId,
-        token: stored.token,
+        sessionId,
+        token,
       });
       sessionConfigured = true;
-      console.log("[DatnexiA] Sesión virtual cargada:", stored.sessionId);
+      console.log("[DatnexiA] Sesión virtual cargada:", sessionId);
     }
   } catch (err) {
     console.warn("[DatnexiA] Error cargando sesión:", err);
@@ -51,7 +57,7 @@ async function loadSessionFromStorage() {
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (changes.sessionId || changes.token)) {
+  if (area === "local" && (changes.sessionId || changes.token || changes.backendUrl)) {
     loadSessionFromStorage();
   }
 });
@@ -70,5 +76,36 @@ function startPolling() {
     }).catch(() => {});
   }, CAPTION_POLL_MS);
 }
+
+// Flush al cerrar la pestaña — fetch keepalive sobrevive al unload.
+function flushOnUnload() {
+  if (!sessionConfigured || !sessionId || !token) return;
+  const caption = readCurrentCaption();
+  if (!caption) return;
+  const payload = [{
+    speaker_name: caption.speaker,
+    texto: caption.text,
+    timestamp_seconds: timestampSeconds(),
+  }];
+  try {
+    fetch(`${backendUrl}/api/sesiones/${sessionId}/caption/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (err) {
+    console.warn("[DatnexiA] Error en flushOnUnload:", err);
+  }
+}
+
+window.addEventListener("pagehide", flushOnUnload);
+window.addEventListener("beforeunload", flushOnUnload);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushOnUnload();
+});
 
 loadSessionFromStorage().then(startPolling);
