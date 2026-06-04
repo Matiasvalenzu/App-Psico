@@ -48,45 +48,37 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-muted/40 dark:bg-background">
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4">
-          <a href="/dashboard" className="mr-4 flex items-center">
-            {/* Desktop: wordmark completo */}
-            <div className="hidden sm:block rounded-lg bg-white px-2 py-1 shadow-sm">
+          <a
+            href="/dashboard"
+            className="mr-2 flex shrink-0 items-center sm:mr-4"
+            aria-label="Ir al dashboard"
+          >
+            <div className="flex h-10 w-[104px] items-center justify-center min-[420px]:w-[128px] sm:w-[170px]">
               <Image
-                src="/logo-wordmark.jpg"
-                alt="DatnexiA"
-                width={1600}
-                height={471}
-                className="h-7 w-auto object-contain"
-                priority
-              />
-            </div>
-            {/* Mobile: solo el ícono */}
-            <div className="sm:hidden rounded-lg bg-white p-1 shadow-sm">
-              <Image
-                src="/logo-icon.jpg"
-                alt="DatnexiA"
-                width={1455}
-                height={1600}
-                className="h-7 w-7 object-contain"
+                src="/logo-psiconex-app.png"
+                alt="Psiconex"
+                width={5916}
+                height={1664}
+                className="h-auto max-h-7 w-full object-contain drop-shadow-md"
                 priority
               />
             </div>
           </a>
 
-          <nav className="flex items-center gap-1 text-sm">
+          <nav className="flex min-w-0 items-center gap-1 text-sm">
             <a
               href="/dashboard"
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${isActive("/dashboard")}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors min-[420px]:px-3 ${isActive("/dashboard")}`}
             >
-              <Users className="h-4 w-4" />
-              Pacientes
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="hidden min-[420px]:inline">Pacientes</span>
             </a>
             <a
               href="/dashboard/voz"
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${isActive("/dashboard/voz")}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors min-[420px]:px-3 ${isActive("/dashboard/voz")}`}
             >
-              <Mic className="h-4 w-4" />
-              Voz
+              <Mic className="h-4 w-4 shrink-0" />
+              <span className="hidden min-[420px]:inline">Voz</span>
             </a>
             {isAdmin && (
               <a

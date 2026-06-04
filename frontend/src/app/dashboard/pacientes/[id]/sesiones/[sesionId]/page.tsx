@@ -4,7 +4,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
-import { ArrowLeft, Download, FileText, Loader2, Mic, MicOff, Save, Square, Video } from "lucide-react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { ArrowLeft, Download, FileText, Loader2, Mic, Save, Square, Trash2, Video } from "lucide-react";
 
 interface Sesion {
   id: number;
@@ -13,7 +14,7 @@ interface Sesion {
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
   audio_path: string;
-  origen: "AUDIO" | "DOCUMENTO_EXTERNO";
+  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL";
   documento_nombre_original: string;
   estado: string;
   notas_sesion: string;
@@ -160,6 +161,9 @@ export default function SesionDetailPage() {
   const [transcriptText, setTranscriptText] = useState("");
   const [savingTranscript, setSavingTranscript] = useState(false);
   const [transcriptSaved, setTranscriptSaved] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [deleteSessionError, setDeleteSessionError] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -314,6 +318,27 @@ export default function SesionDetailPage() {
     }).catch(() => setError("No se pudo exportar el PDF."));
   }
 
+  async function deleteSession() {
+    if (!sesion) return;
+    setDeletingSession(true);
+    setDeleteSessionError("");
+    try {
+      const res = await apiFetch(`/sesiones/${sesion.id}/`, { method: "DELETE" });
+      if (!res.ok) {
+        setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
+        return;
+      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      router.replace(`/dashboard/pacientes/${id}`);
+    } catch (err) {
+      console.error(err);
+      setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
+    } finally {
+      setDeletingSession(false);
+    }
+  }
+
   if (loading) return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando sesión...</div>;
   if (!sesion) return <p className="text-destructive">Sesión no encontrada</p>;
 
@@ -355,6 +380,16 @@ export default function SesionDetailPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteSessionError("");
+                setDeleteDialogOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive shadow-subtle transition-all hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" /> Eliminar sesión
+            </button>
             <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent">
               <Download className="h-4 w-4" /> Exportar PDF
             </button>
@@ -385,6 +420,21 @@ export default function SesionDetailPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Eliminar sesión"
+        description={`Esta acción eliminará permanentemente la sesión del ${formatDate(sesion.fecha_hora_inicio)} a las ${formatTime(sesion.fecha_hora_inicio)}. No se puede deshacer.`}
+        confirmLabel="Eliminar sesión"
+        confirming={deletingSession}
+        error={deleteSessionError}
+        onCancel={() => {
+          if (deletingSession) return;
+          setDeleteDialogOpen(false);
+          setDeleteSessionError("");
+        }}
+        onConfirm={deleteSession}
+      />
 
       {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">{error}</div>}
 

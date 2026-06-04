@@ -38,13 +38,13 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-sm space-y-6 rounded-2xl border border-border/60 bg-card p-8 shadow-card">
         <div className="space-y-3 text-center">
-          <div className="mx-auto w-52 rounded-xl bg-white p-3 shadow-sm">
+          <div className="mx-auto flex w-full max-w-[260px] items-center justify-center px-2 py-1">
             <Image
-              src="/logo-wordmark.jpg"
-              alt="DatnexiA"
-              width={1600}
-              height={471}
-              className="h-auto w-full object-contain"
+              src="/logo-psiconex-login.png"
+              alt="Psiconex"
+              width={5916}
+              height={2325}
+              className="h-auto w-full object-contain drop-shadow-md"
               priority
             />
           </div>

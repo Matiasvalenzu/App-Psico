@@ -35,11 +35,20 @@ class SesionViewSet(viewsets.ModelViewSet):
         return SesionSerializer
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().filter(paciente__psicologo=self.request.user)
         paciente_id = self.request.query_params.get("paciente")
         if paciente_id:
             qs = qs.filter(paciente_id=paciente_id)
         return qs
+
+    def perform_destroy(self, instance):
+        audio_path = instance.audio_path
+        instance.delete()
+        if audio_path and os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
 
     def perform_create(self, serializer):
         serializer.save(psicologo=self.request.user)

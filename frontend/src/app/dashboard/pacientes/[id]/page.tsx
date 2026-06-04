@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration } from "@/lib/utils";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   ArrowLeft,
   ArrowUp,
@@ -20,6 +21,7 @@ import {
   Plus,
   Save,
   Sparkles,
+  Trash2,
   Upload,
   Video,
 } from "lucide-react";
@@ -44,7 +46,7 @@ interface Sesion {
   id: number;
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
-  origen: "AUDIO" | "DOCUMENTO_EXTERNO";
+  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL";
   documento_nombre_original: string;
   estado: string;
 }
@@ -206,6 +208,11 @@ export default function PacienteDetailPage() {
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [documentError, setDocumentError] = useState("");
+
+  // Delete session confirmation
+  const [sessionToDelete, setSessionToDelete] = useState<Sesion | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [deleteSessionError, setDeleteSessionError] = useState("");
 
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -575,6 +582,28 @@ export default function PacienteDetailPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function handleDeleteSession() {
+    if (!sessionToDelete) return;
+    setDeletingSessionId(sessionToDelete.id);
+    setDeleteSessionError("");
+    try {
+      const res = await apiFetch(`/sesiones/${sessionToDelete.id}/`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
+        return;
+      }
+      setSesiones((prev) => prev.filter((sesion) => sesion.id !== sessionToDelete.id));
+      setSessionToDelete(null);
+    } catch (err) {
+      console.error(err);
+      setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
+    } finally {
+      setDeletingSessionId(null);
     }
   }
 
@@ -1158,6 +1187,25 @@ export default function PacienteDetailPage() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={!!sessionToDelete}
+        title="Eliminar sesión"
+        description={
+          sessionToDelete
+            ? `Esta acción eliminará permanentemente la sesión del ${formatDate(sessionToDelete.fecha_hora_inicio)} a las ${formatTime(sessionToDelete.fecha_hora_inicio)}. No se puede deshacer.`
+            : ""
+        }
+        confirmLabel="Eliminar sesión"
+        confirming={deletingSessionId === sessionToDelete?.id}
+        error={deleteSessionError}
+        onCancel={() => {
+          if (deletingSessionId) return;
+          setSessionToDelete(null);
+          setDeleteSessionError("");
+        }}
+        onConfirm={handleDeleteSession}
+      />
+
       {/* Sessions list */}
       {sesiones.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-border/60 bg-card py-16 text-center shadow-subtle">
@@ -1172,59 +1220,78 @@ export default function PacienteDetailPage() {
           {sesiones.map((sesion) => {
             const isExternalDocument = sesion.origen === "DOCUMENTO_EXTERNO";
             return (
-              <button
+              <div
                 key={sesion.id}
-                onClick={() =>
-                  router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`)
-                }
-                className="group flex items-center gap-4 rounded-xl border border-border/60 bg-card p-4 text-left shadow-subtle transition-all hover:border-primary/30 hover:shadow-card hover:-translate-y-0.5"
+                className="group flex items-center rounded-xl border border-border/60 bg-card text-left shadow-subtle transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card"
               >
-                <div
-                  className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
-                    isExternalDocument
-                      ? "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
-                      : "bg-primary/10 text-primary"
-                  }`}
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`)
+                  }
+                  className="flex min-w-0 flex-1 items-center gap-4 p-4 text-left"
                 >
-                  {isExternalDocument ? (
-                    <FileText className="h-5 w-5" />
-                  ) : (
-                    <Calendar className="h-5 w-5" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{formatDate(sesion.fecha_hora_inicio)}</p>
-                  <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatTime(sesion.fecha_hora_inicio)}
-                    </span>
-                    {isExternalDocument && (
-                      <span className="inline-flex min-w-0 items-center gap-1">
-                        <FileText className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">
-                          {sesion.documento_nombre_original || "Documento externo"}
-                        </span>
-                      </span>
+                  <div
+                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
+                      isExternalDocument
+                        ? "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                  >
+                    {isExternalDocument ? (
+                      <FileText className="h-5 w-5" />
+                    ) : (
+                      <Calendar className="h-5 w-5" />
                     )}
-                    {!isExternalDocument && sesion.duracion_segundos
-                      ? formatDuration(sesion.duracion_segundos)
-                      : null}
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{formatDate(sesion.fecha_hora_inicio)}</p>
+                    <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(sesion.fecha_hora_inicio)}
+                      </span>
+                      {isExternalDocument && (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <FileText className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">
+                            {sesion.documento_nombre_original || "Documento externo"}
+                          </span>
+                        </span>
+                      )}
+                      {!isExternalDocument && sesion.duracion_segundos
+                        ? formatDuration(sesion.duracion_segundos)
+                        : null}
+                    </div>
+                  </div>
+                </button>
+                <div className="flex flex-shrink-0 flex-col items-end gap-2 py-4 pr-4">
                   {isExternalDocument && (
                     <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                       Documento
                     </span>
                   )}
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadge(sesion.estado)}`}
-                  >
-                    {getStatusLabel(sesion.estado)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadge(sesion.estado)}`}
+                    >
+                      {getStatusLabel(sesion.estado)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteSessionError("");
+                        setSessionToDelete(sesion);
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground opacity-80 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      aria-label="Eliminar sesión"
+                      title="Eliminar sesión"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
