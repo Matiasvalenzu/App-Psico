@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { ArrowLeft, Download, FileText, Loader2, Mic, Save, Square, Trash2, Video } from "lucide-react";
+import { ArrowLeft, ClipboardList, Download, FileText, Loader2, Mic, Save, Square, Trash2, Video } from "lucide-react";
 
 interface Sesion {
   id: number;
@@ -15,12 +15,30 @@ interface Sesion {
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
   audio_path: string;
-  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL";
+  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
   documento_nombre_original: string;
   estado: string;
   notas_sesion: string;
   segmentos: Segmento[];
   speaker_results: SpeakerResult[];
+  resultado_test: TestResult | null;
+}
+
+interface TestResultSection {
+  key: string;
+  title: string;
+  document_title: string;
+  content: string;
+}
+
+interface TestResult {
+  id: number;
+  test_slug: string;
+  test_nombre: string;
+  puntajes: Record<string, unknown>;
+  interpretacion: Record<string, unknown>;
+  estado_ia: string;
+  secciones: TestResultSection[];
 }
 
 interface Segmento {
@@ -144,6 +162,21 @@ function getPyannoteLabel(label: string) {
   return label || "Sin etiqueta";
 }
 
+function cleanMarkdownEmphasis(text: string) {
+  return (text || "")
+    .replace(/\*\*([^*]+)\*\*/g, (_, value: string) => value.trim().toUpperCase())
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .trim();
+}
+
+function sectionTone(key: string) {
+  if (key === "respuestas") return "border-sky-200 bg-sky-50/40 dark:border-sky-900 dark:bg-sky-950/20";
+  if (key === "puntajes") return "border-emerald-200 bg-emerald-50/40 dark:border-emerald-900 dark:bg-emerald-950/20";
+  if (key === "interpretacion") return "border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20";
+  return "border-violet-200 bg-violet-50/40 dark:border-violet-900 dark:bg-violet-950/20";
+}
+
 export default function SesionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -165,6 +198,7 @@ export default function SesionDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingSession, setDeletingSession] = useState(false);
   const [deleteSessionError, setDeleteSessionError] = useState("");
+  const [downloadingTestSection, setDownloadingTestSection] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -319,6 +353,42 @@ export default function SesionDetailPage() {
     }).catch(() => setError("No se pudo exportar el PDF."));
   }
 
+  function exportDocx() {
+    apiFetch(`/sesiones/${sesionId}/exportar_docx/`).then(async (res) => {
+      if (!res.ok) { setError("No se pudo exportar el Word."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `sesion-${sesionId}.docx`; a.click();
+      URL.revokeObjectURL(url);
+    }).catch(() => setError("No se pudo exportar el Word."));
+  }
+
+  async function downloadTestSection(sectionKey: string, format: "pdf" | "docx") {
+    const key = `${sectionKey}-${format}`;
+    setDownloadingTestSection(key);
+    setError("");
+    try {
+      const res = await apiFetch(`/sesiones/${sesionId}/exportar_test_seccion/?seccion=${sectionKey}&formato=${format}`);
+      if (!res.ok) {
+        setError(`No se pudo descargar la sección en ${format.toUpperCase()}.`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `test-${sectionKey}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setError(`No se pudo descargar la sección en ${format.toUpperCase()}.`);
+    } finally {
+      setDownloadingTestSection(null);
+    }
+  }
+
   async function deleteSession() {
     if (!sesion) return;
     setDeletingSession(true);
@@ -345,8 +415,11 @@ export default function SesionDetailPage() {
 
   const isExternalDoc = sesion.origen === "DOCUMENTO_EXTERNO";
   const isVirtual = sesion.origen === "VIRTUAL";
+  const isTest = sesion.origen === "TEST_PSICOLOGICO";
   const sessionTitle = isExternalDoc
     ? "Documento externo"
+    : isTest
+      ? sesion.documento_nombre_original || "Test psicológico"
     : sesion.numero_sesion
       ? `Sesión ${sesion.numero_sesion}`
       : isVirtual
@@ -364,7 +437,9 @@ export default function SesionDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              {isVirtual && !isExternalDoc ? (
+              {isTest ? (
+                <ClipboardList className="h-5 w-5 text-emerald-600" />
+              ) : isVirtual && !isExternalDoc ? (
                 <>
                   <Video className="h-5 w-5 text-sky-500" />
                 </>
@@ -373,7 +448,7 @@ export default function SesionDetailPage() {
               {" "}— {formatDate(sesion.fecha_hora_inicio)}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              {!isExternalDoc && <span>{isVirtual ? "Remota" : "Presencial"}</span>}
+              {!isExternalDoc && <span>{isTest ? "Test psicológico" : isVirtual ? "Remota" : "Presencial"}</span>}
               <span>{formatTime(sesion.fecha_hora_inicio)}</span>
               {!isExternalDoc && sesion.duracion_segundos && <span>{formatDuration(sesion.duracion_segundos)}</span>}
               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -387,6 +462,11 @@ export default function SesionDetailPage() {
                 <FileText className="h-4 w-4" /> {sesion.documento_nombre_original || "Documento externo cargado"}
               </p>
             )}
+            {isTest && (
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <ClipboardList className="h-4 w-4" /> Resultado guardado como sesión clínica y disponible para el chat IA.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -397,10 +477,13 @@ export default function SesionDetailPage() {
               }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive shadow-subtle transition-all hover:bg-destructive/10"
             >
-              <Trash2 className="h-4 w-4" /> Eliminar sesión
+              <Trash2 className="h-4 w-4" /> {isTest ? "Eliminar test" : "Eliminar sesión"}
             </button>
             <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent">
               <Download className="h-4 w-4" /> Exportar PDF
+            </button>
+            <button onClick={exportDocx} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent">
+              <FileText className="h-4 w-4" /> Exportar Word
             </button>
             {isVirtual && sesion.estado === "PENDIENTE" && (
               <div className="flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
@@ -408,7 +491,7 @@ export default function SesionDetailPage() {
                 Sesión remota pendiente — activa la extensión Chrome durante la reunión
               </div>
             )}
-            {!isExternalDoc && !isVirtual && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
+            {!isExternalDoc && !isVirtual && !isTest && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
               <div className="flex items-center gap-3">
                 {uploading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Subiendo audio...</div>
@@ -432,9 +515,9 @@ export default function SesionDetailPage() {
 
       <ConfirmDialog
         open={deleteDialogOpen}
-        title="Eliminar sesión"
-        description={`Esta acción eliminará permanentemente la sesión del ${formatDate(sesion.fecha_hora_inicio)} a las ${formatTime(sesion.fecha_hora_inicio)}. No se puede deshacer.`}
-        confirmLabel="Eliminar sesión"
+        title={isTest ? "Eliminar test" : "Eliminar sesión"}
+        description={`Esta acción eliminará permanentemente ${isTest ? "el resultado del test" : "la sesión"} del ${formatDate(sesion.fecha_hora_inicio)} a las ${formatTime(sesion.fecha_hora_inicio)}. No se puede deshacer.`}
+        confirmLabel={isTest ? "Eliminar test" : "Eliminar sesión"}
         confirming={deletingSession}
         error={deleteSessionError}
         onCancel={() => {
@@ -447,7 +530,7 @@ export default function SesionDetailPage() {
 
       {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">{error}</div>}
 
-      {!isExternalDoc && sesion.audio_path && ["PENDIENTE", "PROCESANDO"].includes(sesion.estado) && (
+      {!isExternalDoc && !isTest && sesion.audio_path && ["PENDIENTE", "PROCESANDO"].includes(sesion.estado) && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
           <div className="flex items-start gap-3">
             <Loader2 className="mt-0.5 h-5 w-5 animate-spin text-amber-600" />
@@ -460,7 +543,7 @@ export default function SesionDetailPage() {
       )}
 
       {/* Speaker recognition */}
-      {!isExternalDoc && !isVirtual && sesion.speaker_results && sesion.speaker_results.length > 0 && (
+      {!isExternalDoc && !isVirtual && !isTest && sesion.speaker_results && sesion.speaker_results.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card p-6 space-y-4 shadow-card">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Reconocimiento de voz</h2>
@@ -508,26 +591,75 @@ export default function SesionDetailPage() {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Notas privadas sobre la sesión, hipótesis clínicas..." />
       </div>
 
+      {/* Test result */}
+      {isTest && sesion.resultado_test?.secciones?.length ? (
+        <div className="space-y-4">
+          {sesion.resultado_test.secciones.map((section) => (
+            <section
+              key={section.key}
+              className={`rounded-xl border p-6 shadow-card ${sectionTone(section.key)}`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold tracking-tight">{section.title}</h2>
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    {section.document_title}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => downloadTestSection(section.key, "pdf")}
+                    disabled={downloadingTestSection === `${section.key}-pdf`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
+                  >
+                    {downloadingTestSection === `${section.key}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadTestSection(section.key, "docx")}
+                    disabled={downloadingTestSection === `${section.key}-docx`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
+                  >
+                    {downloadingTestSection === `${section.key}-docx` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                    Word
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 max-h-[520px] overflow-auto rounded-xl border border-border/60 bg-card/80 px-4 py-3 text-sm leading-relaxed shadow-inner">
+                <p className="whitespace-pre-wrap">{cleanMarkdownEmphasis(section.content)}</p>
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : null}
+
       {/* Transcript */}
-      {sesion.segmentos && sesion.segmentos.length > 0 && (
+      {!isTest && sesion.segmentos && sesion.segmentos.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card p-6 space-y-3 shadow-card">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight">{isExternalDoc ? "Contenido extraído editable" : "Transcripción editable"}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Mantén una intervención por bloque con prefijo Psicólogo:, Paciente: o Documento:</p>
+              <h2 className="text-lg font-semibold tracking-tight">{isTest ? "Resultado del test" : isExternalDoc ? "Contenido extraído editable" : "Transcripción editable"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isTest ? "Incluye respuestas, puntajes, interpretación y observación IA." : "Mantén una intervención por bloque con prefijo Psicólogo:, Paciente: o Documento:"}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              {transcriptSaved && <span className="text-sm font-medium text-emerald-600">Transcripción guardada</span>}
-              <button onClick={saveTranscript} disabled={savingTranscript} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50">
-                <Save className="h-4 w-4" /> {savingTranscript ? "Guardando..." : "Guardar transcripción"}
-              </button>
-            </div>
+            {!isTest && (
+              <div className="flex items-center gap-3">
+                {transcriptSaved && <span className="text-sm font-medium text-emerald-600">Transcripción guardada</span>}
+                <button onClick={saveTranscript} disabled={savingTranscript} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50">
+                  <Save className="h-4 w-4" /> {savingTranscript ? "Guardando..." : "Guardar transcripción"}
+                </button>
+              </div>
+            )}
           </div>
           <textarea
             value={transcriptText}
             onChange={(e) => setTranscriptText(e.target.value)}
+            readOnly={isTest}
             rows={Math.min(Math.max(sesion.segmentos.length * 2, 12), 30)}
-            className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed font-mono transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+            className={`w-full rounded-xl border border-input px-4 py-3 text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring ${isTest ? "bg-muted/30 font-sans" : "bg-background font-mono"}`}
             placeholder="Psicólogo: Buenos días, ¿cómo estás?\nPaciente: Estoy bien, muchas gracias."
           />
         </div>

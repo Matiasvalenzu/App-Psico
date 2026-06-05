@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
-import { LogOut, Mic, Users } from "lucide-react";
+import { ClipboardList, LogOut, Mic, Users } from "lucide-react";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -79,6 +79,13 @@ export default function DashboardLayout({
             >
               <Mic className="h-4 w-4 shrink-0" />
               <span className="hidden min-[420px]:inline">Voz</span>
+            </a>
+            <a
+              href="/dashboard/tests"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors min-[420px]:px-3 ${isActive("/dashboard/tests")}`}
+            >
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              <span className="hidden min-[420px]:inline">Tests</span>
             </a>
             {isAdmin && (
               <a

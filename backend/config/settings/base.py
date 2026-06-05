@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "sesiones",
     "voz",
     "chat",
+    "evaluaciones",
 ]
 
 MIDDLEWARE = [
@@ -144,6 +145,23 @@ DOCUMENT_UPLOAD_MAX_BYTES = int(
 # DeepSeek
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+
+# Public links and psychological tests
+PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "http://localhost:3000")
+TEST_LINK_EXPIRATION_DAYS = int(os.environ.get("TEST_LINK_EXPIRATION_DAYS", "7"))
+DSM5_DOCUMENT_PATH = os.environ.get(
+    "DSM5_DOCUMENT_PATH",
+    "/app/informes/dsm5-manualdiagnsticoyestadisticodelostrastornosmentales-161006005112.pdf",
+)
+
+# Email delivery. Leave EMAIL_HOST empty to generate links without sending mail.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False").lower() == "true"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "")
 
 # Audio AI pipeline
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")

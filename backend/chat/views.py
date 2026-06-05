@@ -21,6 +21,17 @@ from .serializers import (
 )
 
 
+def sanitize_markdown_emphasis(text):
+    text = text or ""
+
+    def uppercase_match(match):
+        return match.group(1).strip().upper()
+
+    text = re.sub(r"\*\*([^*]+)\*\*", uppercase_match, text)
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
+    return text.replace("**", "").strip()
+
+
 class ChatConversacionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -146,6 +157,11 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
                 if seg.sesion.documento_nombre_original:
                     etiqueta = f"{etiqueta} - {seg.sesion.documento_nombre_original}"
                 contexto.append(f"[{etiqueta}]: {seg.texto}")
+            elif seg.sesion.origen == Sesion.Origen.TEST_PSICOLOGICO:
+                etiqueta = f"Test psicológico {fecha}"
+                if seg.sesion.documento_nombre_original:
+                    etiqueta = f"{etiqueta} - {seg.sesion.documento_nombre_original}"
+                contexto.append(f"[{etiqueta}]: {seg.texto}")
             else:
                 contexto.append(
                     f"[Sesión {fecha} - {seg.hablante}]: {seg.texto}"
@@ -207,7 +223,8 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
             "Estructura la respuesta con estos bloques, omitiendo solo los que no apliquen: "
             "Resumen del proceso; Temas trabajados; Objetivos pendientes; "
             "Indicadores relevantes; Alertas o riesgos; Sugerencias para próxima sesión; "
-            "Límites de la respuesta."
+            "Límites de la respuesta. No uses Markdown ni asteriscos. Si necesitas títulos, "
+            "escríbelos en mayúsculas."
         )
 
         try:
@@ -233,7 +250,7 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
             )
             data = response.json()
             respuesta = data["choices"][0]["message"]["content"]
-            return respuesta
+            return sanitize_markdown_emphasis(respuesta)
         except Exception as e:
             return f"Error al consultar DeepSeek: {str(e)}"
 
@@ -259,7 +276,7 @@ class InformeIAViewSet(viewsets.ModelViewSet):
 
         if mensaje_origen:
             contenido = (serializer.validated_data.get("contenido") or "").strip()
-            extra["contenido"] = contenido or mensaje_origen.contenido
+            extra["contenido"] = sanitize_markdown_emphasis(contenido or mensaje_origen.contenido)
             extra["fuentes_json"] = mensaje_origen.fuentes_json or []
 
         if not titulo:
@@ -297,7 +314,7 @@ class InformeIAViewSet(viewsets.ModelViewSet):
         y -= 8
         draw_line("Contenido", "Helvetica-Bold", 12, 18)
 
-        for raw_line in informe.contenido.splitlines() or [""]:
+        for raw_line in sanitize_markdown_emphasis(informe.contenido).splitlines() or [""]:
             words = raw_line.split()
             if not words:
                 draw_line("")
@@ -330,7 +347,7 @@ class InformeIAViewSet(viewsets.ModelViewSet):
         document.add_paragraph(f"Tipo: {informe.get_tipo_display()}")
         document.add_paragraph(f"Fecha: {informe.created_at.strftime('%d/%m/%Y %H:%M')}")
         document.add_heading("Contenido", level=2)
-        for raw_line in informe.contenido.splitlines() or [""]:
+        for raw_line in sanitize_markdown_emphasis(informe.contenido).splitlines() or [""]:
             document.add_paragraph(raw_line)
 
         buffer = BytesIO()

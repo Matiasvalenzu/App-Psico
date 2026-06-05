@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -93,6 +93,21 @@ export async function apiFetch(
   }
 
   return res;
+}
+
+export async function publicApiFetch(
+  path: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  return fetch(`${API_URL}${path}`, { ...options, headers });
 }
 
 export async function login(username: string, password: string) {

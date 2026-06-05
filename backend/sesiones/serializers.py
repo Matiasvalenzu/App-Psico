@@ -49,6 +49,7 @@ class SesionSerializer(serializers.ModelSerializer):
     speaker_results = SpeakerIdentificationResultSerializer(many=True, read_only=True)
     paciente_nombre = serializers.CharField(source="paciente.nombre_completo", read_only=True)
     psicologo_username = serializers.CharField(source="psicologo.username", read_only=True)
+    resultado_test = serializers.SerializerMethodField()
 
     class Meta:
         model = Sesion
@@ -69,6 +70,7 @@ class SesionSerializer(serializers.ModelSerializer):
             "notas_sesion",
             "segmentos",
             "speaker_results",
+            "resultado_test",
             "created_at",
             "updated_at",
         ]
@@ -92,6 +94,26 @@ class SesionSerializer(serializers.ModelSerializer):
         if request and paciente.psicologo_id != request.user.id:
             raise serializers.ValidationError("Paciente no encontrado.")
         return paciente
+
+    def get_resultado_test(self, obj):
+        if obj.origen != Sesion.Origen.TEST_PSICOLOGICO:
+            return None
+        try:
+            resultado = obj.evaluacion_asignada.resultado
+        except Exception:
+            return None
+
+        from evaluaciones.services import build_result_sections
+
+        return {
+            "id": resultado.id,
+            "test_slug": resultado.asignacion.test_slug,
+            "test_nombre": obj.documento_nombre_original or "Test psicológico",
+            "puntajes": resultado.puntajes,
+            "interpretacion": resultado.interpretacion,
+            "estado_ia": resultado.estado_ia,
+            "secciones": build_result_sections(resultado, include_observation=True),
+        }
 
 
 class SesionListSerializer(serializers.ModelSerializer):

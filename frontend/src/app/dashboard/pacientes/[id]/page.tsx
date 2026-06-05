@@ -12,6 +12,8 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
+  Copy,
   Clock,
   Download,
   FileText,
@@ -21,6 +23,7 @@ import {
   Play,
   Plus,
   Save,
+  Send,
   Sparkles,
   Trash2,
   Upload,
@@ -69,7 +72,7 @@ interface Sesion {
   numero_sesion: number | null;
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
-  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL";
+  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
   documento_nombre_original: string;
   estado: string;
 }
@@ -116,6 +119,15 @@ interface InformeIA {
   tipo: string;
   contenido: string;
   created_at: string;
+}
+
+interface TestSendResult {
+  id: number;
+  public_url: string;
+  email_enviado: boolean;
+  email_error: string;
+  email_configurado: boolean;
+  fecha_expiracion: string;
 }
 
 function getDateTimeInputValue(date = new Date()) {
@@ -234,6 +246,14 @@ function safeFilename(value: string) {
     .replace(/^-+|-+$/g, "") || "informe-ia";
 }
 
+function cleanMarkdownEmphasis(text: string) {
+  return (text || "")
+    .replace(/\*\*([^*]+)\*\*/g, (_, value: string) => value.trim().toUpperCase())
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .trim();
+}
+
 // ------------ CHAT IA + PAGE ------------
 
 export default function PacienteDetailPage() {
@@ -291,6 +311,13 @@ export default function PacienteDetailPage() {
   const [selectedDocument, setSelectedDocument] = useState<DocumentoExternoDetalle | null>(null);
   const [openingDocumentId, setOpeningDocumentId] = useState<number | null>(null);
   const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
+
+  // Psychological test modal
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testSendError, setTestSendError] = useState("");
+  const [testSendResult, setTestSendResult] = useState<TestSendResult | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // Delete session confirmation
   const [sessionToDelete, setSessionToDelete] = useState<Sesion | null>(null);
@@ -805,10 +832,58 @@ export default function PacienteDetailPage() {
     }
   }
 
+  function openTestModal() {
+    setTestSendError("");
+    setTestSendResult(null);
+    setCopySuccess(false);
+    setTestModalOpen(true);
+  }
+
+  async function handleSendEllisTest() {
+    if (!paciente) return;
+    setTestSendError("");
+    setTestSendResult(null);
+    setCopySuccess(false);
+    if (!paciente.email_contacto) {
+      setTestSendError("El paciente no tiene correo registrado. Edita la ficha antes de enviar el test.");
+      return;
+    }
+    setSendingTest(true);
+    try {
+      const res = await apiFetch("/evaluaciones/asignaciones/", {
+        method: "POST",
+        body: JSON.stringify({ paciente: paciente.id, test_slug: "creencias-ellis" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTestSendError(getApiErrorMessage(data, "No se pudo generar el test."));
+        return;
+      }
+      setTestSendResult(data);
+    } catch (err) {
+      console.error(err);
+      setTestSendError("No se pudo generar el test.");
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function copyGeneratedTestLink() {
+    if (!testSendResult?.public_url) return;
+    try {
+      await navigator.clipboard.writeText(testSendResult.public_url);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    } catch {
+      setTestSendError("No se pudo copiar el enlace automáticamente.");
+    }
+  }
+
   async function handleDeleteSession() {
     if (!sessionToDelete) return;
     const isExternalDocument = sessionToDelete.origen === "DOCUMENTO_EXTERNO";
-    const targetLabel = isExternalDocument ? "el documento" : "la sesión";
+    const isTestSession = sessionToDelete.origen === "TEST_PSICOLOGICO";
+    const targetLabel = isExternalDocument ? "el documento" : isTestSession ? "el test" : "la sesión";
     setDeletingSessionId(sessionToDelete.id);
     setDeleteSessionError("");
     try {
@@ -1053,7 +1128,8 @@ export default function PacienteDetailPage() {
     (sesion) => sesion.origen !== "DOCUMENTO_EXTERNO"
   );
   const deleteTargetIsDocument = sessionToDelete?.origen === "DOCUMENTO_EXTERNO";
-  const deleteTargetLabel = deleteTargetIsDocument ? "documento externo" : "sesión";
+  const deleteTargetIsTest = sessionToDelete?.origen === "TEST_PSICOLOGICO";
+  const deleteTargetLabel = deleteTargetIsDocument ? "documento externo" : deleteTargetIsTest ? "test psicológico" : "sesión";
 
   return (
     <div className="space-y-6">
@@ -1087,13 +1163,22 @@ export default function PacienteDetailPage() {
                   {paciente.sexo && paciente.sexo !== "N" && <span>{getSexoLabel(paciente.sexo)}</span>}
                 </p>
               </div>
-              <button
-                onClick={openEditModal}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
-              >
-                <Pencil className="h-4 w-4" />
-                Editar
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={openTestModal}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 shadow-subtle transition-all hover:bg-emerald-100 hover:shadow-card dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+                >
+                  <Send className="h-4 w-4" />
+                  Enviar test
+                </button>
+                <button
+                  onClick={openEditModal}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1196,6 +1281,103 @@ export default function PacienteDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Send test modal */}
+      {testModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold">
+                  <ClipboardList className="h-5 w-5 text-emerald-600" />
+                  Enviar Test de Creencias Ellis
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Se generará un enlace personal para {paciente.nombre_completo} con vencimiento de 7 días y uso único.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTestModalOpen(false)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                <p className="font-medium">Correo destino</p>
+                <p className="mt-1 text-muted-foreground">
+                  {paciente.email_contacto || "Sin correo registrado"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                <p className="font-medium">Mensaje estándar</p>
+                <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                  Hola {paciente.nombre}, tu psicólogo/a te solicita completar el Test de Creencias Ellis como parte de tu proceso. El enlace es personal, vence en 7 días y no requiere iniciar sesión.
+                </p>
+              </div>
+              {!paciente.email_contacto && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                  Para enviar el test debes registrar un correo de contacto en la ficha del paciente.
+                </div>
+              )}
+              {testSendResult && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  <p className="font-semibold">
+                    {testSendResult.email_enviado
+                      ? "Correo enviado correctamente."
+                      : "Enlace generado. El correo queda pendiente hasta configurar SMTP."}
+                  </p>
+                  {testSendResult.email_error && (
+                    <p className="mt-1 text-xs">{testSendResult.email_error}</p>
+                  )}
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      readOnly
+                      value={testSendResult.public_url}
+                      className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-background dark:text-emerald-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={copyGeneratedTestLink}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                    >
+                      <Copy className="h-4 w-4" />
+                      {copySuccess ? "Copiado" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {testSendError && (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {testSendError}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setTestModalOpen(false)}
+                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={handleSendEllisTest}
+                disabled={sendingTest || !paciente.email_contacto}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-subtle transition-all hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {sendingTest && <Loader2 className="h-4 w-4 animate-spin" />}
+                {sendingTest ? "Generando..." : "Generar y enviar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit modal */}
       {editModalOpen && (
@@ -1948,6 +2130,8 @@ export default function PacienteDetailPage() {
           sessionToDelete
             ? deleteTargetIsDocument
               ? `Esta acción eliminará permanentemente el documento ${sessionToDelete.documento_nombre_original || `externo del ${formatDate(sessionToDelete.fecha_hora_inicio)}`}. No se puede deshacer.`
+              : deleteTargetIsTest
+                ? `Esta acción eliminará permanentemente el resultado del test ${sessionToDelete.documento_nombre_original || "psicológico"}. No se puede deshacer.`
               : `Esta acción eliminará permanentemente la sesión del ${formatDate(sessionToDelete.fecha_hora_inicio)} a las ${formatTime(sessionToDelete.fecha_hora_inicio)}. No se puede deshacer.`
             : ""
         }
@@ -1976,8 +2160,11 @@ export default function PacienteDetailPage() {
           {sesionesClinicas.map((sesion) => {
             const isExternalDocument = sesion.origen === "DOCUMENTO_EXTERNO";
             const isRemote = sesion.origen === "VIRTUAL";
+            const isTest = sesion.origen === "TEST_PSICOLOGICO";
             const sessionTitle = isExternalDocument
               ? "Documento externo"
+              : isTest
+                ? sesion.documento_nombre_original || "Test psicológico"
               : sesion.numero_sesion
                 ? `Sesión ${sesion.numero_sesion}`
                 : "Sesión";
@@ -1997,6 +2184,8 @@ export default function PacienteDetailPage() {
                     className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
                       isExternalDocument
                         ? "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
+                        : isTest
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
                         : isRemote
                           ? "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300"
                         : "bg-primary/10 text-primary"
@@ -2004,6 +2193,8 @@ export default function PacienteDetailPage() {
                   >
                     {isExternalDocument ? (
                       <FileText className="h-5 w-5" />
+                    ) : isTest ? (
+                      <ClipboardList className="h-5 w-5" />
                     ) : isRemote ? (
                       <Video className="h-5 w-5" />
                     ) : (
@@ -2026,6 +2217,12 @@ export default function PacienteDetailPage() {
                           </span>
                         </span>
                       )}
+                      {isTest && (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <ClipboardList className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">Resultado de test</span>
+                        </span>
+                      )}
                       {!isExternalDocument && sesion.duracion_segundos
                         ? formatDuration(sesion.duracion_segundos)
                         : null}
@@ -2039,8 +2236,14 @@ export default function PacienteDetailPage() {
                     </span>
                   )}
                   {!isExternalDocument && (
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isRemote ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" : "bg-primary/10 text-primary"}`}>
-                      {isRemote ? "Remota" : "Presencial"}
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      isTest
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        : isRemote
+                          ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                          : "bg-primary/10 text-primary"
+                    }`}>
+                      {isTest ? "Test" : isRemote ? "Remota" : "Presencial"}
                     </span>
                   )}
                   <div className="flex items-center gap-2">
@@ -2141,7 +2344,7 @@ export default function PacienteDetailPage() {
                   </div>
                 </div>
                 <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                  {informe.contenido}
+                  {cleanMarkdownEmphasis(informe.contenido)}
                 </p>
               </div>
             ))}
@@ -2174,7 +2377,7 @@ export default function PacienteDetailPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {selectedInforme.contenido}
+                {cleanMarkdownEmphasis(selectedInforme.contenido)}
               </p>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 p-5">
@@ -2443,7 +2646,7 @@ export default function PacienteDetailPage() {
                           : "rounded-tl-md border border-border/60 bg-card text-foreground shadow-subtle"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{message.contenido}</p>
+                      <p className="whitespace-pre-wrap">{cleanMarkdownEmphasis(message.contenido)}</p>
                     </div>
 
                     {!isUser && (

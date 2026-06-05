@@ -11,6 +11,7 @@ class Sesion(models.Model):
         AUDIO = "AUDIO", "Audio"
         DOCUMENTO_EXTERNO = "DOCUMENTO_EXTERNO", "Documento externo"
         VIRTUAL = "VIRTUAL", "Sesión remota"
+        TEST_PSICOLOGICO = "TEST_PSICOLOGICO", "Test psicológico"
 
     class Plataforma(models.TextChoices):
         GOOGLE_MEET = "GOOGLE_MEET", "Google Meet"

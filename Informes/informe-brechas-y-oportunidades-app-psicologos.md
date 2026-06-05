@@ -653,7 +653,7 @@ Estas tareas tienen alto impacto y conectan directamente con la reunión.
 
 ### 7.1.1 Estado de implementación actualizado
 
-Actualización posterior a la primera iteración de desarrollo: se implementaron los primeros cinco puntos priorizados. Consentimiento informado y primer test digitalizado quedan pendientes por decisión de producto para una etapa posterior.
+Actualización posterior a la segunda iteración de desarrollo: se implementaron los primeros cinco puntos priorizados y luego se incorporó el primer test digitalizado. Consentimiento informado queda pendiente para una etapa posterior.
 
 | Prioridad | Oportunidad | Estado | Implementación realizada |
 |---|---|---|---|
@@ -663,13 +663,13 @@ Actualización posterior a la primera iteración de desarrollo: se implementaron
 | 4 | Prompt IA estructurado | Implementado | El asistente ahora responde con enfoque clínico prudente, separando evidencia e inferencias, evitando diagnósticos definitivos y usando bloques estructurados. |
 | 5 | Guardar respuesta IA como informe | Implementado | Se creó `InformeIA`, endpoint para guardar respuestas del asistente y sección de informes IA guardados en la ficha del paciente, con apertura, eliminación y descarga PDF/Word. |
 | 6 | Consentimiento informado básico | Pendiente | Se mantiene fuera de esta iteración. |
-| 7 | Primer test digitalizado | Pendiente | Se mantiene fuera de esta iteración. |
+| 7 | Primer test digitalizado | Implementado | Se creó el Test de Creencias Ellis con catálogo, vista previa, link público con token, expiración de 7 días, uso único, respuesta sin autenticación, cálculo automático, sesión clínica tipo test, observación IA prudente con apoyo DSM-5, descarga PDF/Word y eliminación. El envío por correo quedó preparado y en espera de credenciales SMTP. |
 
 ### 7.2 Implementar después
 
 | Prioridad | Oportunidad | Razón |
 |---|---|---|
-| 8 | Link público para responder tests | Necesario después de definir primer test |
+| 8 | Link público para responder tests | Implementado dentro del primer módulo de test; queda pendiente conectar SMTP real |
 | 9 | Timeline clínico | Mejora experiencia cuando hay muchas sesiones |
 | 10 | Agenda básica | Expande la app hacia operación diaria |
 | 11 | Pagos básicos | Aumenta valor administrativo |
@@ -709,14 +709,15 @@ Objetivo: construir el diferencial comercial detectado en la reunión.
 
 Tareas:
 
-- Recibir de Lina preguntas, reglas e interpretación.
-- Seleccionar el test más simple para primer MVP.
-- Crear modelo de definición de test.
-- Crear modelo de aplicación de test por paciente.
-- Crear link público con token.
-- Calcular puntaje por código.
-- Mostrar resultado al psicólogo.
-- Permitir generar informe IA del resultado.
+- Test de Creencias Ellis digitalizado como primer MVP.
+- Catálogo de tests con vista previa de preguntas y vista paciente.
+- Aplicación de test por paciente con token público, expiración de 7 días y uso único.
+- Cálculo automático de puntajes por dimensión.
+- Resultado guardado como sesión clínica tipo test dentro de la ficha.
+- Observación IA prudente apoyada en DSM-5, sin diagnóstico automático.
+- Resultados disponibles como conocimiento para el chat IA mediante segmentos con embeddings.
+- Descarga PDF/Word y eliminación del resultado desde la sesión.
+- Envío por correo preparado; pendiente de credenciales SMTP.
 
 ### Fase 3: Evolución clínica y analítica
 
@@ -852,9 +853,9 @@ El chat actual usa `max_tokens=2000`, pero si se agregan informes largos y más 
 
 ## 11. Conclusión
 
-La aplicación actual ya tiene una base técnica fuerte: pacientes, sesiones, transcripción, voz, documentos externos separados, sesiones virtuales, chat IA y exportación PDF/Word. La reunión no indica que haya que cambiar de dirección, sino que muestra cómo convertir esa base en una plataforma mucho más valiosa para psicólogos reales.
+La aplicación actual ya tiene una base técnica fuerte: pacientes, sesiones, transcripción, voz, documentos externos separados, sesiones virtuales, chat IA, tests psicológicos con enlace público y exportación PDF/Word. La reunión no indica que haya que cambiar de dirección, sino que muestra cómo convertir esa base en una plataforma mucho más valiosa para psicólogos reales.
 
-Las ideas más importantes que actualmente no existen o siguen pendientes son tests digitalizados, consentimiento informado, agenda/pagos y analítica. La primera iteración ya incorporó ficha clínica avanzada, número de sesión automático, objetivos de intervención, prompt IA estructurado e informes IA persistentes.
+Las ideas más importantes que siguen pendientes son consentimiento informado, agenda/pagos y analítica. La primera iteración incorporó ficha clínica avanzada, número de sesión automático, objetivos de intervención, prompt IA estructurado e informes IA persistentes; la segunda incorporó el primer test digitalizado con link público y resultado clínico asociado a la ficha.
 
 La oportunidad más diferenciadora es el módulo de tests. Puede transformarse en una ventaja clínica y comercial porque reduce trabajo manual, permite al psicólogo ofrecer procesos más completos y abre modelos de cobro adicionales.
 
@@ -870,7 +871,10 @@ La ruta recomendada es implementar primero las brechas que conectan directamente
 - Botón para guardar respuesta IA como informe: implementado.
 - Informes IA con apertura, eliminación y descarga PDF/Word: implementado.
 - Documentos externos separados de sesiones clínicas, con apertura, eliminación y descarga PDF/Word: implementado.
+- Primer test digitalizado: implementado con Test de Creencias Ellis.
+- Link público para responder test sin autenticación: implementado con expiración de 7 días y uso único.
+- Resultados de test como sesión clínica y conocimiento para chat IA: implementado.
+- Correo automático para tests: preparado, pendiente de credenciales SMTP.
 - Consentimiento informado básico: pendiente para etapa posterior.
-- Diseñar primer modelo simple de tests.
-- Pedir a Lina los cuatro tests con preguntas, reglas y criterios.
+- Pedir a Lina los próximos tests con preguntas, reglas y criterios.
 - Validar con Mauricio cuánto valor le da al módulo de tests y cuánto cobra por aplicarlos.

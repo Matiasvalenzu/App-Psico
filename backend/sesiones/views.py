@@ -379,6 +379,8 @@ class SesionViewSet(viewsets.ModelViewSet):
         title = (
             "Documento externo cargado"
             if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Resultado de test psicológico"
+            if sesion.origen == Sesion.Origen.TEST_PSICOLOGICO
             else "Reporte de sesión psicológica"
         )
         draw_line(title, "Helvetica-Bold", 16, 22)
@@ -402,12 +404,16 @@ class SesionViewSet(viewsets.ModelViewSet):
         section_title = (
             "Contenido extraído"
             if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Resultado del test"
+            if sesion.origen == Sesion.Origen.TEST_PSICOLOGICO
             else "Transcripción"
         )
         draw_line(section_title, "Helvetica-Bold", 12, 18)
         for segmento in sesion.segmentos.all():
             if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
                 draw_line(f"Parte {segmento.orden}", "Helvetica-Bold")
+            elif sesion.origen == Sesion.Origen.TEST_PSICOLOGICO:
+                draw_line(f"Sección {segmento.orden}", "Helvetica-Bold")
             else:
                 draw_line(
                     f"[{segmento.inicio_segundo:.1f}s-{segmento.fin_segundo:.1f}s] {segmento.hablante}",
@@ -438,6 +444,8 @@ class SesionViewSet(viewsets.ModelViewSet):
         title = (
             "Documento externo cargado"
             if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Resultado de test psicológico"
+            if sesion.origen == Sesion.Origen.TEST_PSICOLOGICO
             else "Reporte de sesión psicológica"
         )
         document.add_heading(title, level=1)
@@ -459,12 +467,16 @@ class SesionViewSet(viewsets.ModelViewSet):
         section_title = (
             "Contenido extraído"
             if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Resultado del test"
+            if sesion.origen == Sesion.Origen.TEST_PSICOLOGICO
             else "Transcripción"
         )
         document.add_heading(section_title, level=2)
         for segmento in sesion.segmentos.all():
             if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
                 document.add_paragraph(f"Parte {segmento.orden}", style="Heading 3")
+            elif sesion.origen == Sesion.Origen.TEST_PSICOLOGICO:
+                document.add_paragraph(f"Sección {segmento.orden}", style="Heading 3")
             else:
                 document.add_paragraph(
                     f"[{segmento.inicio_segundo:.1f}s-{segmento.fin_segundo:.1f}s] {segmento.hablante}",
@@ -477,6 +489,105 @@ class SesionViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         filename = f"{self._export_filename(sesion)}.docx"
         return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    @action(detail=True, methods=["get"], url_path="exportar_test_seccion")
+    def exportar_test_seccion(self, request, pk=None):
+        sesion = self.get_object()
+        if sesion.origen != Sesion.Origen.TEST_PSICOLOGICO:
+            return Response(
+                {"error": "La sesión no corresponde a un test psicológico."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            resultado = sesion.evaluacion_asignada.resultado
+        except Exception:
+            return Response(
+                {"error": "Resultado de test no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from evaluaciones.services import build_result_sections
+
+        section_key = request.query_params.get("seccion", "")
+        output_format = request.query_params.get("formato", "pdf")
+        sections = build_result_sections(resultado, include_observation=True)
+        section = next((item for item in sections if item["key"] == section_key), None)
+        if not section:
+            return Response(
+                {"error": "Sección de test inválida."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if output_format == "docx":
+            return self._export_test_section_docx(sesion, section)
+        return self._export_test_section_pdf(sesion, section)
+
+    def _export_test_section_pdf(self, sesion, section):
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+
+        buffer = BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        y = height - 48
+
+        def draw_line(text, font="Helvetica", size=10, leading=14):
+            nonlocal y
+            if y < 48:
+                pdf.showPage()
+                y = height - 48
+            pdf.setFont(font, size)
+            pdf.drawString(48, y, str(text)[:120])
+            y -= leading
+
+        draw_line(section["title"], "Helvetica-Bold", 16, 22)
+        draw_line(section["document_title"], "Helvetica-Bold", 12, 18)
+        draw_line(f"Paciente: {sesion.paciente.nombre_completo}")
+        draw_line(f"Fecha: {sesion.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}")
+        y -= 8
+        for raw_line in section["content"].splitlines() or [""]:
+            words = raw_line.split()
+            if not words:
+                draw_line("")
+                continue
+            line = ""
+            for word in words:
+                if len(line) + len(word) > 95:
+                    draw_line(line)
+                    line = word
+                else:
+                    line = f"{line} {word}".strip()
+            if line:
+                draw_line(line)
+
+        pdf.save()
+        buffer.seek(0)
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=f"{self._export_filename(sesion)}-{section['key']}.pdf",
+        )
+
+    def _export_test_section_docx(self, sesion, section):
+        from docx import Document
+
+        document = Document()
+        document.add_heading(section["title"], level=1)
+        document.add_heading(section["document_title"], level=2)
+        document.add_paragraph(f"Paciente: {sesion.paciente.nombre_completo}")
+        document.add_paragraph(f"Fecha: {sesion.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}")
+        for raw_line in section["content"].splitlines() or [""]:
+            document.add_paragraph(raw_line)
+
+        buffer = BytesIO()
+        document.save(buffer)
+        buffer.seek(0)
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=f"{self._export_filename(sesion)}-{section['key']}.docx",
+        )
 
     def _export_filename(self, sesion):
         base = sesion.documento_nombre_original or f"sesion-{sesion.id}"
