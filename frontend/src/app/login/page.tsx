@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,6 +31,10 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background">
+      <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
+        <ThemeToggle />
+      </div>
+
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-40 left-1/3 h-[300px] w-[500px] rounded-full bg-info/5 blur-3xl" />
