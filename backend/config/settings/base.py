@@ -2,7 +2,10 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR.parent / ".env", override=True)
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "dev-secret-change-me-minimum-32-characters"
