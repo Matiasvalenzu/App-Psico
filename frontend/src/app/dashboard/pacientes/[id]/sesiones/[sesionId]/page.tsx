@@ -11,6 +11,7 @@ interface Sesion {
   id: number;
   paciente: number;
   paciente_nombre: string;
+  numero_sesion: number | null;
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
   audio_path: string;
@@ -344,6 +345,13 @@ export default function SesionDetailPage() {
 
   const isExternalDoc = sesion.origen === "DOCUMENTO_EXTERNO";
   const isVirtual = sesion.origen === "VIRTUAL";
+  const sessionTitle = isExternalDoc
+    ? "Documento externo"
+    : sesion.numero_sesion
+      ? `Sesión ${sesion.numero_sesion}`
+      : isVirtual
+        ? "Sesión remota"
+        : "Sesión presencial";
 
   return (
     <div className="space-y-6">
@@ -356,15 +364,16 @@ export default function SesionDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              {isExternalDoc ? "Documento externo" : isVirtual ? (
+              {isVirtual && !isExternalDoc ? (
                 <>
                   <Video className="h-5 w-5 text-sky-500" />
-                  Sesión virtual
                 </>
-              ) : "Sesión"}
+              ) : null}
+              {sessionTitle}
               {" "}— {formatDate(sesion.fecha_hora_inicio)}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {!isExternalDoc && <span>{isVirtual ? "Remota" : "Presencial"}</span>}
               <span>{formatTime(sesion.fecha_hora_inicio)}</span>
               {!isExternalDoc && sesion.duracion_segundos && <span>{formatDuration(sesion.duracion_segundos)}</span>}
               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -396,7 +405,7 @@ export default function SesionDetailPage() {
             {isVirtual && sesion.estado === "PENDIENTE" && (
               <div className="flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                 <Video className="h-4 w-4 flex-shrink-0" />
-                Sesión virtual pendiente — activa la extensión Chrome durante la reunión
+                Sesión remota pendiente — activa la extensión Chrome durante la reunión
               </div>
             )}
             {!isExternalDoc && !isVirtual && !sesion.audio_path && sesion.estado === "PENDIENTE" && (

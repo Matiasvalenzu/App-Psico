@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Download,
   FileText,
   Loader2,
   MessageCircle,
@@ -24,6 +25,7 @@ import {
   Trash2,
   Upload,
   Video,
+  X,
 } from "lucide-react";
 
 interface Paciente {
@@ -37,6 +39,26 @@ interface Paciente {
   sexo: string;
   ocupacion_laboral: string;
   motivo_consulta: string;
+  telefono_whatsapp: string;
+  email_contacto: string;
+  nacionalidad: string;
+  religion: string;
+  direccion: string;
+  comuna: string;
+  prevision: string;
+  es_menor_edad: boolean;
+  nombre_tutor: string;
+  telefono_tutor: string;
+  contacto_emergencia_nombre: string;
+  contacto_emergencia_telefono: string;
+  origen_consulta: string;
+  derivacion_interconsulta: string;
+  diagnostico_sospechado: string;
+  medicacion_actual: string;
+  riesgo_suicida: boolean;
+  ideacion_suicida_nivel: number | null;
+  frecuencia_atencion: string;
+  objetivos_intervencion: string;
   notas_privadas: string;
   activo: boolean;
   created_at: string;
@@ -44,11 +66,22 @@ interface Paciente {
 
 interface Sesion {
   id: number;
+  numero_sesion: number | null;
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
   origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL";
   documento_nombre_original: string;
   estado: string;
+}
+
+interface SegmentoDocumento {
+  id: number;
+  orden: number;
+  texto: string;
+}
+
+interface DocumentoExternoDetalle extends Sesion {
+  segmentos: SegmentoDocumento[];
 }
 
 interface ChatMensaje {
@@ -74,6 +107,15 @@ interface ChatConversacion {
   mensajes?: ChatMensaje[];
   created_at: string;
   updated_at: string;
+}
+
+interface InformeIA {
+  id: number;
+  paciente: number;
+  titulo: string;
+  tipo: string;
+  contenido: string;
+  created_at: string;
 }
 
 function getDateTimeInputValue(date = new Date()) {
@@ -163,6 +205,35 @@ function getStatusLabel(status: string) {
   return status;
 }
 
+function DetailItem({ label, value }: { label: string; value: string | number | null | undefined }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
+function getInformeTipoLabel(tipo: string) {
+  const map: Record<string, string> = {
+    RESUMEN_CLINICO: "Resumen clínico",
+    EVOLUCION: "Evolución",
+    PROXIMA_SESION: "Próxima sesión",
+    OTRO: "Otro",
+  };
+  return map[tipo] || tipo;
+}
+
+function safeFilename(value: string) {
+  return (value || "informe-ia")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "informe-ia";
+}
+
 // ------------ CHAT IA + PAGE ------------
 
 export default function PacienteDetailPage() {
@@ -172,6 +243,13 @@ export default function PacienteDetailPage() {
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [sesiones, setSesiones] = useState<Sesion[]>([]);
+  const [informes, setInformes] = useState<InformeIA[]>([]);
+  const [savingInformeId, setSavingInformeId] = useState<number | null>(null);
+  const [selectedInforme, setSelectedInforme] = useState<InformeIA | null>(null);
+  const [informeToDelete, setInformeToDelete] = useState<InformeIA | null>(null);
+  const [deletingInformeId, setDeletingInformeId] = useState<number | null>(null);
+  const [downloadingInforme, setDownloadingInforme] = useState<string | null>(null);
+  const [informeSuccess, setInformeSuccess] = useState("");
 
   // Chat state
   const [chatConversations, setChatConversations] = useState<ChatConversacion[]>([]);
@@ -187,6 +265,8 @@ export default function PacienteDetailPage() {
   const [iaTyping, setIaTyping] = useState(false);
   const [showChatControls, setShowChatControls] = useState(false);
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
+  const [chatToDelete, setChatToDelete] = useState<ChatConversacion | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
 
   // Virtual session modal
   const [virtualModalOpen, setVirtualModalOpen] = useState(false);
@@ -208,6 +288,9 @@ export default function PacienteDetailPage() {
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [documentError, setDocumentError] = useState("");
+  const [selectedDocument, setSelectedDocument] = useState<DocumentoExternoDetalle | null>(null);
+  const [openingDocumentId, setOpeningDocumentId] = useState<number | null>(null);
+  const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
 
   // Delete session confirmation
   const [sessionToDelete, setSessionToDelete] = useState<Sesion | null>(null);
@@ -224,6 +307,26 @@ export default function PacienteDetailPage() {
   const [editSexo, setEditSexo] = useState("N");
   const [editOcupacion, setEditOcupacion] = useState("");
   const [editMotivo, setEditMotivo] = useState("");
+  const [editTelefonoWhatsapp, setEditTelefonoWhatsapp] = useState("");
+  const [editEmailContacto, setEditEmailContacto] = useState("");
+  const [editNacionalidad, setEditNacionalidad] = useState("");
+  const [editReligion, setEditReligion] = useState("");
+  const [editDireccion, setEditDireccion] = useState("");
+  const [editComuna, setEditComuna] = useState("");
+  const [editPrevision, setEditPrevision] = useState("");
+  const [editEsMenorEdad, setEditEsMenorEdad] = useState(false);
+  const [editNombreTutor, setEditNombreTutor] = useState("");
+  const [editTelefonoTutor, setEditTelefonoTutor] = useState("");
+  const [editContactoEmergenciaNombre, setEditContactoEmergenciaNombre] = useState("");
+  const [editContactoEmergenciaTelefono, setEditContactoEmergenciaTelefono] = useState("");
+  const [editOrigenConsulta, setEditOrigenConsulta] = useState("");
+  const [editDerivacionInterconsulta, setEditDerivacionInterconsulta] = useState("");
+  const [editDiagnosticoSospechado, setEditDiagnosticoSospechado] = useState("");
+  const [editMedicacionActual, setEditMedicacionActual] = useState("");
+  const [editRiesgoSuicida, setEditRiesgoSuicida] = useState(false);
+  const [editIdeacionSuicidaNivel, setEditIdeacionSuicidaNivel] = useState("");
+  const [editFrecuenciaAtencion, setEditFrecuenciaAtencion] = useState("");
+  const [editObjetivosIntervencion, setEditObjetivosIntervencion] = useState("");
   const [editNotas, setEditNotas] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
@@ -248,19 +351,33 @@ export default function PacienteDetailPage() {
 
   async function loadData() {
     try {
-      const [pacRes, sesRes] = await Promise.all([
+      const [pacRes, sesRes, informesRes] = await Promise.all([
         apiFetch(`/pacientes/${id}/`),
         apiFetch(`/sesiones/?paciente=${id}`),
+        apiFetch(`/chat/informes/?paciente=${id}`),
       ]);
       const pacData = await pacRes.json();
       const sesData = await sesRes.json();
+      const informesData = await informesRes.json();
       setPaciente(pacData);
       setSesiones(sesData.results || sesData);
+      setInformes(informesData.results || informesData);
       await loadChatConversations();
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadInformes() {
+    try {
+      const res = await apiFetch(`/chat/informes/?paciente=${id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setInformes(data.results || data);
+    } catch (err) {
+      console.error(err);
     }
   }
 
@@ -391,6 +508,109 @@ export default function PacienteDetailPage() {
     }
   }
 
+  async function saveMessageAsInforme(message: ChatMensaje) {
+    setSavingInformeId(message.id);
+    setChatError("");
+    setInformeSuccess("");
+    try {
+      const res = await apiFetch("/chat/informes/", {
+        method: "POST",
+        body: JSON.stringify({
+          paciente: parseInt(id),
+          mensaje_origen: message.id,
+          tipo: "RESUMEN_CLINICO",
+          titulo: chatTitle && chatTitle !== "Nueva conversación" ? chatTitle : "Resumen clínico IA",
+        }),
+      });
+      if (!res.ok) {
+        setChatError("No se pudo guardar la respuesta como informe.");
+        return;
+      }
+      await loadInformes();
+      setInformeSuccess("Informe IA guardado correctamente.");
+      setTimeout(() => setInformeSuccess(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudo guardar la respuesta como informe.");
+    } finally {
+      setSavingInformeId(null);
+    }
+  }
+
+  async function downloadInforme(informe: InformeIA, format: "pdf" | "docx") {
+    const key = `${informe.id}-${format}`;
+    setDownloadingInforme(key);
+    setChatError("");
+    try {
+      const endpoint = format === "pdf" ? "exportar_pdf" : "exportar_docx";
+      const res = await apiFetch(`/chat/informes/${informe.id}/${endpoint}/`);
+      if (!res.ok) {
+        setChatError(`No se pudo descargar el informe en ${format.toUpperCase()}.`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeFilename(informe.titulo || getInformeTipoLabel(informe.tipo))}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setChatError(`No se pudo descargar el informe en ${format.toUpperCase()}.`);
+    } finally {
+      setDownloadingInforme(null);
+    }
+  }
+
+  async function deleteInforme() {
+    if (!informeToDelete) return;
+    setDeletingInformeId(informeToDelete.id);
+    setChatError("");
+    try {
+      const res = await apiFetch(`/chat/informes/${informeToDelete.id}/`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setChatError("No se pudo eliminar el informe IA.");
+        return;
+      }
+      setInformes((prev) => prev.filter((informe) => informe.id !== informeToDelete.id));
+      if (selectedInforme?.id === informeToDelete.id) setSelectedInforme(null);
+      setInformeToDelete(null);
+      setInformeSuccess("Informe IA eliminado correctamente.");
+      setTimeout(() => setInformeSuccess(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudo eliminar el informe IA.");
+    } finally {
+      setDeletingInformeId(null);
+    }
+  }
+
+  async function deleteChatConversation() {
+    if (!chatToDelete) return;
+    setDeletingChat(true);
+    setChatError("");
+    try {
+      const res = await apiFetch(`/chat/${chatToDelete.id}/`, { method: "DELETE" });
+      if (!res.ok) {
+        setChatError("No se pudo eliminar la conversación IA.");
+        return;
+      }
+      setChatToDelete(null);
+      setChatId(null);
+      setChatTitle("");
+      setMessages([]);
+      await loadChatConversations();
+    } catch (err) {
+      console.error(err);
+      setChatError("No se pudo eliminar la conversación IA.");
+    } finally {
+      setDeletingChat(false);
+    }
+  }
+
   function toggleSources(messageId: number) {
     setExpandedSources((prev) => {
       const next = new Set(prev);
@@ -513,7 +733,7 @@ export default function PacienteDetailPage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setVirtualError(getApiErrorMessage(data, "No se pudo crear la sesión virtual."));
+        setVirtualError(getApiErrorMessage(data, "No se pudo crear la sesión remota."));
         return;
       }
       const sesion = await res.json();
@@ -523,7 +743,7 @@ export default function PacienteDetailPage() {
       setVirtualStep(2);
       await loadData();
     } catch {
-      setVirtualError("No se pudo crear la sesión virtual.");
+      setVirtualError("No se pudo crear la sesión remota.");
     } finally {
       setCreatingVirtual(false);
     }
@@ -552,7 +772,7 @@ export default function PacienteDetailPage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setVirtualError(getApiErrorMessage(data, "No se pudo finalizar la sesión virtual."));
+        setVirtualError(getApiErrorMessage(data, "No se pudo finalizar la sesión remota."));
         return;
       }
       sessionStorage.removeItem("virtual_session_id");
@@ -562,7 +782,7 @@ export default function PacienteDetailPage() {
       const sesion = await res.json();
       router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`);
     } catch {
-      setVirtualError("No se pudo finalizar la sesión virtual.");
+      setVirtualError("No se pudo finalizar la sesión remota.");
     } finally {
       setFinalizingVirtual(false);
     }
@@ -587,6 +807,8 @@ export default function PacienteDetailPage() {
 
   async function handleDeleteSession() {
     if (!sessionToDelete) return;
+    const isExternalDocument = sessionToDelete.origen === "DOCUMENTO_EXTERNO";
+    const targetLabel = isExternalDocument ? "el documento" : "la sesión";
     setDeletingSessionId(sessionToDelete.id);
     setDeleteSessionError("");
     try {
@@ -594,14 +816,15 @@ export default function PacienteDetailPage() {
         method: "DELETE",
       });
       if (!res.ok) {
-        setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
+        setDeleteSessionError(`No se pudo eliminar ${targetLabel}. Inténtalo nuevamente.`);
         return;
       }
       setSesiones((prev) => prev.filter((sesion) => sesion.id !== sessionToDelete.id));
+      if (selectedDocument?.id === sessionToDelete.id) setSelectedDocument(null);
       setSessionToDelete(null);
     } catch (err) {
       console.error(err);
-      setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
+      setDeleteSessionError(`No se pudo eliminar ${targetLabel}. Inténtalo nuevamente.`);
     } finally {
       setDeletingSessionId(null);
     }
@@ -654,6 +877,52 @@ export default function PacienteDetailPage() {
     }
   }
 
+  async function openExternalDocument(documento: Sesion) {
+    setOpeningDocumentId(documento.id);
+    setDocumentError("");
+    try {
+      const res = await apiFetch(`/sesiones/${documento.id}/`);
+      if (!res.ok) {
+        setDocumentError("No se pudo abrir el documento externo.");
+        return;
+      }
+      const data = await res.json();
+      setSelectedDocument(data);
+    } catch (err) {
+      console.error(err);
+      setDocumentError("No se pudo abrir el documento externo.");
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  }
+
+  async function downloadExternalDocument(documento: Sesion, format: "pdf" | "docx") {
+    const key = `${documento.id}-${format}`;
+    setDownloadingDocument(key);
+    setDocumentError("");
+    try {
+      const endpoint = format === "pdf" ? "exportar_pdf" : "exportar_docx";
+      const res = await apiFetch(`/sesiones/${documento.id}/${endpoint}/`);
+      if (!res.ok) {
+        setDocumentError(`No se pudo descargar el documento en ${format.toUpperCase()}.`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const base = documento.documento_nombre_original || `documento-${documento.id}`;
+      a.download = `${safeFilename(base.replace(/\.[^.]+$/, ""))}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setDocumentError(`No se pudo descargar el documento en ${format.toUpperCase()}.`);
+    } finally {
+      setDownloadingDocument(null);
+    }
+  }
+
   function openEditModal() {
     if (!paciente) return;
     setEditNombre(paciente.nombre);
@@ -664,6 +933,26 @@ export default function PacienteDetailPage() {
     setEditSexo(paciente.sexo || "N");
     setEditOcupacion(paciente.ocupacion_laboral || "");
     setEditMotivo(paciente.motivo_consulta || "");
+    setEditTelefonoWhatsapp(paciente.telefono_whatsapp || "");
+    setEditEmailContacto(paciente.email_contacto || "");
+    setEditNacionalidad(paciente.nacionalidad || "");
+    setEditReligion(paciente.religion || "");
+    setEditDireccion(paciente.direccion || "");
+    setEditComuna(paciente.comuna || "");
+    setEditPrevision(paciente.prevision || "");
+    setEditEsMenorEdad(Boolean(paciente.es_menor_edad));
+    setEditNombreTutor(paciente.nombre_tutor || "");
+    setEditTelefonoTutor(paciente.telefono_tutor || "");
+    setEditContactoEmergenciaNombre(paciente.contacto_emergencia_nombre || "");
+    setEditContactoEmergenciaTelefono(paciente.contacto_emergencia_telefono || "");
+    setEditOrigenConsulta(paciente.origen_consulta || "");
+    setEditDerivacionInterconsulta(paciente.derivacion_interconsulta || "");
+    setEditDiagnosticoSospechado(paciente.diagnostico_sospechado || "");
+    setEditMedicacionActual(paciente.medicacion_actual || "");
+    setEditRiesgoSuicida(Boolean(paciente.riesgo_suicida));
+    setEditIdeacionSuicidaNivel(paciente.ideacion_suicida_nivel?.toString() || "");
+    setEditFrecuenciaAtencion(paciente.frecuencia_atencion || "");
+    setEditObjetivosIntervencion(paciente.objetivos_intervencion || "");
     setEditNotas(paciente.notas_privadas || "");
     setEditError("");
     setEditModalOpen(true);
@@ -685,6 +974,26 @@ export default function PacienteDetailPage() {
           sexo: editSexo,
           ocupacion_laboral: editOcupacion,
           motivo_consulta: editMotivo,
+          telefono_whatsapp: editTelefonoWhatsapp,
+          email_contacto: editEmailContacto,
+          nacionalidad: editNacionalidad,
+          religion: editReligion,
+          direccion: editDireccion,
+          comuna: editComuna,
+          prevision: editPrevision,
+          es_menor_edad: editEsMenorEdad,
+          nombre_tutor: editNombreTutor,
+          telefono_tutor: editTelefonoTutor,
+          contacto_emergencia_nombre: editContactoEmergenciaNombre,
+          contacto_emergencia_telefono: editContactoEmergenciaTelefono,
+          origen_consulta: editOrigenConsulta,
+          derivacion_interconsulta: editDerivacionInterconsulta,
+          diagnostico_sospechado: editDiagnosticoSospechado,
+          medicacion_actual: editMedicacionActual,
+          riesgo_suicida: editRiesgoSuicida,
+          ideacion_suicida_nivel: editIdeacionSuicidaNivel ? parseInt(editIdeacionSuicidaNivel) : null,
+          frecuencia_atencion: editFrecuenciaAtencion,
+          objetivos_intervencion: editObjetivosIntervencion,
           notas_privadas: editNotas,
         }),
       });
@@ -711,6 +1020,40 @@ export default function PacienteDetailPage() {
   if (!paciente) {
     return <p className="text-destructive">Paciente no encontrado</p>;
   }
+
+  const hasContactData = Boolean(
+    paciente.telefono_whatsapp ||
+      paciente.email_contacto ||
+      paciente.direccion ||
+      paciente.comuna ||
+      paciente.nacionalidad ||
+      paciente.religion ||
+      paciente.prevision
+  );
+  const hasClinicalData = Boolean(
+    paciente.diagnostico_sospechado ||
+      paciente.medicacion_actual ||
+      paciente.frecuencia_atencion ||
+      paciente.derivacion_interconsulta ||
+      paciente.origen_consulta
+  );
+  const hasRiskData = Boolean(
+    paciente.riesgo_suicida ||
+      paciente.ideacion_suicida_nivel ||
+      paciente.contacto_emergencia_nombre ||
+      paciente.contacto_emergencia_telefono ||
+      paciente.es_menor_edad ||
+      paciente.nombre_tutor ||
+      paciente.telefono_tutor
+  );
+  const documentosExternos = sesiones.filter(
+    (sesion) => sesion.origen === "DOCUMENTO_EXTERNO"
+  );
+  const sesionesClinicas = sesiones.filter(
+    (sesion) => sesion.origen !== "DOCUMENTO_EXTERNO"
+  );
+  const deleteTargetIsDocument = sessionToDelete?.origen === "DOCUMENTO_EXTERNO";
+  const deleteTargetLabel = deleteTargetIsDocument ? "documento externo" : "sesión";
 
   return (
     <div className="space-y-6">
@@ -796,6 +1139,62 @@ export default function PacienteDetailPage() {
             <p className="mt-1.5 text-sm leading-relaxed">{paciente.motivo_consulta}</p>
           </div>
         )}
+        {paciente.objetivos_intervencion && (
+          <div className="border-t border-border/60 px-6 py-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Objetivos de intervención
+            </p>
+            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed">
+              {paciente.objetivos_intervencion}
+            </p>
+          </div>
+        )}
+        {hasContactData && (
+          <div className="border-t border-border/60 px-6 py-4">
+            <p className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Contacto y datos administrativos
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <DetailItem label="WhatsApp" value={paciente.telefono_whatsapp} />
+              <DetailItem label="Correo" value={paciente.email_contacto} />
+              <DetailItem label="Dirección" value={paciente.direccion} />
+              <DetailItem label="Comuna" value={paciente.comuna} />
+              <DetailItem label="Nacionalidad" value={paciente.nacionalidad} />
+              <DetailItem label="Religión" value={paciente.religion} />
+              <DetailItem label="Previsión" value={paciente.prevision} />
+            </div>
+          </div>
+        )}
+        {hasClinicalData && (
+          <div className="border-t border-border/60 bg-muted/30 px-6 py-4">
+            <p className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Información clínica ampliada
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <DetailItem label="Frecuencia" value={paciente.frecuencia_atencion} />
+              <DetailItem label="Origen" value={paciente.origen_consulta} />
+              <DetailItem label="Diagnóstico sospechado" value={paciente.diagnostico_sospechado} />
+              <DetailItem label="Medicación actual" value={paciente.medicacion_actual} />
+              <DetailItem label="Derivación/interconsulta" value={paciente.derivacion_interconsulta} />
+            </div>
+          </div>
+        )}
+        {hasRiskData && (
+          <div className="border-t border-amber-200 bg-amber-50/60 px-6 py-4 dark:border-amber-900 dark:bg-amber-950/20">
+            <p className="mb-4 text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              Riesgo, emergencia y responsable
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <DetailItem label="Riesgo suicida" value={paciente.riesgo_suicida ? "Sí" : ""} />
+              <DetailItem label="Ideación suicida" value={paciente.ideacion_suicida_nivel} />
+              <DetailItem label="Contacto emergencia" value={paciente.contacto_emergencia_nombre} />
+              <DetailItem label="Tel. emergencia" value={paciente.contacto_emergencia_telefono} />
+              <DetailItem label="Menor de edad" value={paciente.es_menor_edad ? "Sí" : ""} />
+              <DetailItem label="Tutor" value={paciente.nombre_tutor} />
+              <DetailItem label="Tel. tutor" value={paciente.telefono_tutor} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit modal */}
@@ -803,7 +1202,7 @@ export default function PacienteDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
           <form
             onSubmit={handleEdit}
-            className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -907,6 +1306,205 @@ export default function PacienteDetailPage() {
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
                 />
               </label>
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Objetivos y proceso terapéutico
+                </p>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Objetivos de intervención</span>
+                  <textarea
+                    value={editObjetivosIntervencion}
+                    onChange={(e) => setEditObjetivosIntervencion(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
+                    rows={4}
+                    placeholder="Objetivos iniciales, focos de trabajo y metas del proceso..."
+                  />
+                </label>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Contacto y datos administrativos
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">WhatsApp</span>
+                    <input
+                      value={editTelefonoWhatsapp}
+                      onChange={(e) => setEditTelefonoWhatsapp(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Correo de contacto</span>
+                    <input
+                      type="email"
+                      value={editEmailContacto}
+                      onChange={(e) => setEditEmailContacto(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Nacionalidad</span>
+                    <input
+                      value={editNacionalidad}
+                      onChange={(e) => setEditNacionalidad(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Religión</span>
+                    <input
+                      value={editReligion}
+                      onChange={(e) => setEditReligion(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Dirección</span>
+                    <input
+                      value={editDireccion}
+                      onChange={(e) => setEditDireccion(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Comuna</span>
+                    <input
+                      value={editComuna}
+                      onChange={(e) => setEditComuna(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Previsión</span>
+                    <input
+                      value={editPrevision}
+                      onChange={(e) => setEditPrevision(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Origen de consulta</span>
+                    <input
+                      value={editOrigenConsulta}
+                      onChange={(e) => setEditOrigenConsulta(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                      placeholder="Instagram, referido, CAF, boca a boca..."
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Información clínica ampliada
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Frecuencia de atención</span>
+                    <input
+                      value={editFrecuenciaAtencion}
+                      onChange={(e) => setEditFrecuenciaAtencion(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                      placeholder="Semanal, quincenal, mensual, seguimiento..."
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Diagnóstico sospechado</span>
+                    <input
+                      value={editDiagnosticoSospechado}
+                      onChange={(e) => setEditDiagnosticoSospechado(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                </div>
+                <label className="mt-4 block space-y-2">
+                  <span className="text-sm font-medium">Medicación actual</span>
+                  <textarea
+                    value={editMedicacionActual}
+                    onChange={(e) => setEditMedicacionActual(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
+                    rows={2}
+                  />
+                </label>
+                <label className="mt-4 block space-y-2">
+                  <span className="text-sm font-medium">Derivación o interconsulta</span>
+                  <textarea
+                    value={editDerivacionInterconsulta}
+                    onChange={(e) => setEditDerivacionInterconsulta(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
+                    rows={2}
+                  />
+                </label>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  Riesgo, emergencia y responsable
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={editRiesgoSuicida}
+                      onChange={(e) => setEditRiesgoSuicida(e.target.checked)}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    Riesgo suicida activo o relevante
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={editEsMenorEdad}
+                      onChange={(e) => setEditEsMenorEdad(e.target.checked)}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    Menor de edad
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Nivel ideación suicida</span>
+                    <input
+                      type="number"
+                      value={editIdeacionSuicidaNivel}
+                      onChange={(e) => setEditIdeacionSuicidaNivel(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                      min={1}
+                      max={5}
+                      placeholder="1 a 5"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Contacto emergencia</span>
+                    <input
+                      value={editContactoEmergenciaNombre}
+                      onChange={(e) => setEditContactoEmergenciaNombre(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Tel. emergencia</span>
+                    <input
+                      value={editContactoEmergenciaTelefono}
+                      onChange={(e) => setEditContactoEmergenciaTelefono(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Tutor/responsable</span>
+                    <input
+                      value={editNombreTutor}
+                      onChange={(e) => setEditNombreTutor(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Tel. tutor</span>
+                    <input
+                      value={editTelefonoTutor}
+                      onChange={(e) => setEditTelefonoTutor(e.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
               <label className="space-y-2">
                 <span className="text-sm font-medium">Notas privadas</span>
                 <textarea
@@ -943,32 +1541,188 @@ export default function PacienteDetailPage() {
         </div>
       )}
 
+      {/* External documents */}
+      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-subtle">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Documentos externos
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Archivos cargados como contexto del paciente, separados de las sesiones clínicas.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+              {documentosExternos.length} documento{documentosExternos.length !== 1 ? "s" : ""}
+            </span>
+            <button
+              onClick={openDocumentModal}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
+            >
+              <Upload className="h-4 w-4" />
+              Cargar documento
+            </button>
+          </div>
+        </div>
+        {documentError && (
+          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {documentError}
+          </div>
+        )}
+        {documentosExternos.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Aún no hay documentos externos cargados para este paciente.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {documentosExternos.map((documento) => (
+              <div key={documento.id} className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">
+                      {documento.documento_nombre_original || `Documento ${documento.id}`}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {formatDate(documento.fecha_hora_inicio)} · {getStatusLabel(documento.estado)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openExternalDocument(documento)}
+                      disabled={openingDocumentId === documento.id}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      {openingDocumentId === documento.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                      Abrir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadExternalDocument(documento, "pdf")}
+                      disabled={downloadingDocument === `${documento.id}-pdf`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      {downloadingDocument === `${documento.id}-pdf` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadExternalDocument(documento, "docx")}
+                      disabled={downloadingDocument === `${documento.id}-docx`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      {downloadingDocument === `${documento.id}-docx` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                      Word
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSessionToDelete(documento)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-border/60 bg-card shadow-elevated">
+            <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Documento externo
+                </p>
+                <h3 className="mt-1 text-lg font-semibold">
+                  {selectedDocument.documento_nombre_original || `Documento ${selectedDocument.id}`}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Cargado el {formatDate(selectedDocument.fecha_hora_inicio)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDocument(null)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {selectedDocument.segmentos?.length ? (
+                <div className="space-y-5">
+                  {selectedDocument.segmentos.map((segmento) => (
+                    <div key={segmento.id}>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Parte {segmento.orden}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {segmento.texto}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Documento sin contenido extraído.</p>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 p-5">
+              <button
+                type="button"
+                onClick={() => downloadExternalDocument(selectedDocument, "pdf")}
+                disabled={downloadingDocument === `${selectedDocument.id}-pdf`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {downloadingDocument === `${selectedDocument.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Descargar PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadExternalDocument(selectedDocument, "docx")}
+                disabled={downloadingDocument === `${selectedDocument.id}-docx`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {downloadingDocument === `${selectedDocument.id}-docx` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Descargar Word
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionToDelete(selectedDocument)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sessions header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold tracking-tight">
-          Sesiones ({sesiones.length})
+          Sesiones ({sesionesClinicas.length})
         </h2>
         <div className="flex items-center gap-2">
-          <button
-            onClick={openDocumentModal}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
-          >
-            <Upload className="h-4 w-4" />
-            Cargar documento
-          </button>
           <button
             onClick={openVirtualModal}
             className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-50 px-3.5 py-2 text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50"
           >
             <Video className="h-4 w-4" />
-            Sesión virtual
+            Sesión remota
           </button>
           <button
             onClick={handleNewSession}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card"
           >
             <Play className="h-4 w-4" />
-            Nueva sesión
+            Sesión presencial
           </button>
         </div>
       </div>
@@ -981,7 +1735,7 @@ export default function PacienteDetailPage() {
               <div>
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Video className="h-5 w-5 text-sky-500" />
-                  {virtualStep === 1 ? "Nueva sesión virtual" : "Finalizar sesión virtual"}
+                  {virtualStep === 1 ? "Nueva sesión remota" : "Finalizar sesión remota"}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {virtualStep === 1
@@ -1052,14 +1806,14 @@ export default function PacienteDetailPage() {
                   </button>
                   <button type="submit" disabled={creatingVirtual} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white shadow-subtle transition-all hover:bg-sky-700 disabled:opacity-50">
                     {creatingVirtual && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {creatingVirtual ? "Creando..." : "Crear sesión virtual"}
+                    {creatingVirtual ? "Creando..." : "Crear sesión remota"}
                   </button>
                 </div>
               </form>
             ) : (
               <form onSubmit={handleFinalizeVirtual} className="mt-5 space-y-4">
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  <strong>Sesión creada.</strong> Conecta la extensión Chrome durante la reunión. Cuando termines, vuelve aquí y completa los campos para asignar hablantes.
+                  <strong>Sesión remota creada.</strong> Conecta la extensión Chrome durante la reunión. Cuando termines, vuelve aquí y completa los campos para asignar hablantes.
                 </div>
                 {virtualSpeakers.length > 0 && (
                   <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
@@ -1125,7 +1879,7 @@ export default function PacienteDetailPage() {
               <div>
                 <h3 className="text-lg font-semibold">Cargar documento externo</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Se guardará como una sesión completada dentro del historial del paciente.
+                  Se guardará como documento externo, separado de las sesiones clínicas.
                 </p>
               </div>
               <button
@@ -1189,13 +1943,15 @@ export default function PacienteDetailPage() {
 
       <ConfirmDialog
         open={!!sessionToDelete}
-        title="Eliminar sesión"
+        title={`Eliminar ${deleteTargetLabel}`}
         description={
           sessionToDelete
-            ? `Esta acción eliminará permanentemente la sesión del ${formatDate(sessionToDelete.fecha_hora_inicio)} a las ${formatTime(sessionToDelete.fecha_hora_inicio)}. No se puede deshacer.`
+            ? deleteTargetIsDocument
+              ? `Esta acción eliminará permanentemente el documento ${sessionToDelete.documento_nombre_original || `externo del ${formatDate(sessionToDelete.fecha_hora_inicio)}`}. No se puede deshacer.`
+              : `Esta acción eliminará permanentemente la sesión del ${formatDate(sessionToDelete.fecha_hora_inicio)} a las ${formatTime(sessionToDelete.fecha_hora_inicio)}. No se puede deshacer.`
             : ""
         }
-        confirmLabel="Eliminar sesión"
+        confirmLabel={`Eliminar ${deleteTargetLabel}`}
         confirming={deletingSessionId === sessionToDelete?.id}
         error={deleteSessionError}
         onCancel={() => {
@@ -1207,18 +1963,24 @@ export default function PacienteDetailPage() {
       />
 
       {/* Sessions list */}
-      {sesiones.length === 0 ? (
+      {sesionesClinicas.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-border/60 bg-card py-16 text-center shadow-subtle">
           <Calendar className="mb-3 h-10 w-10 text-muted-foreground/50" />
-          <p className="text-sm font-medium">Sin sesiones registradas</p>
+          <p className="text-sm font-medium">Sin sesiones clínicas registradas</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Presiona &ldquo;Nueva sesión&rdquo; o carga un documento externo
+            Presiona &ldquo;Sesión presencial&rdquo; o crea una sesión remota
           </p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {sesiones.map((sesion) => {
+          {sesionesClinicas.map((sesion) => {
             const isExternalDocument = sesion.origen === "DOCUMENTO_EXTERNO";
+            const isRemote = sesion.origen === "VIRTUAL";
+            const sessionTitle = isExternalDocument
+              ? "Documento externo"
+              : sesion.numero_sesion
+                ? `Sesión ${sesion.numero_sesion}`
+                : "Sesión";
             return (
               <div
                 key={sesion.id}
@@ -1235,18 +1997,23 @@ export default function PacienteDetailPage() {
                     className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
                       isExternalDocument
                         ? "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
+                        : isRemote
+                          ? "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300"
                         : "bg-primary/10 text-primary"
                     }`}
                   >
                     {isExternalDocument ? (
                       <FileText className="h-5 w-5" />
+                    ) : isRemote ? (
+                      <Video className="h-5 w-5" />
                     ) : (
                       <Calendar className="h-5 w-5" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{formatDate(sesion.fecha_hora_inicio)}</p>
+                    <p className="font-medium">{sessionTitle}</p>
                     <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>{formatDate(sesion.fecha_hora_inicio)}</span>
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatTime(sesion.fecha_hora_inicio)}
@@ -1269,6 +2036,11 @@ export default function PacienteDetailPage() {
                   {isExternalDocument && (
                     <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                       Documento
+                    </span>
+                  )}
+                  {!isExternalDocument && (
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isRemote ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" : "bg-primary/10 text-primary"}`}>
+                      {isRemote ? "Remota" : "Presencial"}
                     </span>
                   )}
                   <div className="flex items-center gap-2">
@@ -1296,6 +2068,164 @@ export default function PacienteDetailPage() {
           })}
         </div>
       )}
+
+      {/* Saved AI reports */}
+      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-subtle">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Informes IA guardados
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Respuestas clínicas del asistente guardadas como documentos del paciente.
+            </p>
+          </div>
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+            {informes.length} informe{informes.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        {informeSuccess && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+            {informeSuccess}
+          </div>
+        )}
+        {informes.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Aún no hay informes guardados. Guarda una respuesta del chat IA para conservarla como informe clínico.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {informes.map((informe) => (
+              <div key={informe.id} className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{informe.titulo || getInformeTipoLabel(informe.tipo)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {getInformeTipoLabel(informe.tipo)} · {formatDate(informe.created_at)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInforme(informe)}
+                      className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                    >
+                      Abrir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadInforme(informe, "pdf")}
+                      disabled={downloadingInforme === `${informe.id}-pdf`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      {downloadingInforme === `${informe.id}-pdf` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadInforme(informe, "docx")}
+                      disabled={downloadingInforme === `${informe.id}-docx`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      {downloadingInforme === `${informe.id}-docx` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                      Word
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInformeToDelete(informe)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                  {informe.contenido}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedInforme && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-border/60 bg-card shadow-elevated">
+            <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {getInformeTipoLabel(selectedInforme.tipo)}
+                </p>
+                <h3 className="mt-1 text-lg font-semibold">
+                  {selectedInforme.titulo || getInformeTipoLabel(selectedInforme.tipo)}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Generado el {formatDate(selectedInforme.created_at)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedInforme(null)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {selectedInforme.contenido}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 p-5">
+              <button
+                type="button"
+                onClick={() => downloadInforme(selectedInforme, "pdf")}
+                disabled={downloadingInforme === `${selectedInforme.id}-pdf`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {downloadingInforme === `${selectedInforme.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Descargar PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadInforme(selectedInforme, "docx")}
+                disabled={downloadingInforme === `${selectedInforme.id}-docx`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {downloadingInforme === `${selectedInforme.id}-docx` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Descargar Word
+              </button>
+              <button
+                type="button"
+                onClick={() => setInformeToDelete(selectedInforme)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!informeToDelete}
+        title="Eliminar informe IA"
+        description={
+          informeToDelete
+            ? `Se eliminará permanentemente el informe "${informeToDelete.titulo || getInformeTipoLabel(informeToDelete.tipo)}".`
+            : ""
+        }
+        confirmLabel="Eliminar informe"
+        confirming={deletingInformeId === informeToDelete?.id}
+        error=""
+        onCancel={() => {
+          if (deletingInformeId) return;
+          setInformeToDelete(null);
+        }}
+        onConfirm={deleteInforme}
+      />
 
       {/* Private notes */}
       {paciente.notas_privadas && (
@@ -1366,7 +2296,7 @@ export default function PacienteDetailPage() {
 
         {/* Collapsible Controls */}
         {showChatControls && (
-          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-4 animate-fade-in-up sm:grid-cols-[1fr_1fr_auto]">
+          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-4 animate-fade-in-up sm:grid-cols-[1fr_1fr_auto_auto]">
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Conversación
@@ -1417,6 +2347,22 @@ export default function PacienteDetailPage() {
                 <Save className="h-4 w-4" />
               )}
               Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const selected = chatConversations.find((c) => c.id === chatId) || null;
+                setChatToDelete(selected);
+              }}
+              disabled={!chatId || deletingChat}
+              className="inline-flex items-center justify-center gap-1.5 self-end rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive shadow-subtle transition-all hover:bg-destructive/10 disabled:opacity-50"
+            >
+              {deletingChat ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Eliminar
             </button>
           </div>
         )}
@@ -1499,6 +2445,22 @@ export default function PacienteDetailPage() {
                     >
                       <p className="whitespace-pre-wrap">{message.contenido}</p>
                     </div>
+
+                    {!isUser && (
+                      <button
+                        type="button"
+                        onClick={() => saveMessageAsInforme(message)}
+                        disabled={savingInformeId === message.id}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      >
+                        {savingInformeId === message.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Save className="h-3 w-3" />
+                        )}
+                        Guardar como informe
+                      </button>
+                    )}
 
                     {/* Timestamp */}
                     <p
@@ -1604,6 +2566,24 @@ export default function PacienteDetailPage() {
           </button>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={!!chatToDelete}
+        title="Eliminar conversación IA"
+        description={
+          chatToDelete
+            ? `Se eliminará permanentemente la conversación "${chatToDelete.titulo || "Nueva conversación"}" y todos sus mensajes.`
+            : ""
+        }
+        confirmLabel="Eliminar conversación"
+        confirming={deletingChat}
+        error=""
+        onCancel={() => {
+          if (deletingChat) return;
+          setChatToDelete(null);
+        }}
+        onConfirm={deleteChatConversation}
+      />
     </div>
   );
 }

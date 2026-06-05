@@ -1,4 +1,5 @@
 import os
+import re
 from io import BytesIO
 from django.conf import settings
 from django.db import transaction
@@ -382,6 +383,8 @@ class SesionViewSet(viewsets.ModelViewSet):
         )
         draw_line(title, "Helvetica-Bold", 16, 22)
         draw_line(f"Paciente: {sesion.paciente.nombre_completo}")
+        if sesion.numero_sesion:
+            draw_line(f"Número de sesión: {sesion.numero_sesion}")
         draw_line(f"Fecha: {sesion.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}")
         draw_line(f"Estado: {sesion.estado}")
         if sesion.documento_nombre_original:
@@ -425,3 +428,58 @@ class SesionViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         filename = f"sesion-{sesion.id}.pdf"
         return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    @action(detail=True, methods=["get"])
+    def exportar_docx(self, request, pk=None):
+        from docx import Document
+
+        sesion = self.get_object()
+        document = Document()
+        title = (
+            "Documento externo cargado"
+            if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Reporte de sesión psicológica"
+        )
+        document.add_heading(title, level=1)
+        document.add_paragraph(f"Paciente: {sesion.paciente.nombre_completo}")
+        if sesion.numero_sesion:
+            document.add_paragraph(f"Número de sesión: {sesion.numero_sesion}")
+        document.add_paragraph(f"Fecha: {sesion.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}")
+        document.add_paragraph(f"Estado: {sesion.estado}")
+        if sesion.documento_nombre_original:
+            document.add_paragraph(f"Archivo: {sesion.documento_nombre_original}")
+        if sesion.duracion_segundos:
+            document.add_paragraph(f"Duración: {sesion.duracion_segundos} segundos")
+
+        if sesion.notas_sesion:
+            document.add_heading("Notas del psicólogo", level=2)
+            for line in sesion.notas_sesion.splitlines():
+                document.add_paragraph(line)
+
+        section_title = (
+            "Contenido extraído"
+            if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO
+            else "Transcripción"
+        )
+        document.add_heading(section_title, level=2)
+        for segmento in sesion.segmentos.all():
+            if sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
+                document.add_paragraph(f"Parte {segmento.orden}", style="Heading 3")
+            else:
+                document.add_paragraph(
+                    f"[{segmento.inicio_segundo:.1f}s-{segmento.fin_segundo:.1f}s] {segmento.hablante}",
+                    style="Heading 3",
+                )
+            document.add_paragraph(segmento.texto)
+
+        buffer = BytesIO()
+        document.save(buffer)
+        buffer.seek(0)
+        filename = f"{self._export_filename(sesion)}.docx"
+        return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    def _export_filename(self, sesion):
+        base = sesion.documento_nombre_original or f"sesion-{sesion.id}"
+        base = os.path.splitext(base)[0]
+        clean = re.sub(r"[^A-Za-z0-9_-]+", "-", base.strip().lower()).strip("-")
+        return clean or f"sesion-{sesion.id}"

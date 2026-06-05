@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.db.models import Max
 from django.utils import timezone
 from pgvector.django import VectorField
 from pacientes.models import Paciente
@@ -9,7 +10,7 @@ class Sesion(models.Model):
     class Origen(models.TextChoices):
         AUDIO = "AUDIO", "Audio"
         DOCUMENTO_EXTERNO = "DOCUMENTO_EXTERNO", "Documento externo"
-        VIRTUAL = "VIRTUAL", "Sesión virtual"
+        VIRTUAL = "VIRTUAL", "Sesión remota"
 
     class Plataforma(models.TextChoices):
         GOOGLE_MEET = "GOOGLE_MEET", "Google Meet"
@@ -31,6 +32,7 @@ class Sesion(models.Model):
         on_delete=models.SET_NULL,
         related_name="sesiones_psicologo",
     )
+    numero_sesion = models.PositiveIntegerField(null=True, blank=True, db_index=True)
     fecha_hora_inicio = models.DateTimeField(default=timezone.now)
     duracion_segundos = models.PositiveIntegerField(null=True, blank=True)
     audio_path = models.CharField(max_length=500, blank=True, default="")
@@ -54,8 +56,25 @@ class Sesion(models.Model):
     class Meta:
         ordering = ["-fecha_hora_inicio"]
 
+    def save(self, *args, **kwargs):
+        if (
+            self.numero_sesion is None
+            and self.paciente_id
+            and self.origen != self.Origen.DOCUMENTO_EXTERNO
+        ):
+            max_numero = (
+                Sesion.objects.filter(paciente_id=self.paciente_id)
+                .exclude(pk=self.pk)
+                .exclude(origen=self.Origen.DOCUMENTO_EXTERNO)
+                .aggregate(max_numero=Max("numero_sesion"))["max_numero"]
+                or 0
+            )
+            self.numero_sesion = max_numero + 1
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Sesión {self.paciente} - {self.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}"
+        numero = f" #{self.numero_sesion}" if self.numero_sesion else ""
+        return f"Sesión{numero} {self.paciente} - {self.fecha_hora_inicio.strftime('%d/%m/%Y %H:%M')}"
 
 
 class TranscripcionSegmento(models.Model):
