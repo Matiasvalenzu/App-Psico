@@ -121,6 +121,13 @@ interface InformeIA {
   created_at: string;
 }
 
+const CHAT_SUGGESTED_PROMPTS = [
+  "Elabora un informe clínico breve del proceso terapéutico de este paciente.",
+  "Genera un resumen clínico con temas trabajados, indicadores relevantes y límites de la información disponible.",
+  "Analiza el caso y sugiere objetivos pendientes para las próximas sesiones.",
+  "Prepara la próxima sesión considerando avances, alertas o riesgos y focos de intervención.",
+];
+
 interface TestSendResult {
   id: number;
   public_url: string;
@@ -647,6 +654,17 @@ export default function PacienteDetailPage() {
         next.add(messageId);
       }
       return next;
+    });
+  }
+
+  function selectSuggestedChatPrompt(prompt: string) {
+    setChatInput(prompt);
+    requestAnimationFrame(() => {
+      if (!textareaRef.current) return;
+      textareaRef.current.focus();
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height =
+        Math.min(textareaRef.current.scrollHeight, 120) + "px";
     });
   }
 
@@ -2738,6 +2756,25 @@ export default function PacienteDetailPage() {
             </div>
           )}
           <div ref={messagesEndRef} />
+        </div>
+
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Preguntas sugeridas
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {CHAT_SUGGESTED_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => selectSuggestedChatPrompt(prompt)}
+                disabled={sendingChat || creatingChat}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Chat Input */}

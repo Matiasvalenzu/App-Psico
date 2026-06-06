@@ -1,5 +1,6 @@
 import re
 import requests
+import unicodedata
 from io import BytesIO
 from django.conf import settings
 from django.db.models import Count
@@ -206,11 +207,36 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
             return ""
         return "Contexto clínico registrado del paciente:\n" + "\n".join(lineas)
 
+    def _normalizar_texto(self, texto):
+        texto = unicodedata.normalize("NFKD", texto or "")
+        texto = "".join(char for char in texto if not unicodedata.combining(char))
+        return " ".join(texto.lower().split())
+
+    def _usar_modo_informe(self, pregunta):
+        pregunta_normalizada = self._normalizar_texto(pregunta)
+        activadores = [
+            "informe",
+            "resumen clinico",
+            "resumen del proceso",
+            "analiza el caso",
+            "analisis del caso",
+            "evalua el proceso",
+            "evaluacion del proceso",
+            "prepara la proxima sesion",
+            "plan de intervencion",
+            "hipotesis clinica",
+            "objetivos pendientes",
+            "alertas o riesgos",
+            "sugerencias para proxima sesion",
+        ]
+        return any(activador in pregunta_normalizada for activador in activadores)
+
     def _consultar_deepseek(self, pregunta, contexto):
         if not settings.DEEPSEEK_API_KEY:
             return "API de DeepSeek no configurada. Configura DEEPSEEK_API_KEY en el entorno."
 
-        system_prompt = (
+        usar_modo_informe = self._usar_modo_informe(pregunta)
+        reglas_base = (
             "Eres un asistente clínico de apoyo para psicólogos. "
             "Tu rol es ayudar al profesional a ordenar información, detectar patrones "
             "y preparar la siguiente sesión, sin reemplazar su criterio clínico. "
@@ -220,12 +246,25 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
             "Separa evidencia observada de inferencias. "
             "Si falta información, decláralo explícitamente. "
             "Cuando sea posible, cita fechas o fuentes de sesiones. "
-            "Estructura la respuesta con estos bloques, omitiendo solo los que no apliquen: "
-            "Resumen del proceso; Temas trabajados; Objetivos pendientes; "
-            "Indicadores relevantes; Alertas o riesgos; Sugerencias para próxima sesión; "
-            "Límites de la respuesta. No uses Markdown ni asteriscos. Si necesitas títulos, "
-            "escríbelos en mayúsculas."
+            "No uses Markdown ni asteriscos. Si necesitas títulos, escríbelos en mayúsculas. "
         )
+        if usar_modo_informe:
+            system_prompt = reglas_base + (
+                "El psicólogo pidió explícitamente un informe, análisis clínico o preparación estructurada. "
+                "Estructura la respuesta con estos bloques, omitiendo solo los que no apliquen: "
+                "Resumen del proceso; Temas trabajados; Objetivos pendientes; "
+                "Indicadores relevantes; Alertas o riesgos; Sugerencias para próxima sesión; "
+                "Límites de la respuesta."
+            )
+            max_tokens = 2000
+        else:
+            system_prompt = reglas_base + (
+                "El psicólogo NO pidió un informe estructurado. Responde directamente solo lo preguntado. "
+                "No uses la estructura completa por bloques. Sé concreto y prioriza la utilidad clínica inmediata. "
+                "Si la pregunta apunta a un tema, área o sesión específica, limita la respuesta a ese foco. "
+                "Si la pregunta es abierta pero no solicita informe ni análisis estructurado, entrega una respuesta breve y directa."
+            )
+            max_tokens = 900
 
         try:
             response = requests.post(
@@ -244,7 +283,7 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
                         },
                     ],
                     "temperature": 0.3,
-                    "max_tokens": 2000,
+                    "max_tokens": max_tokens,
                 },
                 timeout=60,
             )

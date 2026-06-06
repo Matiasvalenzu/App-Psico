@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "voz",
     "chat",
     "evaluaciones",
+    "agenda",
 ]
 
 MIDDLEWARE = [

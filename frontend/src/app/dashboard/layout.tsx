@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
-import { ClipboardList, LogOut, Mic, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, LogOut, Mic, Users } from "lucide-react";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -81,6 +81,13 @@ export default function DashboardLayout({
               <span className="hidden min-[420px]:inline">Voz</span>
             </a>
             <a
+              href="/dashboard/agenda"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors min-[420px]:px-3 ${isActive("/dashboard/agenda")}`}
+            >
+              <CalendarDays className="h-4 w-4 shrink-0" />
+              <span className="hidden min-[420px]:inline">Agenda</span>
+            </a>
+            <a
               href="/dashboard/tests"
               className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors min-[420px]:px-3 ${isActive("/dashboard/tests")}`}
             >
@@ -112,7 +119,13 @@ export default function DashboardLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <main
+        className={`mx-auto px-4 py-8 ${
+          pathname === "/dashboard/agenda" ? "max-w-[1600px]" : "max-w-6xl"
+        }`}
+      >
+        {children}
+      </main>
     </div>
   );
 }

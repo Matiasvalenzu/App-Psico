@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [edad, setEdad] = useState("");
   const [sexo, setSexo] = useState("N");
   const [ocupacion, setOcupacion] = useState("");
+  const [emailContacto, setEmailContacto] = useState("");
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -105,6 +106,7 @@ export default function DashboardPage() {
           edad: edad ? parseInt(edad) : null,
           sexo,
           ocupacion_laboral: ocupacion,
+          email_contacto: emailContacto,
           motivo_consulta: motivo,
         }),
       });
@@ -119,6 +121,7 @@ export default function DashboardPage() {
       setEdad("");
       setSexo("N");
       setOcupacion("");
+      setEmailContacto("");
       setMotivo("");
       setSuccess("Paciente creado correctamente.");
       setTimeout(() => setSuccess(""), 3000);
@@ -253,6 +256,21 @@ export default function DashboardPage() {
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 placeholder="Ej: Ingeniero, Docente, Estudiante..."
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">
+                Correo de contacto
+              </label>
+              <input
+                type="email"
+                value={emailContacto}
+                onChange={(e) => setEmailContacto(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="correo@ejemplo.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se usará para enviar tests al paciente por correo.
+              </p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">
