@@ -18,8 +18,8 @@ docker-compose exec -T db psql -U psicologo -d psicologo -c "<SQL>"
 
 ## Estructura backend (`backend/`)
 ```
-config/settings/base.py   — settings centrales (WHISPER_*, PYANNOTE_*, SPEAKER_*)
-sesiones/tasks.py         — pipeline de audio (Whisper → Pyannote → ECAPA)
+config/settings/base.py   — settings centrales (WHISPER_*, PYANNOTE_API_*, SPEAKER_*)
+sesiones/tasks.py         — pipeline de audio (Whisper → PyannoteAI API → ECAPA)
 sesiones/models.py        — Sesion, TranscripcionSegmento, SpeakerIdentificationResult
 pacientes/models.py       — Paciente
 voz/models.py             — VoiceProfile
@@ -28,7 +28,7 @@ voz/services.py           — embeddings de voz (get_speaker_encoder con lru_cac
 
 ## Pipeline de audio (sesiones/tasks.py)
 1. `_get_whisper_model()` — carga Whisper una vez por proceso (cache global `_whisper_model`)
-2. `_get_pyannote_pipeline()` — carga Pyannote una vez (cache global `_pyannote_pipeline`)
+2. `_run_diarization()` — sube el audio a PyannoteAI API y espera el job de diarización
 3. Diarización con `min_speakers=1, max_speakers=2` (psicólogo + paciente)
 4. Identificación por ECAPA: score ≥ `SPEAKER_MATCH_THRESHOLD` (0.35) con margen 0.05
 5. Segmentos guardados en `TranscripcionSegmento` con embedding de texto
@@ -56,14 +56,14 @@ public/logo-icon.jpg            — ícono DatnexiA (1455×1600)
 |---|---|
 | `WHISPER_MODEL` | `base` |
 | `WHISPER_DEVICE` | `cpu` |
-| `PYANNOTE_AUTH_TOKEN` | (requerido para diarización) |
-| `PYANNOTE_PIPELINE_MODEL` | `pyannote/speaker-diarization-3.1` |
+| `PYANNOTE_AUTH_TOKEN` | (API key `sk_` requerida para diarización) |
+| `PYANNOTE_API_MODEL` | `precision-2` |
 | `SPEAKER_MATCH_THRESHOLD` | `0.35` |
 | `SPEAKER_MATCH_MARGIN` | `0.05` |
 | `DEEPSEEK_API_KEY` | (para chat IA) |
 
 ## Notas importantes
-- Los modelos Whisper y Pyannote se cachean en variables globales del proceso Celery — reiniciar el worker borra el cache
+- El modelo Whisper se cachea en una variable global del proceso Celery — reiniciar el worker borra el cache
 - En ARM64/WSL2 sin GPU, diarizar 56 min toma ~10-15 min (con `max_speakers=2`)
 - La primera sesión del día paga el costo de carga de modelos (~1-2 min)
 - Los logos JPG tienen fondo blanco — se muestran en contenedor `bg-white rounded-lg`

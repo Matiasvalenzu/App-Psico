@@ -14,7 +14,6 @@ gunicorn>=22.0
 requests>=2.31
 pgvector>=0.2.5
 faster-whisper>=1.0.0
-pyannote.audio>=3.1.1
 torch>=2.2.0
 torchaudio>=2.2.0
 torchvision>=0.17.0

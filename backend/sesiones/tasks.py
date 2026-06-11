@@ -1,5 +1,10 @@
 import logging
+import mimetypes
+import time
+import uuid
+from pathlib import Path
 
+import requests
 from celery import shared_task
 from django.conf import settings
 
@@ -8,7 +13,6 @@ from voz.models import VoiceProfile
 from voz.services import (
     average_embeddings,
     cosine_similarity,
-    decode_audio_for_pyannote,
     extract_voice_embedding_from_path,
     get_audio_duration_seconds,
 )
@@ -18,10 +22,10 @@ from .models import Sesion, SpeakerIdentificationResult, TranscripcionSegmento
 logger = logging.getLogger(__name__)
 
 FULL_AUDIO_LABEL = "AUDIO_COMPLETO"
+PYANNOTE_TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
 
 # Cached models — loaded once per worker process, reused across tasks.
 _whisper_model = None
-_pyannote_pipeline = None
 
 
 def _get_whisper_model():
@@ -36,25 +40,6 @@ def _get_whisper_model():
         )
         logger.info("Modelo Whisper cargado.")
     return _whisper_model
-
-
-def _get_pyannote_pipeline():
-    global _pyannote_pipeline
-    if _pyannote_pipeline is None:
-        from pyannote.audio import Pipeline
-        logger.info("Cargando pipeline Pyannote '%s'…", settings.PYANNOTE_PIPELINE_MODEL)
-        try:
-            _pyannote_pipeline = Pipeline.from_pretrained(
-                settings.PYANNOTE_PIPELINE_MODEL,
-                token=settings.PYANNOTE_AUTH_TOKEN,
-            )
-        except TypeError:
-            _pyannote_pipeline = Pipeline.from_pretrained(
-                settings.PYANNOTE_PIPELINE_MODEL,
-                use_auth_token=settings.PYANNOTE_AUTH_TOKEN,
-            )
-        logger.info("Pipeline Pyannote cargado.")
-    return _pyannote_pipeline
 
 
 def _run_whisper(audio_path):
@@ -76,31 +61,139 @@ def _run_whisper(audio_path):
     ]
 
 
+def _pyannote_api_url(path):
+    return f"{settings.PYANNOTE_API_BASE_URL.rstrip('/')}{path}"
+
+
+def _pyannote_headers():
+    return {"Authorization": f"Bearer {settings.PYANNOTE_AUTH_TOKEN}"}
+
+
+def _raise_for_pyannote_response(response, action):
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        detail = response.text[:500]
+        raise RuntimeError(
+            f"PyannoteAI {action} falló ({response.status_code}): {detail}"
+        ) from exc
+
+
+def _upload_audio_to_pyannote(audio_path):
+    suffix = Path(audio_path).suffix or ".audio"
+    media_url = f"media://sesiones/{uuid.uuid4().hex}{suffix}"
+
+    response = requests.post(
+        _pyannote_api_url("/v1/media/input"),
+        json={"url": media_url},
+        headers={**_pyannote_headers(), "Content-Type": "application/json"},
+        timeout=settings.PYANNOTE_API_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_for_pyannote_response(response, "no pudo crear URL de subida")
+    upload_url = response.json().get("url")
+    if not upload_url:
+        raise RuntimeError("PyannoteAI no devolvió URL de subida.")
+
+    content_type = mimetypes.guess_type(audio_path)[0] or "application/octet-stream"
+    with open(audio_path, "rb") as audio_file:
+        upload_response = requests.put(
+            upload_url,
+            data=audio_file,
+            headers={"Content-Type": content_type},
+            timeout=settings.PYANNOTE_API_UPLOAD_TIMEOUT_SECONDS,
+        )
+    _raise_for_pyannote_response(upload_response, "no pudo subir audio")
+    return media_url
+
+
+def _create_pyannote_diarization_job(media_url):
+    payload = {
+        "url": media_url,
+        "minSpeakers": 1,
+        "maxSpeakers": 2,
+        "exclusive": True,
+    }
+    if settings.PYANNOTE_API_MODEL:
+        payload["model"] = settings.PYANNOTE_API_MODEL
+
+    response = requests.post(
+        _pyannote_api_url("/v1/diarize"),
+        json=payload,
+        headers={**_pyannote_headers(), "Content-Type": "application/json"},
+        timeout=settings.PYANNOTE_API_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_for_pyannote_response(response, "no pudo crear job de diarización")
+    job_id = response.json().get("jobId")
+    if not job_id:
+        raise RuntimeError("PyannoteAI no devolvió jobId.")
+    return job_id
+
+
+def _wait_for_pyannote_job(job_id):
+    deadline = time.monotonic() + settings.PYANNOTE_API_TIMEOUT_SECONDS
+
+    while True:
+        response = requests.get(
+            _pyannote_api_url(f"/v1/jobs/{job_id}"),
+            headers=_pyannote_headers(),
+            timeout=settings.PYANNOTE_API_REQUEST_TIMEOUT_SECONDS,
+        )
+        _raise_for_pyannote_response(response, "no pudo consultar job")
+        data = response.json()
+        status = data.get("status")
+
+        if status == "succeeded":
+            return data
+        if status in PYANNOTE_TERMINAL_STATUSES:
+            output = data.get("output") or {}
+            detail = output.get("error") or output.get("warning") or status
+            raise RuntimeError(
+                f"PyannoteAI job {job_id} terminó en estado {status}: {detail}"
+            )
+        if time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"PyannoteAI job {job_id} excedió timeout de "
+                f"{settings.PYANNOTE_API_TIMEOUT_SECONDS}s."
+            )
+
+        time.sleep(settings.PYANNOTE_API_POLL_INTERVAL_SECONDS)
+
+
+def _extract_pyannote_turns(job_data):
+    output = job_data.get("output") or {}
+    if output.get("warning"):
+        logger.warning("PyannoteAI warning: %s", output["warning"])
+
+    segments = output.get("exclusiveDiarization") or output.get("diarization") or []
+    turns = []
+    for segment in segments:
+        start = segment.get("start")
+        end = segment.get("end")
+        speaker = segment.get("speaker")
+        if start is None or end is None or speaker is None:
+            continue
+        turns.append(
+            {
+                "start": float(start),
+                "end": float(end),
+                "speaker": str(speaker),
+            }
+        )
+    return turns
+
+
 def _run_diarization(audio_path):
     if not settings.PYANNOTE_AUTH_TOKEN:
         logger.info("PYANNOTE_AUTH_TOKEN no configurado; se omite diarización.")
         return []
 
-    pipeline = _get_pyannote_pipeline()
-
-    # Acotar a max 2 speakers (psicólogo + paciente) acelera el clustering;
-    # min=1 permite que grabaciones de un solo hablante no se dividan artificialmente.
-    diarization_output = pipeline(decode_audio_for_pyannote(audio_path), min_speakers=1, max_speakers=2)
-    diarization = getattr(
-        diarization_output,
-        "exclusive_speaker_diarization",
-        diarization_output,
-    )
-
-    turns = []
-    for turn, _track, speaker in diarization.itertracks(yield_label=True):
-        turns.append(
-            {
-                "start": float(turn.start),
-                "end": float(turn.end),
-                "speaker": str(speaker),
-            }
-        )
+    logger.info("Subiendo audio a PyannoteAI para diarización.")
+    media_url = _upload_audio_to_pyannote(audio_path)
+    job_id = _create_pyannote_diarization_job(media_url)
+    logger.info("PyannoteAI job %s creado; esperando resultado.", job_id)
+    job_data = _wait_for_pyannote_job(job_id)
+    turns = _extract_pyannote_turns(job_data)
+    logger.info("PyannoteAI job %s completado con %s turnos.", job_id, len(turns))
     return turns
 
 
