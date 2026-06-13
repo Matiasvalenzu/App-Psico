@@ -8,14 +8,14 @@ from .models import AgendaCita
 
 
 class AgendaCitaSerializer(serializers.ModelSerializer):
-    paciente_nombre_completo = serializers.CharField(
-        source="paciente.nombre_completo",
-        read_only=True,
+    paciente = serializers.PrimaryKeyRelatedField(
+        queryset=Paciente.objects.all(),
+        required=False,
+        allow_null=True,
     )
-    paciente_telefono_whatsapp = serializers.CharField(
-        source="paciente.telefono_whatsapp",
-        read_only=True,
-    )
+    paciente_nombre_completo = serializers.SerializerMethodField()
+    paciente_telefono_whatsapp = serializers.SerializerMethodField()
+    paciente_email_contacto = serializers.SerializerMethodField()
 
     class Meta:
         model = AgendaCita
@@ -24,6 +24,12 @@ class AgendaCitaSerializer(serializers.ModelSerializer):
             "paciente",
             "paciente_nombre_completo",
             "paciente_telefono_whatsapp",
+            "paciente_email_contacto",
+            "prospecto_nombre",
+            "prospecto_apellido",
+            "prospecto_email",
+            "prospecto_telefono_whatsapp",
+            "prospecto_motivo_consulta",
             "inicio",
             "fin",
             "estado",
@@ -34,6 +40,8 @@ class AgendaCitaSerializer(serializers.ModelSerializer):
             "grupo_recurrencia",
             "confirmacion_solicitada_at",
             "confirmada_at",
+            "google_synced_at",
+            "google_sync_error",
             "created_at",
             "updated_at",
         ]
@@ -41,10 +49,13 @@ class AgendaCitaSerializer(serializers.ModelSerializer):
             "id",
             "paciente_nombre_completo",
             "paciente_telefono_whatsapp",
+            "paciente_email_contacto",
             "fin",
             "grupo_recurrencia",
             "confirmacion_solicitada_at",
             "confirmada_at",
+            "google_synced_at",
+            "google_sync_error",
             "created_at",
             "updated_at",
         ]
@@ -58,13 +69,41 @@ class AgendaCitaSerializer(serializers.ModelSerializer):
                 activo=True,
             )
 
+    def get_paciente_nombre_completo(self, obj):
+        if obj.paciente_id and obj.paciente:
+            return obj.paciente.nombre_completo
+        nombre = f"{obj.prospecto_nombre} {obj.prospecto_apellido}".strip()
+        return nombre or "Sin paciente"
+
+    def get_paciente_telefono_whatsapp(self, obj):
+        if obj.paciente_id and obj.paciente:
+            return obj.paciente.telefono_whatsapp
+        return obj.prospecto_telefono_whatsapp
+
+    def get_paciente_email_contacto(self, obj):
+        if obj.paciente_id and obj.paciente:
+            return obj.paciente.email_contacto
+        return obj.prospecto_email
+
     def validate(self, attrs):
         inicio = attrs.get("inicio") or getattr(self.instance, "inicio", None)
         recurrencia = attrs.get("recurrencia", AgendaCita.Recurrencia.NINGUNA)
         recurrente_hasta = attrs.get("recurrente_hasta")
+        paciente = attrs.get("paciente", getattr(self.instance, "paciente", None))
+        prospecto_nombre = attrs.get(
+            "prospecto_nombre", getattr(self.instance, "prospecto_nombre", "")
+        )
+        prospecto_apellido = attrs.get(
+            "prospecto_apellido", getattr(self.instance, "prospecto_apellido", "")
+        )
 
         if inicio:
             attrs["fin"] = inicio + timedelta(hours=1)
+
+        if not paciente and not (prospecto_nombre and prospecto_apellido):
+            raise serializers.ValidationError(
+                {"paciente": "Selecciona un paciente o ingresa nombre y apellido del posible paciente."}
+            )
 
         if self.instance:
             return attrs

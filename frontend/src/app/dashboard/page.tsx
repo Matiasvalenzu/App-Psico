@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [sexo, setSexo] = useState("N");
   const [ocupacion, setOcupacion] = useState("");
   const [emailContacto, setEmailContacto] = useState("");
+  const [telefonoWhatsapp, setTelefonoWhatsapp] = useState("");
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -107,6 +108,7 @@ export default function DashboardPage() {
           sexo,
           ocupacion_laboral: ocupacion,
           email_contacto: emailContacto,
+          telefono_whatsapp: telefonoWhatsapp,
           motivo_consulta: motivo,
         }),
       });
@@ -122,6 +124,7 @@ export default function DashboardPage() {
       setSexo("N");
       setOcupacion("");
       setEmailContacto("");
+      setTelefonoWhatsapp("");
       setMotivo("");
       setSuccess("Paciente creado correctamente.");
       setTimeout(() => setSuccess(""), 3000);
@@ -270,6 +273,20 @@ export default function DashboardPage() {
               />
               <p className="text-xs text-muted-foreground">
                 Se usará para enviar tests al paciente por correo.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">
+                WhatsApp
+              </label>
+              <input
+                value={telefonoWhatsapp}
+                onChange={(e) => setTelefonoWhatsapp(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="Ej: +56 9 1234 5678"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se usará para confirmaciones de agenda por WhatsApp.
               </p>
             </div>
             <div className="space-y-2">

@@ -20,9 +20,12 @@ import {
   ChevronRight,
   Clock,
   Loader2,
+  Link2,
   MessageCircle,
   Plus,
+  RefreshCw,
   Trash2,
+  UserPlus,
   X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -34,6 +37,7 @@ type AgendaEstado =
   | "ANULADA";
 
 type Recurrencia = "NINGUNA" | "SEMANAL" | "QUINCENAL";
+type AgendaTipoPaciente = "EXISTENTE" | "PROSPECTO";
 
 interface PacienteOption {
   id: number;
@@ -44,9 +48,15 @@ interface PacienteOption {
 
 interface AgendaCita {
   id: number;
-  paciente: number;
+  paciente: number | null;
   paciente_nombre_completo: string;
   paciente_telefono_whatsapp: string;
+  paciente_email_contacto: string;
+  prospecto_nombre: string;
+  prospecto_apellido: string;
+  prospecto_email: string;
+  prospecto_telefono_whatsapp: string;
+  prospecto_motivo_consulta: string;
   inicio: string;
   fin: string;
   estado: AgendaEstado;
@@ -57,6 +67,16 @@ interface AgendaCita {
   grupo_recurrencia: string | null;
   confirmacion_solicitada_at: string | null;
   confirmada_at: string | null;
+  google_synced_at: string | null;
+  google_sync_error: string;
+}
+
+interface GoogleCalendarStatus {
+  configured: boolean;
+  connected: boolean;
+  calendar_name: string;
+  calendar_id: string;
+  last_synced_at: string | null;
 }
 
 const STATUS_LABELS: Record<AgendaEstado, string> = {
@@ -108,12 +128,22 @@ export default function AgendaPage() {
   const [activeView, setActiveView] = useState("dayGridMonth");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCita, setSelectedCita] = useState<AgendaCita | null>(null);
+  const [tipoPaciente, setTipoPaciente] = useState<AgendaTipoPaciente>("EXISTENTE");
   const [pacienteId, setPacienteId] = useState("");
+  const [prospectoNombre, setProspectoNombre] = useState("");
+  const [prospectoApellido, setProspectoApellido] = useState("");
+  const [prospectoEmail, setProspectoEmail] = useState("");
+  const [prospectoWhatsapp, setProspectoWhatsapp] = useState("");
+  const [prospectoMotivo, setProspectoMotivo] = useState("");
   const [inicio, setInicio] = useState("");
   const [notas, setNotas] = useState("");
   const [recurrencia, setRecurrencia] = useState<Recurrencia>("NINGUNA");
   const [recurrenteHasta, setRecurrenteHasta] = useState("");
   const [whatsappMessage, setWhatsappMessage] = useState("");
+  const [creatingPatient, setCreatingPatient] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState<GoogleCalendarStatus | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleSyncing, setGoogleSyncing] = useState(false);
 
   const events = useMemo<EventInput[]>(
     () =>
@@ -135,6 +165,15 @@ export default function AgendaPage() {
 
   useEffect(() => {
     loadPacientes();
+    loadGoogleStatus();
+    syncGoogleCalendar(true);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google_calendar") === "connected") {
+      setSuccess("Google Calendar conectado correctamente.");
+    }
+    if (params.get("google_calendar") === "error") {
+      setError("No se pudo conectar Google Calendar.");
+    }
   }, []);
 
   useEffect(() => {
@@ -163,6 +202,67 @@ export default function AgendaPage() {
     }
   }
 
+  async function loadGoogleStatus() {
+    try {
+      const res = await apiFetch("/agenda/google/status/");
+      if (!res.ok) throw new Error();
+      setGoogleStatus(await res.json());
+    } catch {
+      setGoogleStatus(null);
+    }
+  }
+
+  async function connectGoogleCalendar() {
+    setGoogleLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch("/agenda/google/connect/");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail || "No se pudo iniciar la conexión con Google Calendar.");
+      }
+      window.location.href = data.auth_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo iniciar la conexión con Google Calendar.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
+  async function syncGoogleCalendar(silent = false) {
+    setGoogleSyncing(true);
+    if (!silent) {
+      setError("");
+      setSuccess("");
+    }
+    try {
+      const res = await apiFetch("/agenda/google/sync/", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail || "No se pudo sincronizar Google Calendar.");
+      }
+      await loadGoogleStatus();
+      refreshCitas();
+      if (!silent) {
+        if (!data.google_to_app?.connected) {
+          setError("Conecta Google Calendar antes de sincronizar.");
+        } else {
+          const imported = data.google_to_app.created || 0;
+          const updated = data.google_to_app.updated || 0;
+          const pushed = data.app_to_google.synced || 0;
+          setSuccess(`Google Calendar sincronizado. Importadas ${imported}, actualizadas ${updated}, enviadas ${pushed}.`);
+        }
+      }
+    } catch (err) {
+      if (!silent) {
+        setError(err instanceof Error ? err.message : "No se pudo sincronizar Google Calendar.");
+      }
+    } finally {
+      setGoogleSyncing(false);
+    }
+  }
+
   async function loadCitas(start: string, end: string) {
     setLoading(true);
     try {
@@ -180,7 +280,13 @@ export default function AgendaPage() {
 
   function openCreateModal(startDate: Date) {
     setSelectedCita(null);
+    setTipoPaciente("EXISTENTE");
     setPacienteId("");
+    setProspectoNombre("");
+    setProspectoApellido("");
+    setProspectoEmail("");
+    setProspectoWhatsapp("");
+    setProspectoMotivo("");
     setInicio(toDateTimeInputValue(startDate));
     setNotas("");
     setRecurrencia("NINGUNA");
@@ -192,7 +298,13 @@ export default function AgendaPage() {
 
   function openEditModal(cita: AgendaCita) {
     setSelectedCita(cita);
-    setPacienteId(String(cita.paciente));
+    setTipoPaciente(cita.paciente ? "EXISTENTE" : "PROSPECTO");
+    setPacienteId(cita.paciente ? String(cita.paciente) : "");
+    setProspectoNombre(cita.prospecto_nombre || "");
+    setProspectoApellido(cita.prospecto_apellido || "");
+    setProspectoEmail(cita.prospecto_email || "");
+    setProspectoWhatsapp(cita.prospecto_telefono_whatsapp || "");
+    setProspectoMotivo(cita.prospecto_motivo_consulta || "");
     setInicio(toDateTimeInputValue(new Date(cita.inicio)));
     setNotas(cita.notas || "");
     setRecurrencia(cita.recurrencia || "NINGUNA");
@@ -262,11 +374,27 @@ export default function AgendaPage() {
     setError("");
     setSuccess("");
     try {
+      if (tipoPaciente === "EXISTENTE" && !pacienteId) {
+        throw new Error("Selecciona un paciente para agendar la cita.");
+      }
+      if (tipoPaciente === "PROSPECTO" && (!prospectoNombre.trim() || !prospectoApellido.trim())) {
+        throw new Error("Ingresa nombre y apellido del posible paciente.");
+      }
+
       const payload: Record<string, unknown> = {
-        paciente: Number(pacienteId),
         inicio: new Date(inicio).toISOString(),
         notas,
       };
+      if (tipoPaciente === "EXISTENTE") {
+        payload.paciente = Number(pacienteId);
+      } else {
+        payload.paciente = null;
+        payload.prospecto_nombre = prospectoNombre.trim();
+        payload.prospecto_apellido = prospectoApellido.trim();
+        payload.prospecto_email = prospectoEmail.trim();
+        payload.prospecto_telefono_whatsapp = prospectoWhatsapp.trim();
+        payload.prospecto_motivo_consulta = prospectoMotivo.trim();
+      }
       if (!selectedCita) {
         payload.recurrencia = recurrencia;
         if (recurrencia !== "NINGUNA") payload.recurrente_hasta = recurrenteHasta;
@@ -290,6 +418,30 @@ export default function AgendaPage() {
       setError(err instanceof Error ? err.message : "No se pudo guardar la cita.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function crearFichaDesdeCita() {
+    if (!selectedCita) return;
+    setCreatingPatient(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch(`/agenda/citas/${selectedCita.id}/crear_paciente/`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "No se pudo crear la ficha del paciente.");
+      }
+      await loadPacientes();
+      setModalOpen(false);
+      setSuccess(`Ficha creada para ${data.paciente.nombre_completo}.`);
+      refreshCitas();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo crear la ficha del paciente.");
+    } finally {
+      setCreatingPatient(false);
     }
   }
 
@@ -347,7 +499,7 @@ export default function AgendaPage() {
         window.open(data.whatsapp_url, "_blank", "noopener,noreferrer");
         setSuccess("Confirmación solicitada. Envía el mensaje abierto en WhatsApp.");
       } else {
-        setSuccess("Confirmación solicitada. El paciente no tiene teléfono WhatsApp registrado.");
+        setSuccess("Confirmación solicitada. La cita no tiene teléfono WhatsApp registrado.");
       }
       refreshCitas();
     } catch {
@@ -376,19 +528,42 @@ export default function AgendaPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Agenda</h1>
               <p className="text-sm text-muted-foreground">
-                Programa sesiones de 1 hora, mueve horarios y solicita confirmaciones por WhatsApp.
+                Agenda pacientes con ficha o posibles pacientes y solicita confirmaciones por WhatsApp.
               </p>
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => openCreateModal(defaultStartForDate(new Date()))}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Crear cita
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {googleStatus?.connected ? (
+            <button
+              type="button"
+              onClick={() => syncGoogleCalendar(false)}
+              disabled={googleSyncing}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
+            >
+              {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Sincronizar Google
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={connectGoogleCalendar}
+              disabled={googleLoading || googleStatus?.configured === false}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary shadow-subtle transition-all hover:bg-primary/15 disabled:opacity-50"
+            >
+              {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              Conectar Google
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => openCreateModal(defaultStartForDate(new Date()))}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Crear cita
+          </button>
+        </div>
       </div>
 
       {(error || success) && (
@@ -413,6 +588,44 @@ export default function AgendaPage() {
             <Plus className="h-4 w-4" />
             Crear
           </button>
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Google Calendar
+            </p>
+            <p className="mt-1 text-sm font-medium">
+              {googleStatus?.connected ? googleStatus.calendar_name : "No conectado"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {googleStatus?.configured === false
+                ? "Faltan credenciales OAuth de Google."
+                : googleStatus?.connected
+                  ? `Última sync: ${googleStatus.last_synced_at ? new Date(googleStatus.last_synced_at).toLocaleString("es-CL") : "pendiente"}`
+                  : "Sincroniza con el calendario dedicado Agenda Psicológica."}
+            </p>
+            <div className="mt-3 grid gap-2">
+              {googleStatus?.connected ? (
+                <button
+                  type="button"
+                  onClick={() => syncGoogleCalendar(false)}
+                  disabled={googleSyncing}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Sincronizar ahora
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={connectGoogleCalendar}
+                  disabled={googleLoading || googleStatus?.configured === false}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
+                >
+                  {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                  Conectar Google
+                </button>
+              )}
+            </div>
+          </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Resumen visible
@@ -433,7 +646,7 @@ export default function AgendaPage() {
             </div>
           </div>
           <div className="rounded-xl border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
-            Las citas anuladas se esconden y no bloquean el horario. Las sesiones clínicas se crean después, cuando la atención ocurra.
+            Las citas de posibles pacientes permiten crear la ficha después con los datos ya ingresados.
           </div>
         </aside>
 
@@ -546,22 +759,108 @@ export default function AgendaPage() {
             </div>
 
             <form onSubmit={saveCita} className="space-y-4 p-5">
-              <label className="space-y-2 block">
-                <span className="text-sm font-medium">Paciente</span>
-                <select
-                  value={pacienteId}
-                  onChange={(e) => setPacienteId(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Selecciona un paciente</option>
-                  {pacientes.map((paciente) => (
-                    <option key={paciente.id} value={paciente.id}>
-                      {paciente.nombre_completo || `${paciente.nombre} ${paciente.apellido}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="space-y-3">
+                <span className="text-sm font-medium">Tipo de agenda</span>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoPaciente("EXISTENTE")}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      tipoPaciente === "EXISTENTE"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    Paciente existente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoPaciente("PROSPECTO")}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      tipoPaciente === "PROSPECTO"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    Posible paciente
+                  </button>
+                </div>
+              </div>
+
+              {tipoPaciente === "EXISTENTE" ? (
+                <label className="space-y-2 block">
+                  <span className="text-sm font-medium">Paciente</span>
+                  <select
+                    value={pacienteId}
+                    onChange={(e) => setPacienteId(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Selecciona un paciente</option>
+                    {pacientes.map((paciente) => (
+                      <option key={paciente.id} value={paciente.id}>
+                        {paciente.nombre_completo || `${paciente.nombre} ${paciente.apellido}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-2 block">
+                      <span className="text-sm font-medium">Nombre</span>
+                      <input
+                        value={prospectoNombre}
+                        onChange={(e) => setProspectoNombre(e.target.value)}
+                        required={tipoPaciente === "PROSPECTO"}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="Nombre"
+                      />
+                    </label>
+                    <label className="space-y-2 block">
+                      <span className="text-sm font-medium">Apellido</span>
+                      <input
+                        value={prospectoApellido}
+                        onChange={(e) => setProspectoApellido(e.target.value)}
+                        required={tipoPaciente === "PROSPECTO"}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="Apellido"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-2 block">
+                      <span className="text-sm font-medium">Email</span>
+                      <input
+                        type="email"
+                        value={prospectoEmail}
+                        onChange={(e) => setProspectoEmail(e.target.value)}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="correo@ejemplo.com"
+                      />
+                    </label>
+                    <label className="space-y-2 block">
+                      <span className="text-sm font-medium">WhatsApp</span>
+                      <input
+                        value={prospectoWhatsapp}
+                        onChange={(e) => setProspectoWhatsapp(e.target.value)}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="Ej: +56 9 1234 5678"
+                      />
+                    </label>
+                  </div>
+                  <label className="space-y-2 block">
+                    <span className="text-sm font-medium">Motivo de consulta</span>
+                    <textarea
+                      value={prospectoMotivo}
+                      onChange={(e) => setProspectoMotivo(e.target.value)}
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="Motivo inicial de consulta..."
+                    />
+                  </label>
+                </div>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-2 block">
@@ -620,19 +919,25 @@ export default function AgendaPage() {
               )}
 
               <label className="space-y-2 block">
-                <span className="text-sm font-medium">Notas internas</span>
+                <span className="text-sm font-medium">Comentarios adicionales</span>
                 <textarea
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
                   rows={3}
                   className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Notas breves para la agenda..."
+                  placeholder="Comentarios breves para la agenda..."
                 />
               </label>
 
               {selectedPatient && (
                 <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   Paciente seleccionado: {selectedPatient.nombre_completo}
+                </div>
+              )}
+
+              {selectedCita && !selectedCita.paciente && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                  Esta cita corresponde a un posible paciente. Puedes crear su ficha desde aquí si decide atenderse.
                 </div>
               )}
 
@@ -646,10 +951,21 @@ export default function AgendaPage() {
                 <div className="flex flex-wrap gap-2">
                   {selectedCita && (
                     <>
+                      {!selectedCita.paciente && (
+                        <button
+                          type="button"
+                          onClick={crearFichaDesdeCita}
+                          disabled={saving || creatingPatient}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
+                        >
+                          {creatingPatient ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                          Crear ficha
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={solicitarConfirmacion}
-                        disabled={saving}
+                        disabled={saving || creatingPatient}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
                       >
                         <MessageCircle className="h-4 w-4" />
@@ -658,7 +974,7 @@ export default function AgendaPage() {
                       <button
                         type="button"
                         onClick={marcarConfirmada}
-                        disabled={saving}
+                        disabled={saving || creatingPatient}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                       >
                         <Check className="h-4 w-4" />
@@ -667,7 +983,7 @@ export default function AgendaPage() {
                       <button
                         type="button"
                         onClick={anularCita}
-                        disabled={saving}
+                        disabled={saving || creatingPatient}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -686,7 +1002,7 @@ export default function AgendaPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || creatingPatient}
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                   >
                     {saving && <Loader2 className="h-4 w-4 animate-spin" />}
