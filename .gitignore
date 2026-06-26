@@ -6,6 +6,11 @@ ps_output.txt
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
+marketing/node_modules/
+marketing/.next/
+marketing/tsconfig.tsbuildinfo
+marketing/.env.local
+marketing/.env*.local
 backend/venv/
 backend/staticfiles/
 __pycache__/
