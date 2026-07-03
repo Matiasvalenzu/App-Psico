@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -63,6 +63,7 @@ interface Paciente {
   frecuencia_atencion: string;
   objetivos_intervencion: string;
   notas_privadas: string;
+  estado: string;
   activo: boolean;
   created_at: string;
 }
@@ -266,6 +267,7 @@ function cleanMarkdownEmphasis(text: string) {
 export default function PacienteDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
@@ -369,6 +371,7 @@ export default function PacienteDetailPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editQueryHandledRef = useRef(false);
 
   useEffect(() => {
     loadData();
@@ -382,6 +385,13 @@ export default function PacienteDetailPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, iaTyping]);
+
+  useEffect(() => {
+    if (!paciente || editQueryHandledRef.current || searchParams.get("editar") !== "1") return;
+    editQueryHandledRef.current = true;
+    openEditModal();
+    router.replace(`/dashboard/pacientes/${id}`);
+  }, [paciente, searchParams, router, id]);
 
   async function loadData() {
     try {

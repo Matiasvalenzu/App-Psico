@@ -6,8 +6,8 @@ from .models import Paciente
 class PacienteAdmin(admin.ModelAdmin):
     list_display = [
         "nombre", "apellido", "rut", "edad", "sexo", "ocupacion_laboral",
-        "activo", "created_at", "updated_at",
+        "estado", "activo", "created_at", "updated_at",
     ]
-    list_filter = ["activo", "sexo"]
+    list_filter = ["estado", "activo", "sexo"]
     search_fields = ["nombre", "apellido", "rut"]
     ordering = ["apellido", "nombre"]

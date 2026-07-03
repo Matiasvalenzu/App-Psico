@@ -38,6 +38,7 @@ class PacienteSerializer(serializers.ModelSerializer):
             "frecuencia_atencion",
             "objetivos_intervencion",
             "notas_privadas",
+            "estado",
             "activo",
             "created_at",
             "updated_at",
@@ -59,6 +60,7 @@ class PacienteListSerializer(serializers.ModelSerializer):
             "edad",
             "sexo",
             "ocupacion_laboral",
+            "estado",
             "activo",
             "updated_at",
         ]

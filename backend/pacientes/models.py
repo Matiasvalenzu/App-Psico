@@ -3,6 +3,13 @@ from django.conf import settings
 
 
 class Paciente(models.Model):
+    class Estado(models.TextChoices):
+        EN_SESION = "EN_SESION", "En sesión"
+        ALTA = "ALTA", "Alta"
+        ABANDONO = "ABANDONO", "Abandono"
+        PAUSADO = "PAUSADO", "Pausado"
+        DERIVADO = "DERIVADO", "Derivado"
+
     SEXO_CHOICES = [
         ("M", "Masculino"),
         ("F", "Femenino"),
@@ -49,6 +56,12 @@ class Paciente(models.Model):
     frecuencia_atencion = models.CharField(max_length=80, blank=True, default="")
     objetivos_intervencion = models.TextField(blank=True, default="")
     notas_privadas = models.TextField(blank=True, default="")
+    estado = models.CharField(
+        max_length=20,
+        choices=Estado.choices,
+        default=Estado.EN_SESION,
+        db_index=True,
+    )
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
