@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
-import { CalendarDays, ClipboardList, LogOut, Mic, Users, UserPlus, ChevronLeft } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ClipboardList,
+  LogOut,
+  Mic,
+  UserCog,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
@@ -17,6 +26,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
@@ -29,6 +39,7 @@ export default function DashboardLayout({
       try {
         const user = await getCurrentUser();
         setIsAdmin(user.username === "Admin" || user.is_admin === true);
+        setIsSuperuser(user.is_superuser === true);
         setReady(true);
       } catch {
         localStorage.clear();
@@ -48,19 +59,35 @@ export default function DashboardLayout({
     return pathname.startsWith(path);
   };
 
-  const NavItem = ({ href, icon: Icon, label }: { href: string, icon: any, label: string }) => {
+  const NavItem = ({
+    href,
+    icon: Icon,
+    label,
+  }: {
+    href: string;
+    icon: React.ElementType;
+    label: string;
+  }) => {
     const active = isActive(href);
     return (
       <Link
         href={href}
         title={isCollapsed ? label : undefined}
-        className={`group flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-all ${isCollapsed ? "justify-center px-0 mx-2" : "px-3"} ${
-          active 
-            ? "bg-sidebar-primary/10 text-sidebar-primary" 
+        className={`group flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-all ${
+          isCollapsed ? "justify-center px-0 mx-2" : "px-3"
+        } ${
+          active
+            ? "bg-sidebar-primary/10 text-sidebar-primary"
             : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         }`}
       >
-        <Icon className={`h-5 w-5 shrink-0 transition-colors ${active ? "text-sidebar-primary" : "text-sidebar-foreground/50 group-hover:text-sidebar-accent-foreground"}`} />
+        <Icon
+          className={`h-5 w-5 shrink-0 transition-colors ${
+            active
+              ? "text-sidebar-primary"
+              : "text-sidebar-foreground/50 group-hover:text-sidebar-accent-foreground"
+          }`}
+        />
         {!isCollapsed && <span>{label}</span>}
       </Link>
     );
@@ -76,23 +103,30 @@ export default function DashboardLayout({
     return "";
   };
 
+  const showAdminSection = isAdmin || isSuperuser;
+
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-20 flex flex-col border-r border-sidebar-border bg-sidebar py-6 shadow-xl transition-all duration-300 ${isCollapsed ? "w-20" : "w-64 px-4"}`}>
-        
-        {/* Toggle Button */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-20 flex flex-col border-r border-sidebar-border bg-sidebar py-6 shadow-xl transition-all duration-300 ${
+          isCollapsed ? "w-20" : "w-64 px-4"
+        }`}
+      >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-4 top-7 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:scale-110 z-50 transition-all"
+          className="absolute -right-4 top-7 z-50 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-md transition-all hover:scale-110 hover:bg-primary/90"
         >
-          <ChevronLeft className={`h-5 w-5 transition-transform duration-300 ${isCollapsed ? "rotate-180" : ""}`} />
+          <ChevronLeft
+            className={`h-5 w-5 transition-transform duration-300 ${
+              isCollapsed ? "rotate-180" : ""
+            }`}
+          />
         </button>
 
         <div className={`mb-8 flex items-center gap-2 ${isCollapsed ? "justify-center px-0" : "px-2"}`}>
           <Link href="/dashboard" className="flex h-8 items-center justify-center" aria-label="Ir al dashboard">
             {isCollapsed ? (
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-lg drop-shadow-md">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-lg font-bold text-sidebar-primary-foreground drop-shadow-md">
                 P
               </span>
             ) : (
@@ -107,33 +141,36 @@ export default function DashboardLayout({
             )}
           </Link>
         </div>
-        
+
         <nav className="flex flex-1 flex-col gap-1.5">
           <NavItem href="/dashboard" icon={Users} label="Pacientes" />
           <NavItem href="/dashboard/voz" icon={Mic} label="Voz" />
           <NavItem href="/dashboard/agenda" icon={CalendarDays} label="Agenda" />
           <NavItem href="/dashboard/tests" icon={ClipboardList} label="Tests" />
-          
-          {isAdmin && (
+
+          {showAdminSection && (
             <div className="mt-8">
               {!isCollapsed && (
                 <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
                   Administración
                 </div>
               )}
-              {isCollapsed && <div className="mb-2 w-full h-px bg-sidebar-border" />}
-              <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" />
+              {isCollapsed && <div className="mb-2 h-px w-full bg-sidebar-border" />}
+              {isAdmin && (
+                <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" />
+              )}
+              {isSuperuser && (
+                <NavItem href="/dashboard/usuarios" icon={UserCog} label="Usuarios" />
+              )}
             </div>
           )}
         </nav>
       </aside>
 
-      {/* Main Content Area */}
       <div className={`flex flex-1 flex-col transition-all duration-300 ${isCollapsed ? "pl-20" : "pl-64"}`}>
-        {/* Topbar */}
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="text-sm font-semibold text-muted-foreground/80 tracking-wide uppercase">
-             {getSectionTitle()}
+          <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground/80">
+            {getSectionTitle()}
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
@@ -151,8 +188,11 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className={`flex-1 p-6 lg:p-8 ${pathname === "/dashboard/agenda" ? "max-w-[1600px]" : "max-w-6xl"} mx-auto w-full animate-fade-in-up`}>
+        <main
+          className={`mx-auto w-full flex-1 p-6 lg:p-8 ${
+            pathname === "/dashboard/agenda" ? "max-w-[1600px]" : "max-w-6xl"
+          } animate-fade-in-up`}
+        >
           {children}
         </main>
       </div>

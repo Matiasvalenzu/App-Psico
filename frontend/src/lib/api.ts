@@ -128,6 +128,12 @@ export async function getCurrentUser() {
   return res.json();
 }
 
+export async function listUsers() {
+  const res = await apiFetch("/auth/users/list/");
+  if (!res.ok) throw new Error("No se pudieron cargar los usuarios");
+  return res.json();
+}
+
 export async function createUser(input: {
   username: string;
   password: string;

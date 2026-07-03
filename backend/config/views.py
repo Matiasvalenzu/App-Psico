@@ -11,6 +11,10 @@ def _is_admin_user(user):
     return user.is_authenticated and user.username == "Admin"
 
 
+def _is_superuser(user):
+    return user.is_authenticated and user.is_superuser
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def current_user(request):
@@ -18,6 +22,7 @@ def current_user(request):
         {
             "username": request.user.username,
             "is_admin": _is_admin_user(request.user),
+            "is_superuser": request.user.is_superuser,
         }
     )
 
@@ -76,4 +81,34 @@ def create_user(request):
             "email": user.email,
         },
         status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_users(request):
+    if not _is_superuser(request.user):
+        return Response(
+            {"detail": "No tienes permiso para listar usuarios."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    User = get_user_model()
+    users = User.objects.order_by("username")
+    return Response(
+        [
+            {
+                "id": user.id,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "is_active": user.is_active,
+                "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
+                "date_joined": user.date_joined,
+                "last_login": user.last_login,
+            }
+            for user in users
+        ]
     )
