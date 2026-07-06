@@ -230,6 +230,26 @@ export default function AgendaPage() {
     }
   }
 
+  async function disconnectGoogleCalendar() {
+    if (!confirm("¿Seguro que deseas desconectar tu Google Calendar? Dejarán de sincronizarse tus citas.")) return;
+    setGoogleLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch("/agenda/google/disconnect/", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail || "No se pudo desconectar Google Calendar.");
+      }
+      await loadGoogleStatus();
+      setSuccess("Google Calendar desconectado exitosamente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al desconectar.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   async function syncGoogleCalendar(silent = false) {
     setGoogleSyncing(true);
     if (!silent) {
@@ -535,15 +555,25 @@ export default function AgendaPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {googleStatus?.connected ? (
-            <button
-              type="button"
-              onClick={() => syncGoogleCalendar(false)}
-              disabled={googleSyncing}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
-            >
-              {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Sincronizar Google
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => syncGoogleCalendar(false)}
+                disabled={googleSyncing}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
+              >
+                {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Sincronizar Google
+              </button>
+              <button
+                type="button"
+                onClick={disconnectGoogleCalendar}
+                disabled={googleLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm font-medium text-destructive shadow-subtle transition-all hover:bg-destructive/15 disabled:opacity-50"
+              >
+                Desconectar
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -604,15 +634,25 @@ export default function AgendaPage() {
             </p>
             <div className="mt-3 grid gap-2">
               {googleStatus?.connected ? (
-                <button
-                  type="button"
-                  onClick={() => syncGoogleCalendar(false)}
-                  disabled={googleSyncing}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
-                >
-                  {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  Sincronizar ahora
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => syncGoogleCalendar(false)}
+                    disabled={googleSyncing}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                  >
+                    {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Sincronizar ahora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={disconnectGoogleCalendar}
+                    disabled={googleLoading}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/15 disabled:opacity-50 mt-1"
+                  >
+                    Desconectar
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"

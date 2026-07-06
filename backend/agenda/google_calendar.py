@@ -310,6 +310,13 @@ def _refresh_access_token(connection):
         timeout=30,
     )
     if not response.ok:
+        try:
+            data = response.json()
+            if data.get("error") == "invalid_grant":
+                connection.delete()
+                raise GoogleCalendarError("La conexión con Google ha expirado o fue revocada. Por favor, vuelve a conectar tu cuenta.")
+        except Exception:
+            pass
         raise GoogleCalendarError("No se pudo renovar la conexión con Google Calendar.")
     data = response.json()
     connection.access_token = data.get("access_token", "")

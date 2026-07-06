@@ -1,4 +1,5 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -25,8 +26,8 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+  const dialog = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 shadow-elevated">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
@@ -68,4 +69,10 @@ export default function ConfirmDialog({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined") {
+    return createPortal(dialog, document.body);
+  }
+
+  return dialog;
 }

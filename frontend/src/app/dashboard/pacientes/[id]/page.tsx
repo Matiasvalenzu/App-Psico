@@ -1,5 +1,7 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -11,6 +13,7 @@ import {
   Brain,
   Calendar,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   ClipboardList,
   Copy,
@@ -19,6 +22,7 @@ import {
   FileText,
   Loader2,
   MessageCircle,
+  MoreHorizontal,
   Pencil,
   Play,
   Plus,
@@ -264,6 +268,18 @@ function cleanMarkdownEmphasis(text: string) {
 
 // ------------ CHAT IA + PAGE ------------
 
+function ClientPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 export default function PacienteDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -296,6 +312,9 @@ export default function PacienteDetailPage() {
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
   const [chatToDelete, setChatToDelete] = useState<ChatConversacion | null>(null);
   const [deletingChat, setDeletingChat] = useState(false);
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(true);
+  const [editingConversationId, setEditingConversationId] = useState<number | null>(null);
+  const [editingConversationTitle, setEditingConversationTitle] = useState("");
 
   // Virtual session modal
   const [virtualModalOpen, setVirtualModalOpen] = useState(false);
@@ -1312,7 +1331,7 @@ export default function PacienteDetailPage() {
 
       {/* Send test modal */}
       {testModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+        <ClientPortal>
           <div className="w-full max-w-xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1404,12 +1423,12 @@ export default function PacienteDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClientPortal>
       )}
 
       {/* Edit modal */}
       {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+        <ClientPortal>
           <form
             onSubmit={handleEdit}
             className="w-full max-w-3xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
@@ -1748,7 +1767,7 @@ export default function PacienteDetailPage() {
               </button>
             </div>
           </form>
-        </div>
+        </ClientPortal>
       )}
 
       {/* External documents */}
@@ -1842,7 +1861,7 @@ export default function PacienteDetailPage() {
       </div>
 
       {selectedDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+        <ClientPortal>
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-border/60 bg-card shadow-elevated">
             <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
               <div>
@@ -1911,7 +1930,7 @@ export default function PacienteDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClientPortal>
       )}
 
       {/* Sessions header */}
@@ -1939,7 +1958,7 @@ export default function PacienteDetailPage() {
 
       {/* Virtual session modal */}
       {virtualModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+        <ClientPortal>
           <div className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-6 shadow-elevated">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2075,12 +2094,12 @@ export default function PacienteDetailPage() {
               </form>
             )}
           </div>
-        </div>
+        </ClientPortal>
       )}
 
       {/* Document modal */}
       {documentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+        <ClientPortal>
           <form
             onSubmit={handleDocumentUpload}
             className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-6 shadow-elevated"
@@ -2148,7 +2167,7 @@ export default function PacienteDetailPage() {
               </button>
             </div>
           </form>
-        </div>
+        </ClientPortal>
       )}
 
       <ConfirmDialog
@@ -2381,7 +2400,7 @@ export default function PacienteDetailPage() {
       </div>
 
       {selectedInforme && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+        <ClientPortal>
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-border/60 bg-card shadow-elevated">
             <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
               <div>
@@ -2437,7 +2456,7 @@ export default function PacienteDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClientPortal>
       )}
 
       <ConfirmDialog
@@ -2471,350 +2490,440 @@ export default function PacienteDetailPage() {
       )}
 
       {/* ──────────────────────────────────────────────── */}
-      {/*  CHAT IA  –  EL DIAMANTE                        */}
+      {/*  CHAT IA  –  ESTILO CHATGPT                     */}
       {/* ──────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-border/60 bg-card p-6 chat-glow space-y-4">
-        {/* Chat Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shadow-glow">
-              <Sparkles className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Chat IA del paciente
-                </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-soft" />
-                  IA
-                </span>
+      <div className="relative rounded-2xl border border-border/60 bg-card chat-glow overflow-clip">
+        <div className="flex" style={{ minHeight: 540 }}>
+
+          {/* ── Chat Sidebar (Historial) ── */}
+          <div
+            className={`relative flex flex-col border-r border-border/60 bg-muted/20 transition-all duration-300 overflow-hidden ${
+              isChatSidebarOpen ? "w-72 min-w-[288px]" : "w-0 min-w-0 border-r-0"
+            }`}
+          >
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between gap-2 px-4 py-4 border-b border-border/40">
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold truncate">Conversaciones</span>
               </div>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Analiza sesiones transcritas y documentos del paciente con IA
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowChatControls(!showChatControls)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent"
-            >
-              {showChatControls ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-              Controles
-            </button>
-            <button
-              type="button"
-              onClick={createChatConversation}
-              disabled={creatingChat}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card disabled:opacity-50"
-            >
-              {creatingChat ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Nueva
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Controls */}
-        {showChatControls && (
-          <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-4 animate-fade-in-up sm:grid-cols-[1fr_1fr_auto_auto]">
-            <label className="space-y-1">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Conversación
-              </span>
-              <select
-                value={chatId ?? ""}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  if (value) loadChatConversation(value);
-                }}
-                disabled={loadingChat || chatConversations.length === 0}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+              <button
+                type="button"
+                onClick={createChatConversation}
+                disabled={creatingChat}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
+                title="Nueva conversación"
               >
-                {chatConversations.length === 0 ? (
-                  <option value="">Sin conversaciones</option>
+                {creatingChat ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  chatConversations.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {formatChatOption(c)}
-                    </option>
-                  ))
+                  <Plus className="h-4 w-4" />
                 )}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Nombre
-              </span>
-              <div className="flex gap-2">
-                <input
-                  value={chatTitle}
-                  onChange={(event) => setChatTitle(event.target.value)}
-                  disabled={!chatId}
-                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
-                  placeholder="Ej: Hipótesis inicial..."
-                />
-              </div>
-            </label>
-            <button
-              type="button"
-              onClick={saveChatTitle}
-              disabled={!chatId || savingChatTitle}
-              className="inline-flex items-center justify-center gap-1.5 self-end rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
-            >
-              {savingChatTitle ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              </button>
+            </div>
+
+            {/* Conversation List */}
+            <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+              {chatConversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+                  <MessageCircle className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs text-muted-foreground">Sin conversaciones</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Crea una para empezar</p>
+                </div>
               ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Guardar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const selected = chatConversations.find((c) => c.id === chatId) || null;
-                setChatToDelete(selected);
-              }}
-              disabled={!chatId || deletingChat}
-              className="inline-flex items-center justify-center gap-1.5 self-end rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive shadow-subtle transition-all hover:bg-destructive/10 disabled:opacity-50"
-            >
-              {deletingChat ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Eliminar
-            </button>
-          </div>
-        )}
+                chatConversations.map((conv) => {
+                  const isActive = conv.id === chatId;
+                  const isEditing = editingConversationId === conv.id;
 
-        {chatError && (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
-            {chatError}
-          </div>
-        )}
-
-        {/* Message Area */}
-        <div className="min-h-[280px] max-h-[460px] space-y-4 overflow-y-auto rounded-xl bg-muted/30 p-4 transition-all">
-          {loadingChat ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Cargando conversación...
-            </div>
-          ) : !chatId ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                <MessageCircle className="h-6 w-6 text-primary" />
-              </div>
-              <p className="text-sm font-medium">Crea una conversación para empezar</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                La IA analizará las sesiones y documentos de este paciente
-              </p>
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                <Brain className="h-6 w-6 text-primary" />
-              </div>
-              <p className="text-sm font-medium">
-                ¿En qué puedo ayudarte con {paciente.nombre}?
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Pregunta sobre patrones, temas recurrentes o cualquier aspecto clínico
-              </p>
-            </div>
-          ) : (
-            messages.map((message, index) => {
-              const isUser = message.rol === "USER";
-              const sources = deduplicateSources(message.fuentes_json || []);
-              const sourcesOpen = expandedSources.has(message.id);
-              const isLatest =
-                index === messages.length - 1;
-
-              return (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 animate-fade-in-up ${
-                    isUser ? "flex-row-reverse" : ""
-                  }`}
-                >
-                  {/* Avatar */}
-                  <div
-                    className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
-                      isUser
-                        ? "bg-primary/10 text-primary"
-                        : "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
-                    }`}
-                  >
-                    {isUser ? (
-                      <span className="text-xs font-bold">
-                        {paciente?.nombre.charAt(0).toUpperCase() || "P"}
-                      </span>
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                  </div>
-
-                  {/* Bubble */}
-                  <div className={`max-w-[75%] space-y-1 ${isUser ? "items-end" : ""}`}>
+                  return (
                     <div
-                      className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                        isUser
-                          ? "rounded-tr-md bg-primary text-primary-foreground shadow-subtle"
-                          : "rounded-tl-md border border-border/60 bg-card text-foreground shadow-subtle"
+                      key={conv.id}
+                      className={`group relative flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-colors ${
+                        isActive
+                          ? "bg-primary/10 text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       }`}
+                      onClick={() => {
+                        if (!isEditing) loadChatConversation(conv.id);
+                      }}
                     >
-                      <p className="whitespace-pre-wrap">{cleanMarkdownEmphasis(message.contenido)}</p>
+                      <MessageCircle className={`h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
+
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={editingConversationTitle}
+                          onChange={(e) => setEditingConversationTitle(e.target.value)}
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              setChatTitle(editingConversationTitle);
+                              await saveChatTitle();
+                              setEditingConversationId(null);
+                            } else if (e.key === "Escape") {
+                              setEditingConversationId(null);
+                            }
+                          }}
+                          onBlur={() => setEditingConversationId(null)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 min-w-0 bg-background border border-input rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      ) : (
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate font-medium text-sm leading-tight">
+                            {conv.titulo || "Nueva conversación"}
+                          </p>
+                          <p className="text-xs text-muted-foreground/60 mt-0.5">
+                            {formatRelativeTime(conv.updated_at)} · {conv.mensajes_count ?? 0} msgs
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Context actions (visible on hover or when active) */}
+                      {!isEditing && (
+                        <div className={`flex items-center gap-0.5 shrink-0 transition-opacity ${
+                          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingConversationId(conv.id);
+                              setEditingConversationTitle(conv.titulo || "");
+                              setChatTitle(conv.titulo || "");
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
+                            title="Renombrar"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChatToDelete(conv);
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-                    {!isUser && (
-                      <button
-                        type="button"
-                        onClick={() => saveMessageAsInforme(message)}
-                        disabled={savingInformeId === message.id}
-                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      >
-                        {savingInformeId === message.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Save className="h-3 w-3" />
-                        )}
-                        Guardar como informe
-                      </button>
-                    )}
+          {/* ── Toggle Button (Chat Sidebar) ── */}
+          <div
+            className={`relative flex items-start pt-3 z-10 transition-all duration-300 ${
+              isChatSidebarOpen ? "-mx-3.5" : "ml-4 -mr-3.5"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setIsChatSidebarOpen(!isChatSidebarOpen)}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:scale-110 transition-all"
+              title={isChatSidebarOpen ? "Ocultar historial" : "Mostrar historial"}
+            >
+              <ChevronLeft
+                className={`h-4 w-4 transition-transform duration-300 ${
+                  !isChatSidebarOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          </div>
 
-                    {/* Timestamp */}
-                    <p
-                      className={`text-xs text-muted-foreground ${
-                        isUser ? "text-right" : "text-left"
+          {/* ── Main Chat Area ── */}
+          <div className="flex flex-1 flex-col min-w-0">
+            {/* Chat Header */}
+            <div className="flex items-center justify-between gap-3 border-b border-border/40 px-5 py-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 shadow-glow shrink-0">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold tracking-tight truncate">
+                      Chat IA del paciente
+                    </h2>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary shrink-0">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-soft" />
+                      IA
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {chatId
+                      ? chatConversations.find((c) => c.id === chatId)?.titulo || "Nueva conversación"
+                      : "Analiza sesiones y documentos con IA"}
+                  </p>
+                </div>
+              </div>
+
+              {chatId && (
+                <button
+                  type="button"
+                  onClick={() => setShowChatControls(!showChatControls)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium shadow-subtle transition-all hover:bg-accent shrink-0"
+                >
+                  {showChatControls ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  Controles
+                </button>
+              )}
+            </div>
+
+            {/* Collapsible Controls */}
+            {showChatControls && chatId && (
+              <div className="flex items-center gap-3 border-b border-border/40 px-5 py-2.5 bg-muted/20 animate-fade-in-up">
+                <label className="flex-1 space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Nombre de la conversación
+                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      value={chatTitle}
+                      onChange={(event) => setChatTitle(event.target.value)}
+                      disabled={!chatId}
+                      className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-sm disabled:opacity-50"
+                      placeholder="Ej: Hipótesis inicial..."
+                    />
+                  </div>
+                </label>
+                <button
+                  type="button"
+                  onClick={saveChatTitle}
+                  disabled={!chatId || savingChatTitle}
+                  className="inline-flex items-center justify-center gap-1.5 self-end rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
+                >
+                  {savingChatTitle ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Guardar
+                </button>
+              </div>
+            )}
+
+            {chatError && (
+              <div className="mx-5 mt-3 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+                {chatError}
+              </div>
+            )}
+
+            {/* Message Area */}
+            <div className="flex-1 overflow-y-auto space-y-4 p-5 transition-all">
+              {loadingChat ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando conversación...
+                </div>
+              ) : !chatId ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    <MessageCircle className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="text-sm font-medium">Crea una conversación para empezar</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    La IA analizará las sesiones y documentos de este paciente
+                  </p>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    <Brain className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="text-sm font-medium">
+                    ¿En qué puedo ayudarte con {paciente.nombre}?
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pregunta sobre patrones, temas recurrentes o cualquier aspecto clínico
+                  </p>
+                </div>
+              ) : (
+                messages.map((message, index) => {
+                  const isUser = message.rol === "USER";
+                  const sources = deduplicateSources(message.fuentes_json || []);
+                  const sourcesOpen = expandedSources.has(message.id);
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex gap-3 animate-fade-in-up ${
+                        isUser ? "flex-row-reverse" : ""
                       }`}
                     >
-                      {message.id > 9999999 ? "ahora" : ""}
-                    </p>
+                      {/* Avatar */}
+                      <div
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
+                          isUser
+                            ? "bg-primary/10 text-primary"
+                            : "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
+                        }`}
+                      >
+                        {isUser ? (
+                          <span className="text-xs font-bold">
+                            {paciente?.nombre.charAt(0).toUpperCase() || "P"}
+                          </span>
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </div>
 
-                    {/* Sources (AI only) */}
-                    {!isUser && sources.length > 0 && (
-                      <div className="mt-1">
-                        <button
-                          onClick={() => toggleSources(message.id)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      {/* Bubble */}
+                      <div className={`max-w-[75%] space-y-1 ${isUser ? "items-end" : ""}`}>
+                        <div
+                          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            isUser
+                              ? "rounded-tr-md bg-primary text-primary-foreground shadow-subtle"
+                              : "rounded-tl-md border border-border/60 bg-card text-foreground shadow-subtle"
+                          }`}
                         >
-                          <FileText className="h-3 w-3" />
-                          Fuentes ({sources.length})
-                          {sourcesOpen ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                        </button>
-                        {sourcesOpen && (
-                          <div className="mt-2 space-y-2 animate-fade-in-up">
-                            {sources.map((src, i) => (
-                              <div
-                                key={i}
-                                className="rounded-lg border border-border/60 bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
-                              >
-                                <div className="flex items-center gap-2 font-medium text-foreground">
-                                  <FileText className="h-3 w-3 text-violet-500" />
-                                  {src.origen === "DOCUMENTO_EXTERNO"
-                                    ? src.documento_nombre_original || "Documento"
-                                    : `Sesión ${src.fecha}`}
-                                  {src.hablante && (
-                                    <span className="rounded bg-muted px-1 py-0.5 text-muted-foreground">
-                                      {src.hablante === "PSICOLOGO"
-                                        ? "Psicólogo"
-                                        : src.hablante === "PACIENTE"
-                                          ? "Paciente"
-                                          : src.hablante}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-1 line-clamp-3">{src.texto}</p>
+                          <p className="whitespace-pre-wrap">{cleanMarkdownEmphasis(message.contenido)}</p>
+                        </div>
+
+                        {!isUser && (
+                          <button
+                            type="button"
+                            onClick={() => saveMessageAsInforme(message)}
+                            disabled={savingInformeId === message.id}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                          >
+                            {savingInformeId === message.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Save className="h-3 w-3" />
+                            )}
+                            Guardar como informe
+                          </button>
+                        )}
+
+                        {/* Timestamp */}
+                        <p
+                          className={`text-xs text-muted-foreground ${
+                            isUser ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {message.id > 9999999 ? "ahora" : ""}
+                        </p>
+
+                        {/* Sources (AI only) */}
+                        {!isUser && sources.length > 0 && (
+                          <div className="mt-1">
+                            <button
+                              onClick={() => toggleSources(message.id)}
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            >
+                              <FileText className="h-3 w-3" />
+                              Fuentes ({sources.length})
+                              {sourcesOpen ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                            </button>
+                            {sourcesOpen && (
+                              <div className="mt-2 space-y-2 animate-fade-in-up">
+                                {sources.map((src, i) => (
+                                  <div
+                                    key={i}
+                                    className="rounded-lg border border-border/60 bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+                                  >
+                                    <div className="flex items-center gap-2 font-medium text-foreground">
+                                      <FileText className="h-3 w-3 text-violet-500" />
+                                      {src.origen === "DOCUMENTO_EXTERNO"
+                                        ? src.documento_nombre_original || "Documento"
+                                        : `Sesión ${src.fecha}`}
+                                      {src.hablante && (
+                                        <span className="rounded bg-muted px-1 py-0.5 text-muted-foreground">
+                                          {src.hablante === "PSICOLOGO"
+                                            ? "Psicólogo"
+                                            : src.hablante === "PACIENTE"
+                                              ? "Paciente"
+                                              : src.hablante}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="mt-1 line-clamp-3">{src.texto}</p>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Typing indicator */}
+              {iaTyping && (
+                <div className="flex animate-fade-in-up items-start gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="flex items-center gap-1 rounded-2xl rounded-tl-md border border-border/60 bg-card px-4 py-3 shadow-subtle">
+                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
+                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
+                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
                   </div>
                 </div>
-              );
-            })
-          )}
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-          {/* Typing indicator */}
-          {iaTyping && (
-            <div className="flex animate-fade-in-up items-start gap-3">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="flex items-center gap-1 rounded-2xl rounded-tl-md border border-border/60 bg-card px-4 py-3 shadow-subtle">
-                <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
-                <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
-                <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
+            {/* Suggested Prompts */}
+            <div className="border-t border-border/40 px-5 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Preguntas sugeridas
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {CHAT_SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => selectSuggestedChatPrompt(prompt)}
+                    disabled={sendingChat || creatingChat}
+                    className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
 
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Preguntas sugeridas
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CHAT_SUGGESTED_PROMPTS.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => selectSuggestedChatPrompt(prompt)}
-                disabled={sendingChat || creatingChat}
-                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50"
-              >
-                {prompt}
-              </button>
-            ))}
+            {/* Chat Input */}
+            <div className="border-t border-border/40 px-5 py-3">
+              <form onSubmit={sendChatMessage} className="flex items-end gap-2">
+                <textarea
+                  ref={textareaRef}
+                  value={chatInput}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  disabled={sendingChat || creatingChat}
+                  className="flex-1 resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
+                  placeholder={
+                    chatId
+                      ? `Pregunta sobre las sesiones de ${paciente.nombre}...`
+                      : "Crea una conversación para empezar"
+                  }
+                />
+                <button
+                  type="submit"
+                  disabled={sendingChat || creatingChat || !chatInput.trim()}
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {sendingChat ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-5 w-5" />
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
-
-        {/* Chat Input */}
-        <form onSubmit={sendChatMessage} className="flex items-end gap-2">
-          <textarea
-            ref={textareaRef}
-            value={chatInput}
-            onChange={handleTextareaChange}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            disabled={sendingChat || creatingChat}
-            className="flex-1 resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
-            placeholder={
-              chatId
-                ? `Pregunta sobre las sesiones de ${paciente.nombre}...`
-                : "Crea una conversación para empezar"
-            }
-          />
-          <button
-            type="submit"
-            disabled={sendingChat || creatingChat || !chatInput.trim()}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {sendingChat ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowUp className="h-5 w-5" />
-            )}
-          </button>
-        </form>
       </div>
 
       <ConfirmDialog
