@@ -78,6 +78,36 @@ function getAvatarColor(name: string) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+async function getApiErrorMessage(res: Response, fallback: string) {
+  try {
+    const data = await res.json();
+    if (typeof data.detail === "string") return data.detail;
+
+    const fieldLabels: Record<string, string> = {
+      nombre: "Nombre",
+      apellido: "Apellido",
+      fecha_nacimiento: "Fecha de nacimiento",
+      rut: "RUT",
+      edad: "Edad",
+      sexo: "Sexo",
+      ocupacion_laboral: "Ocupación laboral",
+      email_contacto: "Correo de contacto",
+      telefono_whatsapp: "WhatsApp",
+      motivo_consulta: "Motivo de consulta",
+    };
+
+    for (const [field, value] of Object.entries(data)) {
+      const label = fieldLabels[field] || field;
+      if (Array.isArray(value)) return `${label}: ${value.join(" ")}`;
+      if (typeof value === "string") return `${label}: ${value}`;
+    }
+  } catch {
+    // Keep the generic message when the response is not JSON.
+  }
+
+  return fallback;
+}
+
 const PATIENT_STATUS_OPTIONS = [
   {
     value: "EN_SESION",
@@ -173,19 +203,19 @@ export default function DashboardPage() {
       const res = await apiFetch("/pacientes/", {
         method: "POST",
         body: JSON.stringify({
-          nombre,
-          apellido,
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
           fecha_nacimiento: fechaNacimiento || null,
-          rut,
+          rut: rut.trim(),
           edad: edad ? parseInt(edad) : null,
           sexo,
-          ocupacion_laboral: ocupacion,
-          email_contacto: emailContacto,
-          telefono_whatsapp: telefonoWhatsapp,
-          motivo_consulta: motivo,
+          ocupacion_laboral: ocupacion.trim(),
+          email_contacto: emailContacto.trim(),
+          telefono_whatsapp: telefonoWhatsapp.trim(),
+          motivo_consulta: motivo.trim(),
         }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error(await getApiErrorMessage(res, "No se pudo guardar el paciente."));
       const nuevo = await res.json();
       setPacientes((prev) => [nuevo, ...prev]);
       setShowForm(false);
@@ -201,8 +231,8 @@ export default function DashboardPage() {
       setMotivo("");
       setSuccess("Paciente creado correctamente.");
       setTimeout(() => setSuccess(""), 3000);
-    } catch {
-      setError("No se pudo guardar el paciente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el paciente.");
     } finally {
       setSaving(false);
     }
@@ -317,6 +347,7 @@ export default function DashboardPage() {
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Nombre del paciente"
+                  maxLength={100}
                   required
                 />
               </div>
@@ -326,6 +357,7 @@ export default function DashboardPage() {
                   value={apellido}
                   onChange={(e) => setApellido(e.target.value)}
                   placeholder="Apellido del paciente"
+                  maxLength={100}
                   required
                 />
               </div>
@@ -336,6 +368,7 @@ export default function DashboardPage() {
                 value={rut}
                 onChange={(e) => setRut(e.target.value)}
                 placeholder="Ej: 12.345.678-9"
+                maxLength={12}
               />
             </div>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -367,6 +400,7 @@ export default function DashboardPage() {
                 value={ocupacion}
                 onChange={(e) => setOcupacion(e.target.value)}
                 placeholder="Ej: Ingeniero, Docente, Estudiante..."
+                maxLength={200}
               />
             </div>
             <div className="space-y-2">
@@ -376,6 +410,7 @@ export default function DashboardPage() {
                 value={emailContacto}
                 onChange={(e) => setEmailContacto(e.target.value)}
                 placeholder="correo@ejemplo.com"
+                maxLength={254}
               />
             </div>
             <div className="space-y-2">
@@ -384,6 +419,7 @@ export default function DashboardPage() {
                 value={telefonoWhatsapp}
                 onChange={(e) => setTelefonoWhatsapp(e.target.value)}
                 placeholder="Ej: +56 9 1234 5678"
+                maxLength={30}
               />
             </div>
             <div className="space-y-2">

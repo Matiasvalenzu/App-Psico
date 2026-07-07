@@ -1,2 +1,5 @@
 node_modules/
 .next/
+node_modules_backup/
+pages_disabled/
+package-lock_backup.json
