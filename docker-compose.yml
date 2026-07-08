@@ -1,28 +1,9 @@
 version: "3.9"
 
 services:
-  db:
-    image: pgvector/pgvector:pg15
-    container_name: psicologo-db
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-psicologo}
-      POSTGRES_USER: ${POSTGRES_USER:-psicologo}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    # ports:                           # Solo red interna Docker
-    #   - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-psicologo} -d ${POSTGRES_DB:-psicologo}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: psicologo-redis
-    # ports:                           # Solo red interna Docker
-    #   - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -35,6 +16,8 @@ services:
       dockerfile: Dockerfile
     container_name: psicologo-backend
     command: python manage.py runserver 0.0.0.0:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - ./Informes:/app/informes:ro
@@ -49,7 +32,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-psicologo}
       - POSTGRES_USER=${POSTGRES_USER:-psicologo}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me}
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=172.18.0.1
       - POSTGRES_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
@@ -93,8 +76,6 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
       - EMBEDDING_USE_MODEL=${EMBEDDING_USE_MODEL:-False}
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -102,6 +83,8 @@ services:
     image: app-psico-backend
     container_name: psicologo-celery
     command: celery -A config.celery_app worker --loglevel=info --concurrency=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - ./Informes:/app/informes:ro
@@ -114,7 +97,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-psicologo}
       - POSTGRES_USER=${POSTGRES_USER:-psicologo}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me}
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=172.18.0.1
       - POSTGRES_PORT=5432
       - REDIS_URL=redis://redis:6379/0
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
@@ -157,8 +140,6 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
       - EMBEDDING_USE_MODEL=${EMBEDDING_USE_MODEL:-False}
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -166,16 +147,13 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.psico.datnexia.com/api}
     container_name: psicologo-frontend
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
     depends_on:
       - backend
 
 volumes:
-  postgres_data:
   audio_data:
   model_cache:
