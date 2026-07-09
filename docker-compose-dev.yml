@@ -1,0 +1,147 @@
+version: "3.9"
+
+x-backend-env: &backend-env
+  DJANGO_SETTINGS_MODULE: config.settings.development
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-change-me-minimum-32-characters}
+  DJANGO_DEBUG: "True"
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+  CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+  POSTGRES_DB: ${POSTGRES_DB:-psicologo}
+  POSTGRES_USER: ${POSTGRES_USER:-psicologo}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  REDIS_URL: redis://redis:6379/0
+  DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+  DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+  PUBLIC_APP_URL: http://localhost:3000
+  TEST_LINK_EXPIRATION_DAYS: ${TEST_LINK_EXPIRATION_DAYS:-7}
+  DSM5_DOCUMENT_PATH: ${DSM5_DOCUMENT_PATH:-/app/informes/dsm5-manualdiagnsticoyestadisticodelostrastornosmentales-161006005112.pdf}
+  EMAIL_HOST: ${EMAIL_HOST:-}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+  EMAIL_USE_SSL: ${EMAIL_USE_SSL:-False}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_CALENDAR_REDIRECT_URI: http://localhost:8000/api/agenda/google/callback/
+  GOOGLE_CALENDAR_NAME: ${GOOGLE_CALENDAR_NAME:-Agenda Psicológica}
+  AUDIO_STORAGE_PATH: /data/audio
+  DOCUMENT_UPLOAD_MAX_BYTES: ${DOCUMENT_UPLOAD_MAX_BYTES:-10485760}
+  WHISPER_MODEL: ${WHISPER_MODEL:-base}
+  WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+  WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+  PYANNOTE_AUTH_TOKEN: ${PYANNOTE_AUTH_TOKEN:-}
+  PYANNOTE_API_BASE_URL: ${PYANNOTE_API_BASE_URL:-https://api.pyannote.ai}
+  PYANNOTE_API_MODEL: ${PYANNOTE_API_MODEL:-precision-2}
+  PYANNOTE_API_TIMEOUT_SECONDS: ${PYANNOTE_API_TIMEOUT_SECONDS:-3600}
+  PYANNOTE_API_POLL_INTERVAL_SECONDS: ${PYANNOTE_API_POLL_INTERVAL_SECONDS:-10}
+  PYANNOTE_API_REQUEST_TIMEOUT_SECONDS: ${PYANNOTE_API_REQUEST_TIMEOUT_SECONDS:-60}
+  PYANNOTE_API_UPLOAD_TIMEOUT_SECONDS: ${PYANNOTE_API_UPLOAD_TIMEOUT_SECONDS:-300}
+  SPEAKER_EMBEDDING_MODEL: ${SPEAKER_EMBEDDING_MODEL:-speechbrain/spkrec-ecapa-voxceleb}
+  SPEAKER_EMBEDDING_CACHE_DIR: ${SPEAKER_EMBEDDING_CACHE_DIR:-/data/models/speechbrain}
+  SPEAKER_EMBEDDING_DEVICE: ${SPEAKER_EMBEDDING_DEVICE:-cpu}
+  SPEAKER_MATCH_THRESHOLD: ${SPEAKER_MATCH_THRESHOLD:-0.35}
+  SPEAKER_MATCH_MARGIN: ${SPEAKER_MATCH_MARGIN:-0.05}
+  SPEAKER_MIN_TURN_SECONDS: ${SPEAKER_MIN_TURN_SECONDS:-1.0}
+  SPEAKER_MIN_TOTAL_SECONDS: ${SPEAKER_MIN_TOTAL_SECONDS:-3.0}
+  SPEAKER_MAX_SECONDS_PER_LABEL: ${SPEAKER_MAX_SECONDS_PER_LABEL:-30.0}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
+  EMBEDDING_USE_MODEL: ${EMBEDDING_USE_MODEL:-False}
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: psicologo-db-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-psicologo}
+      POSTGRES_USER: ${POSTGRES_USER:-psicologo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-psicologo} -d ${POSTGRES_DB:-psicologo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: psicologo-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: psicologo-backend-dev
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+      - ./Informes:/app/informes:ro
+      - audio_data:/data/audio
+      - model_cache:/data/models
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: psicologo-celery-dev
+    command: celery -A config.celery_app worker --loglevel=info --concurrency=1
+    volumes:
+      - ./backend:/app
+      - ./Informes:/app/informes:ro
+      - audio_data:/data/audio
+      - model_cache:/data/models
+    environment:
+      <<: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: psicologo-frontend-dev
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  audio_data:
+  model_cache:

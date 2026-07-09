@@ -7,7 +7,8 @@ from django.conf import settings
 from django.db import transaction
 from django.shortcuts import redirect
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
+from django_ratelimit.decorators import ratelimit
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -26,8 +27,33 @@ from .google_calendar import (
     sync_cita_to_google,
     sync_google_to_app,
 )
-from .models import AgendaCita
-from .serializers import AgendaCitaSerializer
+from .models import (
+    AgendaBloqueo,
+    AgendaCita,
+    AgendaDisponibilidad,
+    AgendaPerfilPublico,
+    AgendaReservaPublica,
+)
+from .serializers import (
+    AgendaCitaSerializer,
+    DisponibilidadSerializer,
+    PerfilPublicoInternoSerializer,
+    PerfilPublicoSerializer,
+    ReservaPublicaSerializer,
+    VerificarPacienteSerializer,
+    buscar_paciente_existente,
+    calcular_slots,
+    crear_o_reutilizar_paciente,
+    ip_hash,
+    normalizar_email,
+    normalizar_rut,
+    normalizar_telefono,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  VISTAS INTERNAS (AUTENTICADAS) — AgendaCita
+# ═══════════════════════════════════════════════════════════════════════
 
 
 class AgendaCitaViewSet(viewsets.ModelViewSet):
@@ -268,6 +294,301 @@ class AgendaCitaViewSet(viewsets.ModelViewSet):
             f"agendada para el {fecha} a las {hora} hrs con {psicologo}. "
             "Por favor responde este mensaje para confirmar tu asistencia."
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  VISTAS INTERNAS — Disponibilidad y Perfil Público
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class DisponibilidadViewSet(viewsets.ModelViewSet):
+    serializer_class = DisponibilidadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return AgendaDisponibilidad.objects.filter(psicologo=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(psicologo=self.request.user)
+
+
+@api_view(["GET", "PATCH", "POST"])
+@permission_classes([IsAuthenticated])
+def perfil_publico_interno(request):
+    """GET: obtener perfil público. PATCH: actualizar. POST: crear si no existe."""
+    if request.method == "GET":
+        try:
+            perfil = request.user.agenda_perfil_publico
+        except AgendaPerfilPublico.DoesNotExist:
+            return Response({"existe": False})
+        serializer = PerfilPublicoInternoSerializer(perfil)
+        data = serializer.data
+        data["existe"] = True
+        return Response(data)
+
+    if request.method == "POST":
+        # Crear perfil si no existe
+        if hasattr(request.user, "agenda_perfil_publico"):
+            return Response(
+                {"error": "Ya tienes un perfil público configurado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = request.data.copy()
+        if not data.get("nombre_publico"):
+            data["nombre_publico"] = request.user.get_full_name() or request.user.username
+        serializer = PerfilPublicoInternoSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(psicologo=request.user)
+
+        # Generar disponibilidad por defecto (Lunes a Viernes 09:00 - 18:00)
+        from datetime import time
+        for dia in range(5):
+            AgendaDisponibilidad.objects.get_or_create(
+                psicologo=request.user,
+                dia_semana=dia,
+                hora_inicio=time(9, 0),
+                hora_fin=time(18, 0)
+            )
+
+        result = serializer.data
+        result["existe"] = True
+        return Response(result, status=status.HTTP_201_CREATED)
+
+    # PATCH
+    try:
+        perfil = request.user.agenda_perfil_publico
+    except AgendaPerfilPublico.DoesNotExist:
+        return Response(
+            {"error": "No tienes un perfil público. Créalo primero."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    serializer = PerfilPublicoInternoSerializer(perfil, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    data = serializer.data
+    data["existe"] = True
+    return Response(data)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  VISTAS PÚBLICAS (sin autenticación)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _get_perfil_activo(slug):
+    """Retorna perfil activo o None."""
+    try:
+        return AgendaPerfilPublico.objects.select_related("psicologo").get(
+            slug=slug, activo=True
+        )
+    except AgendaPerfilPublico.DoesNotExist:
+        return None
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def perfil_publico(request, slug):
+    """GET /api/agenda/publica/<slug>/ — Perfil público del psicólogo."""
+    perfil = _get_perfil_activo(slug)
+    if not perfil:
+        return Response(
+            {"error": "No se encontró esta agenda o no está disponible."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(PerfilPublicoSerializer(perfil).data)
+
+
+@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def verificar_paciente(request, slug):
+    """POST /api/agenda/publica/<slug>/verificar-paciente/ — Verifica existencia sin filtrar datos."""
+    perfil = _get_perfil_activo(slug)
+    if not perfil:
+        return Response(
+            {"error": "No se encontró esta agenda."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = VerificarPacienteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    paciente = buscar_paciente_existente(
+        perfil.psicologo,
+        rut=data["rut"],
+        email=data["email"],
+        whatsapp=data["whatsapp"],
+    )
+
+    if paciente:
+        return Response({
+            "encontrado": True,
+            "paciente_id": paciente.id,
+            "nombre": paciente.nombre,
+        })
+    return Response({
+        "encontrado": False,
+        "mensaje": "No encontramos una ficha con esos datos. Puedes continuar como primera reserva.",
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def slots_disponibles(request, slug):
+    """GET /api/agenda/publica/<slug>/slots/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD"""
+    perfil = _get_perfil_activo(slug)
+    if not perfil:
+        return Response(
+            {"error": "No se encontró esta agenda."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    desde_str = request.query_params.get("desde")
+    hasta_str = request.query_params.get("hasta")
+    if not desde_str or not hasta_str:
+        return Response(
+            {"error": "Los parámetros 'desde' y 'hasta' son obligatorios (YYYY-MM-DD)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    desde = parse_date(desde_str)
+    hasta = parse_date(hasta_str)
+    if not desde or not hasta:
+        return Response(
+            {"error": "Formato de fecha inválido. Usa YYYY-MM-DD."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    slots = calcular_slots(perfil, desde, hasta)
+    return Response({
+        "duracion_minutos": perfil.duracion_minutos,
+        "slots": slots,
+    })
+
+
+@ratelimit(key="ip", rate="3/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@transaction.atomic
+def reservar(request, slug):
+    """POST /api/agenda/publica/<slug>/reservar/ — Crea reserva pública."""
+    perfil = _get_perfil_activo(slug)
+    if not perfil:
+        return Response(
+            {"error": "No se encontró esta agenda."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = ReservaPublicaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    psicologo = perfil.psicologo
+    inicio = data["inicio"]
+    duracion = timedelta(minutes=perfil.duracion_minutos)
+    fin = inicio + duracion
+    tipo = data["tipo_paciente"]
+
+    # Verificar que el slot está dentro de la disponibilidad calculada
+    desde_fecha = inicio.date()
+    hasta_fecha = inicio.date()
+    slots_validos = calcular_slots(perfil, desde_fecha, hasta_fecha)
+    slot_solicitado = inicio.isoformat()
+    if not any(s["inicio"] == slot_solicitado for s in slots_validos):
+        return Response(
+            {"error": "El horario seleccionado ya no está disponible."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Doble verificación de cruce dentro de transacción atómica
+    cruce = AgendaCita.objects.filter(
+        psicologo=psicologo,
+        inicio__lt=fin,
+        fin__gt=inicio,
+    ).exclude(estado=AgendaCita.Estado.ANULADA).select_for_update().exists()
+    if cruce:
+        return Response(
+            {"error": "El horario seleccionado se cruza con otra cita. Por favor elige otro."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Resolver paciente
+    if tipo == "EXISTENTE":
+        paciente = Paciente.objects.filter(
+            id=data["paciente_id"],
+            psicologo=psicologo,
+            activo=True,
+        ).first()
+        if not paciente:
+            return Response(
+                {"error": "No se encontró la ficha del paciente."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        origen = AgendaCita.OrigenReserva.PUBLICA_PACIENTE_EXISTENTE
+    else:
+        # NUEVO
+        if not perfil.acepta_pacientes_nuevos:
+            return Response(
+                {"error": "Esta agenda no acepta reservas de pacientes nuevos en este momento."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        paciente, _ = crear_o_reutilizar_paciente(
+            psicologo=psicologo,
+            nombre_completo=data["nombre_completo"],
+            rut=data.get("rut", ""),
+            email=data.get("email", ""),
+            whatsapp=data.get("whatsapp", ""),
+            motivo=data.get("motivo_consulta", ""),
+        )
+        origen = AgendaCita.OrigenReserva.PUBLICA_PACIENTE_NUEVO
+
+    # Crear cita
+    cita = AgendaCita.objects.create(
+        psicologo=psicologo,
+        paciente=paciente,
+        inicio=inicio,
+        fin=fin,
+        estado=AgendaCita.Estado.CONFIRMADA,
+        confirmada_at=timezone.now(),
+        origen_reserva=origen,
+        reserva_publica_at=timezone.now(),
+        notas=f"Reserva pública — {tipo.lower().replace('_', ' ')}",
+    )
+
+    # Trazabilidad
+    AgendaReservaPublica.objects.create(
+        cita=cita,
+        paciente=paciente,
+        perfil=perfil,
+        tipo_paciente=tipo,
+        ip_hash=ip_hash(request),
+        user_agent=(request.META.get("HTTP_USER_AGENT", ""))[:300],
+    )
+
+    # Sincronizar con Google Calendar
+    sync_cita_to_google(cita)
+
+    inicio_local = timezone.localtime(cita.inicio)
+    return Response(
+        {
+            "reserva": {
+                "id": cita.id,
+                "fecha": inicio_local.strftime("%d/%m/%Y"),
+                "hora": inicio_local.strftime("%H:%M"),
+                "duracion_minutos": perfil.duracion_minutos,
+                "estado": cita.estado,
+                "paciente_nombre": paciente.nombre_completo,
+            },
+            "mensaje": "Tu hora quedó reservada exitosamente.",
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  VISTAS INTERNAS — Google Calendar
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @api_view(["GET"])

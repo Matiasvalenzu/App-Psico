@@ -122,6 +122,25 @@ export async function login(username: string, password: string) {
   return data;
 }
 
+export async function loginWithGoogle(credential: string) {
+  const res = await fetch(`${API_URL}/auth/google/login/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential }),
+  });
+  if (!res.ok) {
+    let message = "Error de autenticación con Google";
+    try {
+      const data = await res.json();
+      message = data.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  const data = await res.json();
+  setTokens(data.access, data.refresh);
+  return data;
+}
+
 export async function getCurrentUser() {
   const res = await apiFetch("/auth/me/");
   if (!res.ok) throw new Error("No se pudo obtener el usuario actual");

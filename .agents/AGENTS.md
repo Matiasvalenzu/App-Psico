@@ -13,3 +13,10 @@ Cuando crees o corrijas problemas de posicionamiento de modales, cuadros de diá
 - **Acción:** No intentes solucionar el problema modificando múltiples `z-index` o eliminando restricciones de `overflow` en los contenedores padre, ya que esto suele romper la UI.
 - **Acción:** Envuelve el modal problemático utilizando un Portal de React (`createPortal` de `react-dom`) para montarlo directamente en `document.body` (ej. creando un wrapper `<ClientPortal>`), asegurando que escape de cualquier contexto de apilamiento conflictivo.
 </RULE[react_modals_portals]>
+
+<RULE[frontend_api_usage]>
+### Uso de API en Frontend (apiFetch)
+- **Acción:** Al realizar peticiones desde componentes del frontend hacia el backend, debes utilizar estrictamente las utilidades exportadas en `@/lib/api.ts`, específicamente `apiFetch` (para rutas autenticadas) o `publicApiFetch` (para rutas públicas).
+- **Restricción:** NUNCA inventes funciones como `apiCall` ni uses `fetch` crudo (a menos que no exista otra opción) para evitar errores de importación y problemas con el refresco de tokens JWT.
+- **Manejo de Errores:** Estas funciones retornan un objeto `Response` nativo. Debes validar los errores manualmente usando `if (!res.ok)` y leer el JSON con `await res.json()` para extraer mensajes detallados (`res.json().detail`).
+</RULE[frontend_api_usage]>

@@ -19,6 +19,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Copy,
+  ExternalLink,
+  Globe,
   Loader2,
   Link2,
   MessageCircle,
@@ -67,8 +70,27 @@ interface AgendaCita {
   grupo_recurrencia: string | null;
   confirmacion_solicitada_at: string | null;
   confirmada_at: string | null;
+  origen_reserva: string;
+  reserva_publica_at: string | null;
   google_synced_at: string | null;
   google_sync_error: string;
+}
+
+interface PerfilPublicoInterno {
+  existe: boolean;
+  id?: number;
+  slug?: string;
+  activo?: boolean;
+  nombre_publico?: string;
+  url_reserva?: string;
+}
+
+interface DisponibilidadBloque {
+  id: number;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+  activo: boolean;
 }
 
 interface GoogleCalendarStatus {
@@ -145,6 +167,13 @@ export default function AgendaPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleSyncing, setGoogleSyncing] = useState(false);
 
+  // Booking link & availability
+  const [perfilPublico, setPerfilPublico] = useState<PerfilPublicoInterno | null>(null);
+  const [disponibilidad, setDisponibilidad] = useState<DisponibilidadBloque[]>([]);
+  const [showDisponibilidad, setShowDisponibilidad] = useState(false);
+  const [dispSaving, setDispSaving] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const events = useMemo<EventInput[]>(
     () =>
       citas.map((cita) => {
@@ -166,6 +195,8 @@ export default function AgendaPage() {
   useEffect(() => {
     loadPacientes();
     loadGoogleStatus();
+    loadPerfilPublico();
+    loadDisponibilidad();
     syncGoogleCalendar(true);
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_calendar") === "connected") {
@@ -296,6 +327,87 @@ export default function AgendaPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // ─── Booking link & availability ──────────────────
+
+  async function loadPerfilPublico() {
+    try {
+      const res = await apiFetch("/agenda/perfil-publico/");
+      if (res.ok) setPerfilPublico(await res.json());
+    } catch { /* silent */ }
+  }
+
+  async function crearPerfilPublico() {
+    try {
+      const res = await apiFetch("/agenda/perfil-publico/", { method: "POST", body: "{}" });
+      if (res.ok) {
+        setPerfilPublico(await res.json());
+        setSuccess("Perfil público creado. Configura tu disponibilidad semanal.");
+      }
+    } catch {
+      setError("No se pudo crear el perfil público.");
+    }
+  }
+
+  async function togglePerfilActivo() {
+    if (!perfilPublico?.existe) return;
+    try {
+      const res = await apiFetch("/agenda/perfil-publico/", {
+        method: "PATCH",
+        body: JSON.stringify({ activo: !perfilPublico.activo }),
+      });
+      if (res.ok) setPerfilPublico(await res.json());
+    } catch {
+      setError("No se pudo actualizar el estado.");
+    }
+  }
+
+  async function copyBookingLink() {
+    if (!perfilPublico?.url_reserva) return;
+    try {
+      await navigator.clipboard.writeText(perfilPublico.url_reserva);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch { /* silent */ }
+  }
+
+  async function loadDisponibilidad() {
+    try {
+      const res = await apiFetch("/agenda/disponibilidad/");
+      if (res.ok) {
+        const data = await res.json();
+        setDisponibilidad(Array.isArray(data) ? data : data.results || []);
+      }
+    } catch { /* silent */ }
+  }
+
+  const DIAS_SEMANA_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+  async function addDisponibilidad(dia: number, horaInicio: string, horaFin: string) {
+    setDispSaving(true);
+    try {
+      const res = await apiFetch("/agenda/disponibilidad/", {
+        method: "POST",
+        body: JSON.stringify({ dia_semana: dia, hora_inicio: horaInicio, hora_fin: horaFin }),
+      });
+      if (res.ok) await loadDisponibilidad();
+      else {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.hora_fin?.[0] || data?.non_field_errors?.[0] || "Error al agregar bloque.");
+      }
+    } catch {
+      setError("Error al agregar bloque.");
+    } finally {
+      setDispSaving(false);
+    }
+  }
+
+  async function deleteDisponibilidad(id: number) {
+    try {
+      await apiFetch(`/agenda/disponibilidad/${id}/`, { method: "DELETE" });
+      await loadDisponibilidad();
+    } catch { /* silent */ }
   }
 
   function openCreateModal(startDate: Date) {
@@ -666,6 +778,69 @@ export default function AgendaPage() {
               )}
             </div>
           </div>
+
+          {/* ── Enlace de reserva pública ── */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Globe className="inline h-3 w-3 mr-1 -mt-0.5" />
+              Enlace de reserva
+            </p>
+            {perfilPublico?.existe ? (
+              <>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${perfilPublico.activo ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                  <span className="text-sm font-medium">
+                    {perfilPublico.activo ? "Agenda pública activa" : "Agenda pública inactiva"}
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={copyBookingLink}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+                  >
+                    {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedLink ? "¡Copiado!" : "Copiar enlace"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={togglePerfilActivo}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-accent"
+                  >
+                    {perfilPublico.activo ? "Desactivar" : "Activar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDisponibilidad(!showDisponibilidad)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    Configurar disponibilidad
+                  </button>
+                </div>
+                {!googleStatus?.connected && (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+                    Conecta Google Calendar para sincronizar reservas automáticamente.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Crea tu enlace público para que pacientes reserven hora directamente.
+                </p>
+                <button
+                  type="button"
+                  onClick={crearPerfilPublico}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Crear enlace público
+                </button>
+              </>
+            )}
+          </div>
+
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Resumen visible
@@ -1051,6 +1226,73 @@ export default function AgendaPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Disponibilidad configurator modal ── */}
+      {showDisponibilidad && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setShowDisponibilidad(false)}>
+          <div className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-elevated animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Disponibilidad semanal</h2>
+              <button type="button" onClick={() => setShowDisponibilidad(false)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Configura los bloques horarios en que aceptas reservas públicas. Los pacientes solo verán estas horas como disponibles.
+            </p>
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {DIAS_SEMANA_LABELS.map((label, dia) => {
+                const bloques = disponibilidad.filter((d) => d.dia_semana === dia);
+                return (
+                  <div key={dia} className="rounded-lg border border-border/60 p-3">
+                    <p className="text-sm font-medium mb-2">{label}</p>
+                    {bloques.length > 0 && (
+                      <div className="space-y-1 mb-2">
+                        {bloques.map((b) => (
+                          <div key={b.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-1.5 text-sm">
+                            <span>{b.hora_inicio.slice(0, 5)} — {b.hora_fin.slice(0, 5)}</span>
+                            <button
+                              type="button"
+                              onClick={() => deleteDisponibilidad(b.id)}
+                              className="text-destructive/70 hover:text-destructive text-xs"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        const hi = (form.elements.namedItem("hora_inicio") as HTMLInputElement).value;
+                        const hf = (form.elements.namedItem("hora_fin") as HTMLInputElement).value;
+                        if (hi && hf) {
+                          addDisponibilidad(dia, hi, hf);
+                          form.reset();
+                        }
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="time" name="hora_inicio" defaultValue="09:00" className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+                      <span className="text-xs text-muted-foreground">a</span>
+                      <input type="time" name="hora_fin" defaultValue="18:00" className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+                      <button
+                        type="submit"
+                        disabled={dispSaving}
+                        className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {dispSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                      </button>
+                    </form>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

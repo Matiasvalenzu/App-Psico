@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 
@@ -112,3 +112,102 @@ def list_users(request):
             for user in users
         ]
     )
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def change_user_password(request, user_id):
+    if not _is_superuser(request.user):
+        return Response(
+            {"detail": "No tienes permiso para cambiar claves."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    new_password = str(request.data.get("password", ""))
+    if not new_password:
+        return Response(
+            {"detail": "La nueva contraseña es obligatoria."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"detail": "Usuario no encontrado."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        validate_password(new_password, user)
+    except ValidationError as exc:
+        return Response(
+            {"detail": " ".join(exc.messages)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(new_password)
+    user.save()
+    return Response({"detail": "Contraseña actualizada exitosamente."})
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def google_login(request):
+    token = request.data.get("credential")
+    if not token:
+        return Response({"detail": "Falta el token de Google."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests
+        from django.conf import settings
+
+        # Verificar token con Google
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            requests.Request(),
+            settings.GOOGLE_CLIENT_ID
+        )
+
+        email = idinfo.get("email")
+        if not email:
+            return Response({"detail": "El token de Google no incluye un correo electrónico."}, status=status.HTTP_400_BAD_REQUEST)
+
+        first_name = idinfo.get("given_name", "")
+        last_name = idinfo.get("family_name", "")
+
+        User = get_user_model()
+        user = User.objects.filter(email=email).first()
+
+        if not user:
+            # Multi-tenant: Create user dynamically if it doesn't exist
+            username = email.split('@')[0]
+            # Ensure uniqueness
+            original_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{original_username}{counter}"
+                counter += 1
+
+            user = User(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name
+            )
+            user.set_unusable_password()
+            user.save()
+
+        # Generar JWT tokens
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh)
+        })
+
+    except ValueError as exc:
+        return Response({"detail": f"Token inválido: {str(exc)}"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:
+        return Response({"detail": f"Error de autenticación con Google: {str(exc)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

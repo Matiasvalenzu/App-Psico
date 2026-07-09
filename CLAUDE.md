@@ -5,15 +5,16 @@
 - **Frontend**: Next.js 14 + Tailwind en `frontend/`, puerto 3000
 - **DB**: PostgreSQL 15 + pgvector, puerto 5432
 - **Cola**: Redis + Celery (worker de audio), `concurrency=1`
-- **Orquestación**: Docker Compose (`docker-compose.yml` en raíz)
+- **Orquestación local**: Docker Compose (`docker-compose-dev.yml` en raíz)
+- **Producción**: `docker-compose.yml` en raíz, no usar para desarrollo local
 
 ## Comandos frecuentes
 ```bash
-docker-compose up -d                        # levantar todo
-docker-compose restart celery               # recargar worker tras cambios en tasks.py
-docker-compose restart frontend             # recargar frontend tras cambios en código
-docker-compose logs --no-color --tail=80 celery    # logs del pipeline de audio
-docker-compose exec -T db psql -U psicologo -d psicologo -c "<SQL>"
+docker-compose -f docker-compose-dev.yml up -d                        # levantar todo local
+docker-compose -f docker-compose-dev.yml restart celery               # recargar worker tras cambios en tasks.py
+docker-compose -f docker-compose-dev.yml restart frontend             # recargar frontend tras cambios en código
+docker-compose -f docker-compose-dev.yml logs --no-color --tail=80 celery    # logs del pipeline de audio
+docker-compose -f docker-compose-dev.yml exec -T db psql -U psicologo -d psicologo -c "<SQL>"
 ```
 
 ## Estructura backend (`backend/`)
@@ -51,7 +52,7 @@ public/logo-icon.jpg            — ícono DatnexiA (1455×1600)
 - Rama principal: `main`
 - No es necesario `ssh-add` — la llave se usa directo vía config
 
-## Variables de entorno clave (en docker-compose.yml)
+## Variables de entorno clave (en docker-compose-dev.yml)
 | Variable | Default |
 |---|---|
 | `WHISPER_MODEL` | `base` |
