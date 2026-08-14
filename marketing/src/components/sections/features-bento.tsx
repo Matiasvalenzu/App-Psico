@@ -211,7 +211,7 @@ export function FeaturesBentoSection() {
               >
                 <div className="relative flex items-start justify-between">
                   <div className="icon-tile h-11 w-11">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
+                    <Icon className="h-5 w-5" aria-hidden />
                   </div>
                   {feature.badge && (
                     <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/8 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
