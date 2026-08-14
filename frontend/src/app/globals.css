@@ -22,14 +22,14 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 217 91% 60%;
     
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 220 68% 88%;
+    --sidebar-foreground: 225 75% 8%;
+    --sidebar-primary: 223 58% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 32% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 32% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 220 55% 81%;
+    --sidebar-accent-foreground: 225 75% 8%;
+    --sidebar-border: 220 45% 76%;
+    --sidebar-ring: 223 58% 43%;
     
     --success: 162 82% 34%;
     --success-foreground: 0 0% 100%;

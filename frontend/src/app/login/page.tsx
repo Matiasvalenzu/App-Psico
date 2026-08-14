@@ -64,12 +64,12 @@ export default function LoginPage() {
 
         <div className="relative w-full max-w-sm space-y-6 rounded-2xl border border-border/60 bg-card p-8 shadow-card">
           <div className="space-y-3 text-center">
-            <div className="mx-auto flex w-full max-w-[260px] items-center justify-center px-2 py-1">
+            <div className="mx-auto flex w-full max-w-[320px] items-center justify-center px-2 py-1">
               <Image
-                src="/logo-psiconex-login.png"
+                src="/logo-psiconex.png"
                 alt="Psiconex"
-                width={5916}
-                height={2325}
+                width={1951}
+                height={393}
                 className="h-auto w-full object-contain drop-shadow-md"
                 priority
               />

@@ -126,16 +126,21 @@ export default function DashboardLayout({
         <div className={`mb-8 flex items-center gap-2 ${isCollapsed ? "justify-center px-0" : "px-2"}`}>
           <Link href="/dashboard" className="flex h-8 items-center justify-center" aria-label="Ir al dashboard">
             {isCollapsed ? (
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-lg font-bold text-sidebar-primary-foreground drop-shadow-md">
-                P
-              </span>
+              <Image
+                src="/logo-psiconex-icon.png"
+                alt="Psiconex"
+                width={281}
+                height={282}
+                className="h-8 w-8 object-contain"
+                priority
+              />
             ) : (
               <Image
-                src="/logo-psiconex-app.png"
+                src="/logo-psiconex.png"
                 alt="Psiconex"
-                width={5916}
-                height={1664}
-                className="h-full w-auto object-contain drop-shadow-md brightness-0 invert"
+                width={1951}
+                height={393}
+                className="h-full w-auto object-contain drop-shadow-md"
                 priority
               />
             )}
