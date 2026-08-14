@@ -1,4 +1,6 @@
 .env
+.env.production
+.env.hostinger
 APIDEEPSEEK.TXT
 PYANNOTEAPI.TXT
 ps_list.txt

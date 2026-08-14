@@ -6,7 +6,7 @@ export const ROUTES = {
 
 export const SITE = {
   name: "Psiconex",
-  domain: "localhost:3000",
+  domain: "app.psiconex.cl",
   tagline: "La IA que devuelve tiempo a tu consulta",
-  email: "hola@psiconex.app",
+  email: "hola@psiconex.cl",
 } as const;
