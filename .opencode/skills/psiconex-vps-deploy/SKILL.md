@@ -9,6 +9,8 @@ description: Deploy Psiconex to the production VPS. Use ONLY when the user expli
 
 - SSH alias: `psiconex-vps` (`root@72.60.59.142`)
 - Repository checkout: `/srv/psiconex-docker/current`
+- Git mirror: `/srv/psiconex-docker/repository.git`
+- Local Git remote: `vps` (`ssh://psiconex-vps/srv/psiconex-docker/repository.git`)
 - Compose file: `docker-compose.prod.yml`
 - Production environment file: `/srv/psiconex-docker/shared/.env`, linked as `current/.env`
 - Local production environment source: `.env.production`
@@ -29,12 +31,14 @@ or use destructive Git commands to clean the worktree.
 
 1. Run the relevant local tests or build checks. Report blockers before
    deploying if they are caused by the requested change.
-2. Commit the intended files and push the commit to `origin/main`.
+2. Commit the intended files, push the commit to `origin/main`, then push the
+   same commit to `vps/main`.
 3. Compare the SHA-256 hashes of local `.env.production` and the shared VPS
    `.env`. If they differ, atomically replace the VPS file with the local
    source using mode `600`. Do not use `rsync --delete` for environment files.
 4. Over SSH, confirm the VPS checkout is on `main`, clean, and can fast-forward.
-   Fetch and update it with `git pull --ff-only origin main`.
+   Its `origin` is the VPS Git mirror; update it with
+   `git pull --ff-only origin main`.
 5. Validate production Compose with
    `docker compose -p psiconex -f docker-compose.prod.yml config --quiet`.
 6. Deploy with

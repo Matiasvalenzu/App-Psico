@@ -56,6 +56,8 @@ public/logo-icon.jpg            — ícono DatnexiA (1455×1600)
 - Acceso: `ssh psiconex-vps` (`root@72.60.59.142`)
 - Llave local: `~/.ssh/psiconex_vps_ed25519`; nunca se versiona ni se copia al servidor.
 - El host alias está definido en `~/.ssh/config` para despliegues desde este workspace.
+- Checkout productivo: `/srv/psiconex-docker/current`; mirror Git: `/srv/psiconex-docker/repository.git`.
+- Comandos de producción: `docker compose -p psiconex -f docker-compose.prod.yml`.
 
 ## Variables de entorno clave (en docker-compose-dev.yml)
 | Variable | Default |
