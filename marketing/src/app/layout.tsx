@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   description:
     "Psiconex transcribe, diariza y resume tus sesiones de psicología. Informes clínicos en un minuto, no en una hora.",
-  metadataBase: new URL("https://psiconex.vercel.app"),
+  metadataBase: new URL("https://psiconex.cl"),
   openGraph: {
     title: "Psiconex — La IA que devuelve tiempo a tu consulta",
     description:

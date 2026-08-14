@@ -23,9 +23,9 @@ const COLUMNS = [
   {
     title: "Empresa",
     links: [
-      { href: "mailto:hola@psiconex.app", label: "Contacto" },
-      { href: "#privacidad", label: "Privacidad" },
-      { href: "#terminos", label: "Términos" },
+      { href: "mailto:matiasv.1992@gmail.com", label: "Contacto" },
+      { href: "/privacidad", label: "Privacidad" },
+      { href: "/terminos", label: "Términos" },
     ],
   },
 ]

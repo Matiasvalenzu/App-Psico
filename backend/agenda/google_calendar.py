@@ -102,6 +102,12 @@ def get_connection_status(user):
 
 
 def disconnect_google_calendar(user):
+    AgendaCita.objects.filter(psicologo=user).update(
+        google_calendar_id="",
+        google_event_id="",
+        google_synced_at=None,
+        google_sync_error="",
+    )
     AgendaGoogleCalendarConnection.objects.filter(psicologo=user).delete()
 
 
