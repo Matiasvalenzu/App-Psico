@@ -20,7 +20,7 @@ const FAQS = [
   },
   {
     q: "¿Los datos van a OpenAI o a servidores en EE.UU.?",
-    a: "No. Whisper corre en infraestructura chilena, los resúmenes con DeepSeek pasan por una API que no entrena con tus datos, y el audio nunca sale del país. Detallamos arquitectura en el DPA.",
+    a: "La transcripción se procesa en infraestructura chilena. Las funciones de IA se solicitan de forma explícita por el profesional; los datos obtenidos mediante Google Calendar nunca se envían a servicios de IA. Detallamos la arquitectura en el DPA.",
   },
   {
     q: "¿Puedo migrar mis fichas actuales?",

@@ -25,7 +25,6 @@ from .google_calendar import (
     get_redirect_uri,
     sync_app_to_google,
     sync_cita_to_google,
-    sync_google_to_app,
 )
 from .models import (
     AgendaBloqueo,
@@ -633,11 +632,10 @@ def google_calendar_callback(request):
 @permission_classes([IsAuthenticated])
 def google_calendar_sync(request):
     try:
-        inbound = sync_google_to_app(request.user)
         outbound = sync_app_to_google(request.user)
     except GoogleCalendarError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-    return Response({"google_to_app": inbound, "app_to_google": outbound})
+    return Response({"app_to_google": outbound})
 
 
 @api_view(["POST"])

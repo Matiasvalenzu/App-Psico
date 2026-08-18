@@ -19,9 +19,9 @@ const PILLARS = [
   },
   {
     icon: Eye,
-    title: "Cero entrenamiento con tus datos",
-    body: "Ni Whisper, ni DeepSeek, ni Pyannote ven tus sesiones para mejorar sus modelos. Punto.",
-    chip: "Opt-out total",
+    title: "Google aislado de la IA",
+    body: "Los datos obtenidos desde Google Calendar no se envían a DeepSeek ni a otros servicios de inteligencia artificial.",
+    chip: "Datos segregados",
   },
   {
     icon: FileKey,

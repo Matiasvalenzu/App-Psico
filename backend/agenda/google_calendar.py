@@ -4,10 +4,8 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
-from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 
 from .models import (
     AgendaCita,
@@ -18,8 +16,11 @@ from .models import (
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
-GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar"
+# Psiconex only manages the secondary calendar it creates. Calendar data must
+# never be imported into clinical records or sent to external AI services.
+GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar.app.created"
 SYNC_WINDOW_PAST_DAYS = 30
 SYNC_WINDOW_FUTURE_DAYS = 365
 
@@ -42,6 +43,8 @@ def build_authorization_url(user, redirect_uri):
     if not google_calendar_configured():
         raise GoogleCalendarError("Faltan GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET.")
 
+    # Replace prior broad grants before requesting the isolated Calendar scope.
+    disconnect_google_calendar(user)
     state = secrets.token_urlsafe(32)
     AgendaGoogleOAuthState.objects.create(
         psicologo=user,
@@ -74,6 +77,9 @@ def complete_oauth_callback(code, state):
         raise GoogleCalendarError("La autorización de Google expiró. Intenta conectar nuevamente.")
 
     token_data = _exchange_code_for_tokens(code, oauth_state.redirect_uri)
+    if not _has_required_scope(token_data.get("scope", "")):
+        raise GoogleCalendarError("Google no otorgó el permiso requerido para el calendario dedicado.")
+
     connection, _ = AgendaGoogleCalendarConnection.objects.get_or_create(
         psicologo=oauth_state.psicologo,
         defaults={"calendar_name": settings.GOOGLE_CALENDAR_NAME},
@@ -92,9 +98,13 @@ def complete_oauth_callback(code, state):
 
 def get_connection_status(user):
     connection = AgendaGoogleCalendarConnection.objects.filter(psicologo=user).first()
+    requires_reauthorization = bool(
+        connection and connection.connected and not _has_required_scope(connection.scope)
+    )
     return {
         "configured": google_calendar_configured(),
-        "connected": bool(connection and connection.connected),
+        "connected": bool(connection and connection.connected and not requires_reauthorization),
+        "requires_reauthorization": requires_reauthorization,
         "calendar_name": settings.GOOGLE_CALENDAR_NAME,
         "calendar_id": connection.calendar_id if connection else "",
         "last_synced_at": connection.last_synced_at if connection else None,
@@ -102,6 +112,9 @@ def get_connection_status(user):
 
 
 def disconnect_google_calendar(user):
+    connection = AgendaGoogleCalendarConnection.objects.filter(psicologo=user).first()
+    if connection:
+        _revoke_connection(connection)
     AgendaCita.objects.filter(psicologo=user).update(
         google_calendar_id="",
         google_event_id="",
@@ -112,10 +125,8 @@ def disconnect_google_calendar(user):
 
 
 def sync_cita_to_google(cita):
-    connection = AgendaGoogleCalendarConnection.objects.filter(
-        psicologo=cita.psicologo
-    ).first()
-    if not connection or not connection.connected:
+    connection = _get_active_connection(cita.psicologo)
+    if not connection:
         return None
 
     try:
@@ -178,59 +189,9 @@ def sync_cita_to_google(cita):
         return None
 
 
-@transaction.atomic
-def sync_google_to_app(user):
-    connection = AgendaGoogleCalendarConnection.objects.filter(psicologo=user).first()
-    if not connection or not connection.connected:
-        return {"connected": False, "created": 0, "updated": 0, "cancelled": 0, "skipped": 0}
-
-    calendar_id = ensure_dedicated_calendar(connection)
-    now = timezone.now()
-    params = {
-        "singleEvents": "true",
-        "showDeleted": "true",
-        "orderBy": "startTime",
-        "maxResults": "2500",
-        "timeMin": (now - timedelta(days=SYNC_WINDOW_PAST_DAYS)).isoformat(),
-        "timeMax": (now + timedelta(days=SYNC_WINDOW_FUTURE_DAYS)).isoformat(),
-    }
-    created = updated = cancelled = skipped = 0
-
-    while True:
-        data = _google_request(
-            connection,
-            "GET",
-            f"{GOOGLE_CALENDAR_API}/calendars/{calendar_id}/events",
-            params=params,
-        )
-        for event in data.get("items", []):
-            result = _upsert_event_from_google(user, calendar_id, event)
-            created += int(result == "created")
-            updated += int(result == "updated")
-            cancelled += int(result == "cancelled")
-            skipped += int(result == "skipped")
-
-        page_token = data.get("nextPageToken")
-        if not page_token:
-            break
-        params["pageToken"] = page_token
-
-    connection.last_synced_at = timezone.now()
-    connection.save(update_fields=["last_synced_at", "updated_at"])
-    return {
-        "connected": True,
-        "calendar_name": connection.calendar_name,
-        "created": created,
-        "updated": updated,
-        "cancelled": cancelled,
-        "skipped": skipped,
-        "last_synced_at": connection.last_synced_at,
-    }
-
-
 def sync_app_to_google(user):
-    connection = AgendaGoogleCalendarConnection.objects.filter(psicologo=user).first()
-    if not connection or not connection.connected:
+    connection = _get_active_connection(user)
+    if not connection:
         return {"connected": False, "synced": 0, "failed": 0}
 
     now = timezone.now()
@@ -247,32 +208,14 @@ def sync_app_to_google(user):
             failed += 1
         else:
             synced += 1
+    connection.last_synced_at = timezone.now()
+    connection.save(update_fields=["last_synced_at", "updated_at"])
     return {"connected": True, "synced": synced, "failed": failed}
 
 
 def ensure_dedicated_calendar(connection):
     if connection.calendar_id:
         return connection.calendar_id
-
-    page_token = None
-    while True:
-        params = {"maxResults": "250"}
-        if page_token:
-            params["pageToken"] = page_token
-        data = _google_request(
-            connection,
-            "GET",
-            f"{GOOGLE_CALENDAR_API}/users/me/calendarList",
-            params=params,
-        )
-        for calendar in data.get("items", []):
-            if calendar.get("summary") == connection.calendar_name:
-                connection.calendar_id = calendar.get("id", "")
-                connection.save(update_fields=["calendar_id", "updated_at"])
-                return connection.calendar_id
-        page_token = data.get("nextPageToken")
-        if not page_token:
-            break
 
     calendar = _google_request(
         connection,
@@ -338,6 +281,28 @@ def _access_token(connection):
     return _refresh_access_token(connection)
 
 
+def _has_required_scope(scope):
+    return GOOGLE_SCOPE in (scope or "").split()
+
+
+def _get_active_connection(user):
+    connection = AgendaGoogleCalendarConnection.objects.filter(psicologo=user).first()
+    if not connection or not connection.connected or not _has_required_scope(connection.scope):
+        return None
+    return connection
+
+
+def _revoke_connection(connection):
+    token = connection.refresh_token or connection.access_token
+    if not token:
+        return
+    try:
+        requests.post(GOOGLE_REVOKE_URL, data={"token": token}, timeout=10)
+    except requests.RequestException:
+        # Local credentials are deleted even if Google's revocation endpoint is unavailable.
+        pass
+
+
 def _google_request(connection, method, url, allow_not_found=False, **kwargs):
     token = _access_token(connection)
     headers = kwargs.pop("headers", {})
@@ -386,106 +351,3 @@ def _contact_full_name(cita):
         return cita.paciente.nombre_completo
     nombre = f"{cita.prospecto_nombre} {cita.prospecto_apellido}".strip()
     return nombre or "Paciente"
-
-
-def _upsert_event_from_google(user, calendar_id, event):
-    event_id = event.get("id", "")
-    if not event_id:
-        return "skipped"
-
-    local = _find_local_cita(user, event)
-    if event.get("status") == "cancelled":
-        if local and local.estado != AgendaCita.Estado.ANULADA:
-            local.estado = AgendaCita.Estado.ANULADA
-            local.google_synced_at = timezone.now()
-            local.save(update_fields=["estado", "google_synced_at", "updated_at"])
-            return "cancelled"
-        return "skipped"
-
-    start, end = _event_times(event)
-    if not start or not end:
-        return "skipped"
-
-    if _has_overlap(user, start, end, exclude_id=local.id if local else None):
-        return "skipped"
-
-    if local:
-        local.inicio = start
-        local.fin = end
-        local.google_calendar_id = calendar_id
-        local.google_event_id = event_id
-        local.google_synced_at = timezone.now()
-        local.google_sync_error = ""
-        local.save(
-            update_fields=[
-                "inicio",
-                "fin",
-                "google_calendar_id",
-                "google_event_id",
-                "google_synced_at",
-                "google_sync_error",
-                "updated_at",
-            ]
-        )
-        return "updated"
-
-    nombre, apellido = _name_from_summary(event.get("summary", ""))
-    AgendaCita.objects.create(
-        psicologo=user,
-        prospecto_nombre=nombre,
-        prospecto_apellido=apellido,
-        inicio=start,
-        fin=end,
-        notas="Importado desde Google Calendar.",
-        google_calendar_id=calendar_id,
-        google_event_id=event_id,
-        google_synced_at=timezone.now(),
-    )
-    return "created"
-
-
-def _find_local_cita(user, event):
-    private = event.get("extendedProperties", {}).get("private", {})
-    cita_id = private.get("herramienta_psicologo_cita_id")
-    if cita_id:
-        local = AgendaCita.objects.filter(id=cita_id, psicologo=user).first()
-        if local:
-            return local
-    return AgendaCita.objects.filter(psicologo=user, google_event_id=event.get("id", "")).first()
-
-
-def _event_times(event):
-    start_value = event.get("start", {}).get("dateTime")
-    end_value = event.get("end", {}).get("dateTime")
-    if not start_value or not end_value:
-        return None, None
-    start = parse_datetime(start_value)
-    end = parse_datetime(end_value)
-    if start and timezone.is_naive(start):
-        start = timezone.make_aware(start, timezone.get_current_timezone())
-    if end and timezone.is_naive(end):
-        end = timezone.make_aware(end, timezone.get_current_timezone())
-    return start, end
-
-
-def _name_from_summary(summary):
-    cleaned = summary.strip() or "Posible paciente"
-    if cleaned.lower().startswith("sesión -"):
-        cleaned = cleaned.split("-", 1)[1].strip()
-    parts = cleaned.split()
-    if not parts:
-        return "Posible", "Paciente"
-    if len(parts) == 1:
-        return parts[0], "Pendiente"
-    return parts[0], " ".join(parts[1:])
-
-
-def _has_overlap(user, inicio, fin, exclude_id=None):
-    qs = AgendaCita.objects.filter(
-        psicologo=user,
-        inicio__lt=fin,
-        fin__gt=inicio,
-    ).exclude(estado=AgendaCita.Estado.ANULADA)
-    if exclude_id:
-        qs = qs.exclude(id=exclude_id)
-    return qs.exists()

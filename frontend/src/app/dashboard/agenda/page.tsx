@@ -96,6 +96,7 @@ interface DisponibilidadBloque {
 interface GoogleCalendarStatus {
   configured: boolean;
   connected: boolean;
+  requires_reauthorization: boolean;
   calendar_name: string;
   calendar_id: string;
   last_synced_at: string | null;
@@ -296,13 +297,11 @@ export default function AgendaPage() {
       await loadGoogleStatus();
       refreshCitas();
       if (!silent) {
-        if (!data.google_to_app?.connected) {
+        if (!data.app_to_google?.connected) {
           setError("Conecta Google Calendar antes de sincronizar.");
         } else {
-          const imported = data.google_to_app.created || 0;
-          const updated = data.google_to_app.updated || 0;
           const pushed = data.app_to_google.synced || 0;
-          setSuccess(`Google Calendar sincronizado. Importadas ${imported}, actualizadas ${updated}, enviadas ${pushed}.`);
+          setSuccess(`Google Calendar sincronizado. Se enviaron ${pushed} citas al calendario dedicado.`);
         }
       }
     } catch (err) {
@@ -675,7 +674,7 @@ export default function AgendaPage() {
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
               >
                 {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                Sincronizar Google
+                Enviar a Google
               </button>
               <button
                 type="button"
@@ -694,7 +693,7 @@ export default function AgendaPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary shadow-subtle transition-all hover:bg-primary/15 disabled:opacity-50"
             >
               {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-              Conectar Google
+              {googleStatus?.requires_reauthorization ? "Reconectar Google" : "Conectar Google"}
             </button>
           )}
           <button
@@ -742,7 +741,9 @@ export default function AgendaPage() {
                 ? "Faltan credenciales OAuth de Google."
                 : googleStatus?.connected
                   ? `Última sync: ${googleStatus.last_synced_at ? new Date(googleStatus.last_synced_at).toLocaleString("es-CL") : "pendiente"}`
-                  : "Sincroniza con el calendario dedicado Agenda Psicológica."}
+                  : googleStatus?.requires_reauthorization
+                    ? "Reconecta Google para usar el calendario dedicado de Psiconex."
+                    : "Envía tus citas al calendario dedicado Agenda Psicológica."}
             </p>
             <div className="mt-3 grid gap-2">
               {googleStatus?.connected ? (
@@ -754,7 +755,7 @@ export default function AgendaPage() {
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
                   >
                     {googleSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    Sincronizar ahora
+                    Enviar citas ahora
                   </button>
                   <button
                     type="button"
@@ -773,7 +774,7 @@ export default function AgendaPage() {
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
                 >
                   {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                  Conectar Google
+                  {googleStatus?.requires_reauthorization ? "Reconectar Google" : "Conectar Google"}
                 </button>
               )}
             </div>
