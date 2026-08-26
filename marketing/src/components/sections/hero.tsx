@@ -4,7 +4,7 @@ import Link from "next/link"
 import { motion } from "motion/react"
 import { ArrowRight, PlayCircle, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { TranscriptPreview } from "@/components/sections/transcript-preview"
+import { HeroVideoPreview } from "@/components/sections/hero-video-preview"
 import { ROUTES } from "@/lib/config"
 
 export function HeroSection() {
@@ -105,7 +105,7 @@ export function HeroSection() {
             </motion.p>
           </div>
 
-          {/* Right: transcript preview */}
+          {/* Right: video preview */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -113,7 +113,7 @@ export function HeroSection() {
             className="relative"
           >
             <div className="absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-br from-primary/20 via-transparent to-[hsl(280_75%_64%)/0.15] blur-2xl" />
-            <TranscriptPreview />
+            <HeroVideoPreview />
           </motion.div>
         </div>
       </div>
