@@ -242,8 +242,8 @@ class ReservaPublicaSerializer(serializers.Serializer):
                 )
             whatsapp = normalizar_telefono(attrs.get("whatsapp", ""))
             attrs["whatsapp"] = whatsapp
-        return attrs
             attrs["rut"] = normalizar_rut(attrs.get("rut", ""))
+        return attrs
 
 
 
