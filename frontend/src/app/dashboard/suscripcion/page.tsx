@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser, apiFetch } from "@/lib/api";
-import { CreditCard, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { getCurrentUser } from "@/lib/api";
+import { CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function SuscripcionPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -24,23 +23,6 @@ export default function SuscripcionPage() {
     }
     loadData();
   }, []);
-
-  const handleSubscribe = async () => {
-    setCheckoutLoading(true);
-    try {
-      const res = await apiFetch("/suscripciones/checkout/", { method: "POST" });
-      if (!res.ok) throw new Error("No se pudo iniciar el pago");
-      const data = await res.json();
-      if (data.init_point) {
-        window.location.href = data.init_point;
-      } else {
-        throw new Error("No se devolvió un link de pago");
-      }
-    } catch (err) {
-      setError("Error al procesar la suscripción. Intente nuevamente más tarde.");
-      setCheckoutLoading(false);
-    }
-  };
 
   if (loading) {
     return <div className="p-8 text-center text-muted-foreground">Cargando...</div>;
@@ -112,10 +94,9 @@ export default function SuscripcionPage() {
               <Button
                 size="lg"
                 className="w-full sm:w-auto"
-                onClick={handleSubscribe}
-                disabled={checkoutLoading}
+                disabled
               >
-                {checkoutLoading ? "Procesando..." : "Suscribirme ahora"}
+                Próximamente
               </Button>
             )}
 
@@ -127,9 +108,8 @@ export default function SuscripcionPage() {
             )}
 
             {!isActive && (
-              <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                <CreditCard className="h-4 w-4" />
-                Pago seguro vía Mercado Pago
+              <div className="mt-2 text-center text-[11px] text-muted-foreground">
+                Los pagos en línea estarán disponibles próximamente.
               </div>
             )}
           </div>
