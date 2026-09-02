@@ -82,6 +82,7 @@ interface PerfilPublicoInterno {
   slug?: string;
   activo?: boolean;
   nombre_publico?: string;
+  instrucciones_reserva?: string;
   url_reserva?: string;
 }
 
@@ -174,6 +175,8 @@ export default function AgendaPage() {
   const [showDisponibilidad, setShowDisponibilidad] = useState(false);
   const [dispSaving, setDispSaving] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [instruccionesReserva, setInstruccionesReserva] = useState("");
+  const [instruccionesSaving, setInstruccionesSaving] = useState(false);
 
   const events = useMemo<EventInput[]>(
     () =>
@@ -333,7 +336,11 @@ export default function AgendaPage() {
   async function loadPerfilPublico() {
     try {
       const res = await apiFetch("/agenda/perfil-publico/");
-      if (res.ok) setPerfilPublico(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setPerfilPublico(data);
+        setInstruccionesReserva(data.instrucciones_reserva || "");
+      }
     } catch { /* silent */ }
   }
 
@@ -341,7 +348,9 @@ export default function AgendaPage() {
     try {
       const res = await apiFetch("/agenda/perfil-publico/", { method: "POST", body: "{}" });
       if (res.ok) {
-        setPerfilPublico(await res.json());
+        const data = await res.json();
+        setPerfilPublico(data);
+        setInstruccionesReserva(data.instrucciones_reserva || "");
         setSuccess("Perfil público creado. Configura tu disponibilidad semanal.");
       }
     } catch {
@@ -369,6 +378,27 @@ export default function AgendaPage() {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch { /* silent */ }
+  }
+
+  async function guardarInstruccionesReserva() {
+    if (!perfilPublico?.existe) return;
+    setInstruccionesSaving(true);
+    setError("");
+    try {
+      const res = await apiFetch("/agenda/perfil-publico/", {
+        method: "PATCH",
+        body: JSON.stringify({ instrucciones_reserva: instruccionesReserva }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setPerfilPublico(data);
+      setInstruccionesReserva(data.instrucciones_reserva || "");
+      setSuccess("Indicaciones de reserva actualizadas.");
+    } catch {
+      setError("No se pudieron guardar las indicaciones de reserva.");
+    } finally {
+      setInstruccionesSaving(false);
+    }
   }
 
   async function loadDisponibilidad() {
@@ -819,6 +849,32 @@ export default function AgendaPage() {
                     Configurar disponibilidad
                   </button>
                 </div>
+                <div className="mt-3 border-t border-border/60 pt-3">
+                  <label htmlFor="instrucciones-reserva" className="text-xs font-medium text-foreground">
+                    Indicaciones para el paciente
+                  </label>
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                    Agrega modalidad, dirección, enlace o recomendaciones. Se mostrarán antes de confirmar y en el correo.
+                  </p>
+                  <textarea
+                    id="instrucciones-reserva"
+                    value={instruccionesReserva}
+                    onChange={(event) => setInstruccionesReserva(event.target.value)}
+                    rows={4}
+                    maxLength={1500}
+                    placeholder="Ej: Sesión online. Recibirás el enlace por este medio..."
+                    className="mt-2 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none transition-colors focus:border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={guardarInstruccionesReserva}
+                    disabled={instruccionesSaving}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-60"
+                  >
+                    {instruccionesSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Guardar indicaciones
+                  </button>
+                </div>
                 {!googleStatus?.connected && (
                   <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
                     Conecta Google Calendar para sincronizar reservas automáticamente.
@@ -890,7 +946,7 @@ export default function AgendaPage() {
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
-              <h2 className="min-w-[180px] text-xl font-semibold capitalize tracking-tight">
+              <h2 className="min-w-0 text-base md:text-xl font-semibold capitalize tracking-tight">
                 {viewTitle}
               </h2>
               {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

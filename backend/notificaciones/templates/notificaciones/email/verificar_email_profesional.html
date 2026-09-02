@@ -1,0 +1,10 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Verifica tu correo{% endblock %}
+{% block preheader %}Usa este código para verificar tu correo de notificaciones.{% endblock %}
+{% block eyebrow %}Seguridad de tu cuenta{% endblock %}
+{% block heading %}Verifica tu correo de notificaciones{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ first_name }}, ingresa este código en Psiconex para confirmar que las notificaciones de tus reservas deben llegar a esta dirección.</p>
+<div style="margin:0 0 22px;padding:20px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;text-align:center;color:#1e3a8a;font-size:30px;font-weight:700;letter-spacing:.2em;">{{ verification_code }}</div>
+<p style="margin:0;color:#475569;font-size:14px;line-height:1.7;">El código vence en {{ expiration_minutes }} minutos. Si no solicitaste este cambio, no realices ninguna acción y tu correo actual seguirá activo.</p>
+{% endblock %}

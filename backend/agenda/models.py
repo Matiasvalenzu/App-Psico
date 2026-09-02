@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
+import uuid
 
 from pacientes.models import Paciente
 
@@ -69,6 +70,7 @@ class AgendaCita(models.Model):
     google_event_id = models.CharField(max_length=255, blank=True, default="", db_index=True)
     google_synced_at = models.DateTimeField(null=True, blank=True)
     google_sync_error = models.TextField(blank=True, default="")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -128,8 +130,10 @@ class AgendaPerfilPublico(models.Model):
     nombre_publico = models.CharField(max_length=200)
     subtitulo_publico = models.CharField(max_length=200, blank=True, default="")
     descripcion_publica = models.TextField(blank=True, default="")
+    instrucciones_reserva = models.TextField(max_length=1500, blank=True, default="")
     duracion_minutos = models.PositiveIntegerField(default=60)
     anticipacion_minima_horas = models.PositiveIntegerField(default=12)
+    anticipacion_cambios_horas = models.PositiveIntegerField(default=12)
     ventana_reserva_dias = models.PositiveIntegerField(default=30)
     acepta_pacientes_nuevos = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -229,6 +233,14 @@ class AgendaReservaPublica(models.Model):
         related_name="reservas",
     )
     tipo_paciente = models.CharField(max_length=20, choices=TipoPaciente.choices)
+    codigo_reserva = models.CharField(
+        max_length=24, unique=True, null=True, blank=True, db_index=True
+    )
+    tipo_documento = models.CharField(max_length=15, blank=True, default="")
+    documento_digest = models.CharField(max_length=64, blank=True, default="")
+    email_confirmacion = models.EmailField(blank=True, default="")
+    version = models.PositiveIntegerField(default=1)
+    ultima_gestion_at = models.DateTimeField(null=True, blank=True)
     ip_hash = models.CharField(max_length=64, blank=True, default="")
     user_agent = models.CharField(max_length=300, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -239,3 +251,74 @@ class AgendaReservaPublica(models.Model):
 
     def __str__(self):
         return f"Reserva {self.tipo_paciente} - {self.cita}"
+
+
+class AgendaVerificacionReserva(models.Model):
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    perfil = models.ForeignKey(
+        AgendaPerfilPublico,
+        on_delete=models.CASCADE,
+        related_name="verificaciones_reserva",
+    )
+    paciente = models.ForeignKey(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name="verificaciones_reserva",
+        null=True,
+        blank=True,
+    )
+    tipo_paciente = models.CharField(
+        max_length=20, choices=AgendaReservaPublica.TipoPaciente.choices
+    )
+    tipo_documento = models.CharField(max_length=15)
+    documento_digest = models.CharField(max_length=64)
+    email = models.EmailField()
+    codigo_hash = models.CharField(max_length=64)
+    expira_at = models.DateTimeField()
+    intentos = models.PositiveSmallIntegerField(default=0)
+    verificada_at = models.DateTimeField(null=True, blank=True)
+    consumida_at = models.DateTimeField(null=True, blank=True)
+    ip_hash = models.CharField(max_length=64, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AgendaReservaEvento(models.Model):
+    class Tipo(models.TextChoices):
+        CREADA = "CREADA", "Creada"
+        REPROGRAMADA = "REPROGRAMADA", "Reprogramada"
+        CANCELADA = "CANCELADA", "Cancelada"
+
+    class Actor(models.TextChoices):
+        PACIENTE = "PACIENTE", "Paciente"
+        PSICOLOGO = "PSICOLOGO", "Psicólogo"
+        SISTEMA = "SISTEMA", "Sistema"
+
+    reserva = models.ForeignKey(
+        AgendaReservaPublica,
+        on_delete=models.CASCADE,
+        related_name="eventos",
+    )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    actor = models.CharField(max_length=20, choices=Actor.choices)
+    inicio_anterior = models.DateTimeField(null=True, blank=True)
+    fin_anterior = models.DateTimeField(null=True, blank=True)
+    inicio_nuevo = models.DateTimeField(null=True, blank=True)
+    fin_nuevo = models.DateTimeField(null=True, blank=True)
+    estado_anterior = models.CharField(max_length=30, blank=True, default="")
+    estado_nuevo = models.CharField(max_length=30, blank=True, default="")
+    motivo = models.CharField(max_length=300, blank=True, default="")
+    version = models.PositiveIntegerField()
+    ip_hash = models.CharField(max_length=64, blank=True, default="")
+    user_agent = models.CharField(max_length=300, blank=True, default="")
+    request_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reserva", "request_id"],
+                condition=~models.Q(request_id=""),
+                name="reserva_evento_request_unico",
+            )
+        ]

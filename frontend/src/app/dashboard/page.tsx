@@ -307,7 +307,7 @@ export default function DashboardPage() {
     <div className="space-y-8 animate-fade-in-up">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Pacientes</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Pacientes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {pacientes.length} paciente{pacientes.length !== 1 ? "s" : ""} registrado{pacientes.length !== 1 ? "s" : ""}
           </p>
@@ -467,148 +467,234 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="rounded-2xl border border-border/50 bg-card shadow-card overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
-              <Search className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-            <p className="text-lg font-semibold">Sin pacientes encontrados</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {search ? "Intenta con otros términos de búsqueda." : "Crea tu primer paciente para comenzar."}
-            </p>
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center rounded-2xl border border-border/50 bg-card shadow-card">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+            <Search className="h-8 w-8 text-muted-foreground/50" />
           </div>
-        ) : (
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="font-semibold text-foreground/80 pl-6 h-12">Nombre</TableHead>
-                <TableHead className="font-semibold text-foreground/80 h-12">Última Actualización</TableHead>
-                <TableHead className="font-semibold text-foreground/80 h-12">Estado</TableHead>
-                <TableHead className="text-right font-semibold text-foreground/80 pr-6 h-12">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((paciente) => (
-                <TableRow 
-                  key={paciente.id} 
-                  className="group cursor-pointer transition-colors hover:bg-muted/40"
-                  onClick={(e) => {
-                    // Prevent navigation if clicking on dropdown trigger
-                    if ((e.target as HTMLElement).closest('.action-menu')) return;
-                    router.push(`/dashboard/pacientes/${paciente.id}`);
-                  }}
-                >
-                  <TableCell className="pl-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <Avatar className={`h-10 w-10 border ${getAvatarColor(paciente.nombre_completo)}`}>
-                        <AvatarFallback className="font-semibold bg-transparent">
-                          {getInitials(paciente.nombre, paciente.apellido)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium text-base tracking-tight">{paciente.nombre_completo}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(paciente.updated_at)}
-                  </TableCell>
-                  <TableCell>
+          <p className="text-lg font-semibold">Sin pacientes encontrados</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {search ? "Intenta con otros términos de búsqueda." : "Crea tu primer paciente para comenzar."}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* ── Mobile: Patient Cards ── */}
+          <div className="space-y-3 md:hidden">
+            {filtered.map((paciente) => (
+              <div
+                key={paciente.id}
+                className="flex items-center gap-3 rounded-xl border border-border/50 bg-card p-4 shadow-subtle active:bg-muted/40 transition-colors cursor-pointer"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('.action-menu')) return;
+                  router.push(`/dashboard/pacientes/${paciente.id}`);
+                }}
+              >
+                <Avatar className={`h-11 w-11 shrink-0 border ${getAvatarColor(paciente.nombre_completo)}`}>
+                  <AvatarFallback className="font-semibold bg-transparent text-sm">
+                    {getInitials(paciente.nombre, paciente.apellido)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">{paciente.nombre_completo}</div>
+                  <div className="mt-0.5 flex items-center gap-2">
                     <Badge
                       variant="secondary"
-                      className={`font-normal px-3 py-0.5 text-xs ${getPatientStatus(paciente.estado).className}`}
+                      className={`font-normal px-2 py-0 text-[10px] ${getPatientStatus(paciente.estado).className}`}
                     >
                       {getPatientStatus(paciente.estado).label}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-right pr-6 action-menu">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="h-8 w-8 p-0 opacity-100 transition-opacity hover:bg-muted data-[popup-open]:bg-muted sm:opacity-0 sm:group-hover:opacity-100 sm:data-[popup-open]:opacity-100"
-                        >
-                          <span className="sr-only">Abrir menú</span>
-                          <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-elevated">
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                            Acciones
-                          </DropdownMenuLabel>
-                          <DropdownMenuItem
-                            className="cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/dashboard/pacientes/${paciente.id}`);
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4 text-primary" />
-                            Ver ficha
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/dashboard/pacientes/${paciente.id}?editar=1`);
-                            }}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Editar paciente
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
-                            <Activity className="mr-2 h-4 w-4" />
-                            <span>Cambiar Estado</span>
-                            {updatingStatusId === paciente.id && (
-                              <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" />
-                            )}
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-64 rounded-xl shadow-elevated">
-                            <DropdownMenuRadioGroup
-                              value={paciente.estado || "EN_SESION"}
-                              onValueChange={(estado) => handleChangeEstado(paciente, estado)}
-                            >
-                              {PATIENT_STATUS_OPTIONS.map((status) => (
-                                <DropdownMenuRadioItem
-                                  key={status.value}
-                                  value={status.value}
-                                  className="cursor-pointer py-2"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <span className="flex flex-col">
-                                    <span className="text-sm font-medium">{status.label}</span>
-                                    <span className="text-xs text-muted-foreground">{status.description}</span>
-                                  </span>
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                        <DropdownMenuSeparator />
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {formatDate(paciente.updated_at)}
+                    </span>
+                  </div>
+                </div>
+                <div className="action-menu shrink-0">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menú</span>
+                        <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-elevated">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                          Acciones
+                        </DropdownMenuLabel>
                         <DropdownMenuItem
-                          variant="destructive"
                           className="cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPacienteToDelete(paciente);
-                            setDeletePacienteError("");
+                            router.push(`/dashboard/pacientes/${paciente.id}`);
                           }}
                         >
-                          <Trash className="mr-2 h-4 w-4" />
-                          Eliminar paciente
+                          <Eye className="mr-2 h-4 w-4 text-primary" />
+                          Ver ficha
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/dashboard/pacientes/${paciente.id}?editar=1`);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar paciente
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPacienteToDelete(paciente);
+                          setDeletePacienteError("");
+                        }}
+                      >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Eliminar paciente
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Desktop: Table ── */}
+          <div className="hidden md:block rounded-2xl border border-border/50 bg-card shadow-card overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="font-semibold text-foreground/80 pl-6 h-12">Nombre</TableHead>
+                  <TableHead className="font-semibold text-foreground/80 h-12">Última Actualización</TableHead>
+                  <TableHead className="font-semibold text-foreground/80 h-12">Estado</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground/80 pr-6 h-12">Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((paciente) => (
+                  <TableRow
+                    key={paciente.id}
+                    className="group cursor-pointer transition-colors hover:bg-muted/40"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('.action-menu')) return;
+                      router.push(`/dashboard/pacientes/${paciente.id}`);
+                    }}
+                  >
+                    <TableCell className="pl-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <Avatar className={`h-10 w-10 border ${getAvatarColor(paciente.nombre_completo)}`}>
+                          <AvatarFallback className="font-semibold bg-transparent">
+                            {getInitials(paciente.nombre, paciente.apellido)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="font-medium text-base tracking-tight">{paciente.nombre_completo}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(paciente.updated_at)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={`font-normal px-3 py-0.5 text-xs ${getPatientStatus(paciente.estado).className}`}
+                      >
+                        {getPatientStatus(paciente.estado).label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right pr-6 action-menu">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-8 w-8 p-0 opacity-100 transition-opacity hover:bg-muted data-[popup-open]:bg-muted sm:opacity-0 sm:group-hover:opacity-100 sm:data-[popup-open]:opacity-100"
+                          >
+                            <span className="sr-only">Abrir menú</span>
+                            <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-elevated">
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                              Acciones
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/pacientes/${paciente.id}`);
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4 text-primary" />
+                              Ver ficha
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/pacientes/${paciente.id}?editar=1`);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar paciente
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
+                              <Activity className="mr-2 h-4 w-4" />
+                              <span>Cambiar Estado</span>
+                              {updatingStatusId === paciente.id && (
+                                <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" />
+                              )}
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="w-64 rounded-xl shadow-elevated">
+                              <DropdownMenuRadioGroup
+                                value={paciente.estado || "EN_SESION"}
+                                onValueChange={(estado) => handleChangeEstado(paciente, estado)}
+                              >
+                                {PATIENT_STATUS_OPTIONS.map((status) => (
+                                  <DropdownMenuRadioItem
+                                    key={status.value}
+                                    value={status.value}
+                                    className="cursor-pointer py-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <span className="flex flex-col">
+                                      <span className="text-sm font-medium">{status.label}</span>
+                                      <span className="text-xs text-muted-foreground">{status.description}</span>
+                                    </span>
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            className="cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPacienteToDelete(paciente);
+                              setDeletePacienteError("");
+                            }}
+                          >
+                            <Trash className="mr-2 h-4 w-4" />
+                            Eliminar paciente
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
       <ConfirmDialog
         open={Boolean(pacienteToDelete)}
         title="Eliminar paciente"

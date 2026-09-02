@@ -25,8 +25,8 @@ export default function LoginPage() {
     try {
       await login(username, password);
       router.push("/dashboard");
-    } catch {
-      setError("Credenciales inválidas");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "No se pudo iniciar sesión.");
     } finally {
       setLoading(false);
     }

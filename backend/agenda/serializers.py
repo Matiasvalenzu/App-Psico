@@ -4,12 +4,12 @@ from datetime import date, datetime, time, timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import serializers
 
 from pacientes.models import Paciente
+from pacientes.documentos import TIPOS_DOCUMENTO, normalizar_documento
 
 from .models import (
     AgendaBloqueo,
@@ -191,6 +191,7 @@ class PerfilPublicoSerializer(serializers.ModelSerializer):
             "nombre_publico",
             "subtitulo_publico",
             "descripcion_publica",
+            "instrucciones_reserva",
             "duracion_minutos",
             "acepta_pacientes_nuevos",
             "disponibilidad",
@@ -210,31 +211,12 @@ class PerfilPublicoSerializer(serializers.ModelSerializer):
         ]
 
 
-class VerificarPacienteSerializer(serializers.Serializer):
-    rut = serializers.CharField(required=False, allow_blank=True, default="")
-    email = serializers.EmailField(required=False, allow_blank=True, default="")
-    whatsapp = serializers.CharField(required=False, allow_blank=True, default="")
-
-    def validate(self, attrs):
-        rut = normalizar_rut(attrs.get("rut", ""))
-        email = normalizar_email(attrs.get("email", ""))
-        whatsapp = normalizar_telefono(attrs.get("whatsapp", ""))
-        if not rut and not email and not whatsapp:
-            raise serializers.ValidationError(
-                "Ingresa al menos un dato: RUT, email o WhatsApp."
-            )
-        attrs["rut"] = rut
-        attrs["email"] = email
-        attrs["whatsapp"] = whatsapp
-        return attrs
-
-
 class ReservaPublicaSerializer(serializers.Serializer):
     tipo_paciente = serializers.ChoiceField(choices=["EXISTENTE", "NUEVO"])
     inicio = serializers.DateTimeField()
-
-    # Para paciente existente
-    paciente_id = serializers.IntegerField(required=False, allow_null=True)
+    verification_token = serializers.CharField()
+    tipo_documento = serializers.ChoiceField(choices=TIPOS_DOCUMENTO)
+    numero_documento = serializers.CharField(max_length=40)
 
     # Para paciente nuevo
     nombre_completo = serializers.CharField(required=False, allow_blank=True, default="")
@@ -243,37 +225,40 @@ class ReservaPublicaSerializer(serializers.Serializer):
     whatsapp = serializers.CharField(required=False, allow_blank=True, default="")
     motivo_consulta = serializers.CharField(required=False, allow_blank=True, default="")
 
+
     def validate(self, attrs):
         tipo = attrs["tipo_paciente"]
+        attrs["documento_normalizado"] = normalizar_documento(
+            attrs["tipo_documento"], attrs["numero_documento"]
+        )
+        attrs["email"] = normalizar_email(attrs.get("email", ""))
         if tipo == "EXISTENTE":
-            if not attrs.get("paciente_id"):
-                raise serializers.ValidationError(
-                    {"paciente_id": "Se requiere el ID del paciente."}
-                )
+            pass
         elif tipo == "NUEVO":
             nombre = (attrs.get("nombre_completo") or "").strip()
             if not nombre:
                 raise serializers.ValidationError(
                     {"nombre_completo": "El nombre completo es obligatorio."}
                 )
-            email = normalizar_email(attrs.get("email", ""))
             whatsapp = normalizar_telefono(attrs.get("whatsapp", ""))
-            if not email and not whatsapp:
-                raise serializers.ValidationError(
-                    "Ingresa al menos un dato de contacto: email o WhatsApp."
-                )
-            attrs["email"] = email
             attrs["whatsapp"] = whatsapp
-            attrs["rut"] = normalizar_rut(attrs.get("rut", ""))
         return attrs
+            attrs["rut"] = normalizar_rut(attrs.get("rut", ""))
+
 
 
 # ─── Cálculo de slots ────────────────────────────────────────────────
 
-def calcular_slots(perfil: AgendaPerfilPublico, desde: date, hasta: date) -> list[dict]:
+def calcular_slots(
+    perfil: AgendaPerfilPublico,
+    desde: date,
+    hasta: date,
+    exclude_cita_id=None,
+    duration_minutes=None,
+) -> list[dict]:
     """Calcula slots disponibles para un perfil público entre dos fechas."""
     psicologo = perfil.psicologo
-    duracion = timedelta(minutes=perfil.duracion_minutos)
+    duracion = timedelta(minutes=duration_minutes or perfil.duracion_minutos)
     ahora = timezone.now()
     min_inicio = ahora + timedelta(hours=perfil.anticipacion_minima_horas)
     max_fecha = (ahora + timedelta(days=perfil.ventana_reserva_dias)).date()
@@ -296,15 +281,14 @@ def calcular_slots(perfil: AgendaPerfilPublico, desde: date, hasta: date) -> lis
     rango_inicio = timezone.make_aware(datetime.combine(desde, time.min), tz)
     rango_fin = timezone.make_aware(datetime.combine(hasta, time.max), tz)
 
-    citas_ocupadas = list(
-        AgendaCita.objects.filter(
+    citas_queryset = AgendaCita.objects.filter(
             psicologo=psicologo,
             inicio__lt=rango_fin,
             fin__gt=rango_inicio,
-        )
-        .exclude(estado=AgendaCita.Estado.ANULADA)
-        .values_list("inicio", "fin")
-    )
+        ).exclude(estado=AgendaCita.Estado.ANULADA)
+    if exclude_cita_id:
+        citas_queryset = citas_queryset.exclude(pk=exclude_cita_id)
+    citas_ocupadas = list(citas_queryset.values_list("inicio", "fin"))
 
     # Obtener bloqueos
     bloqueos = list(
@@ -367,49 +351,6 @@ def calcular_slots(perfil: AgendaPerfilPublico, desde: date, hasta: date) -> lis
     return slots
 
 
-# ─── Servicio de reserva ─────────────────────────────────────────────
-
-def buscar_paciente_existente(psicologo, rut="", email="", whatsapp=""):
-    """Busca paciente activo del psicólogo por RUT, email o WhatsApp."""
-    filtros = Q()
-    if rut:
-        filtros |= Q(rut=rut)
-    if email:
-        filtros |= Q(email_contacto=email)
-    if whatsapp:
-        filtros |= Q(telefono_whatsapp=whatsapp)
-    if not filtros:
-        return None
-    return (
-        Paciente.objects.filter(filtros, psicologo=psicologo, activo=True)
-        .first()
-    )
-
-
-def crear_o_reutilizar_paciente(psicologo, nombre_completo, rut="", email="", whatsapp="", motivo=""):
-    """Crea paciente o reutiliza existente si hay coincidencia por RUT/email/WhatsApp."""
-    existente = buscar_paciente_existente(psicologo, rut, email, whatsapp)
-    if existente:
-        return existente, False  # (paciente, es_nuevo)
-
-    partes = nombre_completo.strip().split()
-    nombre = partes[0] if partes else "Paciente"
-    apellido = " ".join(partes[1:]) if len(partes) > 1 else "Pendiente"
-
-    paciente = Paciente.objects.create(
-        psicologo=psicologo,
-        nombre=nombre,
-        apellido=apellido,
-        rut=rut,
-        email_contacto=email,
-        telefono_whatsapp=whatsapp,
-        motivo_consulta=motivo,
-        origen_consulta="Reserva pública",
-        activo=True,
-    )
-    return paciente, True
-
-
 # ─── Serializers internos (autenticados) ─────────────────────────────
 
 class DisponibilidadSerializer(serializers.ModelSerializer):
@@ -440,8 +381,10 @@ class PerfilPublicoInternoSerializer(serializers.ModelSerializer):
             "nombre_publico",
             "subtitulo_publico",
             "descripcion_publica",
+            "instrucciones_reserva",
             "duracion_minutos",
             "anticipacion_minima_horas",
+            "anticipacion_cambios_horas",
             "ventana_reserva_dias",
             "acepta_pacientes_nuevos",
             "url_reserva",
@@ -456,3 +399,64 @@ class PerfilPublicoInternoSerializer(serializers.ModelSerializer):
     def get_url_reserva(self, obj):
         base = settings.PUBLIC_APP_URL.rstrip("/")
         return f"{base}/reservar/{obj.slug}"
+
+
+class SolicitudOtpReservaSerializer(serializers.Serializer):
+    tipo_paciente = serializers.ChoiceField(choices=["EXISTENTE", "NUEVO"])
+    tipo_documento = serializers.ChoiceField(choices=TIPOS_DOCUMENTO)
+    numero_documento = serializers.CharField(max_length=40)
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        attrs["documento_normalizado"] = normalizar_documento(
+            attrs["tipo_documento"], attrs["numero_documento"]
+        )
+        attrs["email"] = normalizar_email(attrs.get("email", ""))
+        if attrs["tipo_paciente"] == "NUEVO" and not attrs["email"]:
+            raise serializers.ValidationError({"email": "El correo es obligatorio."})
+        return attrs
+
+
+class ConfirmarOtpReservaSerializer(serializers.Serializer):
+    verificacion_id = serializers.UUIDField()
+    codigo = serializers.RegexField(r"^\d{6}$")
+
+
+class GestionReservaAuthSerializer(serializers.Serializer):
+    codigo_reserva = serializers.CharField(max_length=24)
+    tipo_documento = serializers.ChoiceField(choices=TIPOS_DOCUMENTO)
+    numero_documento = serializers.CharField(max_length=40)
+
+    def validate(self, attrs):
+        attrs["codigo_reserva"] = attrs["codigo_reserva"].strip().upper()
+        attrs["documento_normalizado"] = normalizar_documento(
+            attrs["tipo_documento"], attrs["numero_documento"]
+        )
+        return attrs
+
+
+class ReprogramarReservaSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    inicio = serializers.DateTimeField()
+    version = serializers.IntegerField(min_value=1)
+    request_id = serializers.CharField(max_length=64)
+
+
+class SlotsGestionReservaSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    desde = serializers.DateField()
+    hasta = serializers.DateField()
+
+    def validate(self, attrs):
+        if attrs["hasta"] < attrs["desde"]:
+            raise serializers.ValidationError(
+                {"hasta": "La fecha final debe ser igual o posterior a la inicial."}
+            )
+        return attrs
+
+
+class CancelarReservaSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    version = serializers.IntegerField(min_value=1)
+    request_id = serializers.CharField(max_length=64)
+    motivo = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")

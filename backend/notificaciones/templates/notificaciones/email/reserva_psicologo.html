@@ -1,0 +1,15 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Nueva reserva{% endblock %}
+{% block preheader %}{{ patient_name }} reservó una sesión en tu agenda.{% endblock %}
+{% block eyebrow %}Nueva reserva pública{% endblock %}
+{% block heading %}Tienes una nueva sesión agendada{% endblock %}
+{% block content %}
+<p style="margin:0 0 20px;color:#334155;font-size:16px;line-height:1.7;"><strong>{{ patient_name }}</strong> realizó una reserva desde tu enlace público.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+  <tr><td style="padding:18px 20px;color:#334155;font-size:14px;line-height:1.8;"><strong style="color:#0f172a;">Código:</strong> {{ booking_code }}<br><strong style="color:#0f172a;">Paciente:</strong> {{ patient_name }}<br><strong style="color:#0f172a;">Fecha:</strong> {{ appointment_date }}<br><strong style="color:#0f172a;">Horario:</strong> {{ appointment_start }} a {{ appointment_end }} hrs, hora de Chile<br><strong style="color:#0f172a;">Duración:</strong> {{ duration_minutes }} minutos</td></tr>
+</table>
+<p style="margin:0 0 22px;color:#475569;font-size:14px;line-height:1.7;">Revisa que las indicaciones de modalidad, dirección o acceso estén actualizadas. Puedes responder este correo si necesitas contactar al paciente.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ agenda_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Ver mi agenda</a></td></tr></table>
+{% endblock %}

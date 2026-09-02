@@ -1,0 +1,13 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Evaluación psicológica{% endblock %}
+{% block preheader %}{{ psychologist_name }} te invita a completar una evaluación.{% endblock %}
+{% block eyebrow %}Evaluación psicológica{% endblock %}
+{% block heading %}Tienes una evaluación pendiente{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ patient_name }}, <strong>{{ psychologist_name }}</strong> te solicita completar el Test de Creencias Ellis como parte de tu proceso de atención.</p>
+<p style="margin:0 0 22px;color:#475569;font-size:14px;line-height:1.7;">El enlace es personal, vence en {{ expiration_days }} días y solo puede utilizarse una vez. No necesitas iniciar sesión ni ingresar datos adicionales.</p>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Este instrumento no reemplaza la evaluación profesional. Tus resultados serán revisados por tu psicólogo/a.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ public_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Completar evaluación</a></td></tr></table>
+{% endblock %}

@@ -1,0 +1,17 @@
+Hola {{ patient_name }},
+
+Tu reserva con {{ psychologist_name }} fue confirmada correctamente.
+
+Código de reserva: {{ booking_code }}
+Fecha: {{ appointment_date }}
+Horario: {{ appointment_start }} a {{ appointment_end }} hrs, hora de Chile
+Duración: {{ duration_minutes }} minutos
+Profesional: {{ psychologist_name }}
+{% if booking_instructions %}
+Indicaciones del profesional:
+{{ booking_instructions }}
+{% endif %}
+Revisa las indicaciones y procura estar disponible cinco minutos antes.
+Gestiona tu reserva: {{ management_url }}
+
+Equipo Psiconex

@@ -9,12 +9,14 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django_ratelimit.decorators import ratelimit
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from pacientes.models import Paciente
+from cuentas.services import get_notification_email
+from notificaciones.services import enqueue_booking_confirmations
 
 from .google_calendar import (
     GoogleCalendarError,
@@ -38,16 +40,30 @@ from .serializers import (
     DisponibilidadSerializer,
     PerfilPublicoInternoSerializer,
     PerfilPublicoSerializer,
+    CancelarReservaSerializer,
+    ConfirmarOtpReservaSerializer,
+    GestionReservaAuthSerializer,
+    ReprogramarReservaSerializer,
     ReservaPublicaSerializer,
-    VerificarPacienteSerializer,
-    buscar_paciente_existente,
+    SlotsGestionReservaSerializer,
+    SolicitudOtpReservaSerializer,
     calcular_slots,
-    crear_o_reutilizar_paciente,
     ip_hash,
-    normalizar_email,
-    normalizar_rut,
-    normalizar_telefono,
 )
+from .public_booking import (
+    ReservationConflict,
+    assign_booking_code,
+    authenticate_reservation,
+    cancel_reservation,
+    confirm_booking_email_verification,
+    consume_booking_verification,
+    create_booking_event,
+    management_slots,
+    request_booking_email_verification,
+    reschedule_reservation,
+)
+from .security import document_digest
+from .tasks import sync_appointment_to_google
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -332,6 +348,11 @@ def perfil_publico_interno(request):
                 {"error": "Ya tienes un perfil público configurado."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not get_notification_email(request.user):
+            return Response(
+                {"error": "Configura tu correo antes de activar la agenda pública."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         data = request.data.copy()
         if not data.get("nombre_publico"):
             data["nombre_publico"] = request.user.get_full_name() or request.user.username
@@ -360,6 +381,11 @@ def perfil_publico_interno(request):
         return Response(
             {"error": "No tienes un perfil público. Créalo primero."},
             status=status.HTTP_404_NOT_FOUND,
+        )
+    if request.data.get("activo") is True and not get_notification_email(request.user):
+        return Response(
+            {"error": "Configura tu correo antes de activar la agenda pública."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     serializer = PerfilPublicoInternoSerializer(perfil, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -397,39 +423,49 @@ def perfil_publico(request, slug):
     return Response(PerfilPublicoSerializer(perfil).data)
 
 
-@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@ratelimit(key="ip", rate="3/m", method="POST", block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def verificar_paciente(request, slug):
-    """POST /api/agenda/publica/<slug>/verificar-paciente/ — Verifica existencia sin filtrar datos."""
+def solicitar_otp_reserva(request, slug):
     perfil = _get_perfil_activo(slug)
     if not perfil:
         return Response(
             {"error": "No se encontró esta agenda."},
             status=status.HTTP_404_NOT_FOUND,
         )
-
-    serializer = VerificarPacienteSerializer(data=request.data)
+    serializer = SolicitudOtpReservaSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-
-    paciente = buscar_paciente_existente(
-        perfil.psicologo,
-        rut=data["rut"],
-        email=data["email"],
-        whatsapp=data["whatsapp"],
+    verification, masked_email = request_booking_email_verification(
+        perfil, serializer.validated_data, ip_hash(request)
+    )
+    return Response(
+        {
+            "verificacion_id": verification.public_id,
+            "email": masked_email,
+            "expira_en_minutos": 10,
+        },
+        status=status.HTTP_201_CREATED,
     )
 
-    if paciente:
-        return Response({
-            "encontrado": True,
-            "paciente_id": paciente.id,
-            "nombre": paciente.nombre,
-        })
-    return Response({
-        "encontrado": False,
-        "mensaje": "No encontramos una ficha con esos datos. Puedes continuar como primera reserva.",
-    })
+
+@ratelimit(key="ip", rate="10/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def confirmar_otp_reserva(request, slug):
+    perfil = _get_perfil_activo(slug)
+    if not perfil:
+        return Response(
+            {"error": "No se encontró esta agenda."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    serializer = ConfirmarOtpReservaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    token = confirm_booking_email_verification(
+        perfil,
+        serializer.validated_data["verificacion_id"],
+        serializer.validated_data["codigo"],
+    )
+    return Response({"verification_token": token})
 
 
 @api_view(["GET"])
@@ -478,12 +514,21 @@ def reservar(request, slug):
             {"error": "No se encontró esta agenda."},
             status=status.HTTP_404_NOT_FOUND,
         )
+    perfil = AgendaPerfilPublico.objects.select_for_update().select_related(
+        "psicologo"
+    ).get(pk=perfil.pk)
 
     serializer = ReservaPublicaSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
     psicologo = perfil.psicologo
+    psychologist_email = get_notification_email(psicologo)
+    if not psychologist_email:
+        return Response(
+            {"error": "Esta agenda no puede recibir reservas por el momento."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     inicio = data["inicio"]
     duracion = timedelta(minutes=perfil.duracion_minutos)
     fin = inicio + duracion
@@ -512,18 +557,19 @@ def reservar(request, slug):
             status=status.HTTP_409_CONFLICT,
         )
 
-    # Resolver paciente
+    verification = consume_booking_verification(
+        perfil,
+        data["verification_token"],
+        tipo,
+        data["tipo_documento"],
+        data["documento_normalizado"],
+    )
+
+    # Resolver paciente exclusivamente desde la verificación OTP.
     if tipo == "EXISTENTE":
-        paciente = Paciente.objects.filter(
-            id=data["paciente_id"],
-            psicologo=psicologo,
-            activo=True,
-        ).first()
-        if not paciente:
-            return Response(
-                {"error": "No se encontró la ficha del paciente."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        paciente = verification.paciente
+        if not paciente or not paciente.activo or paciente.psicologo_id != psicologo.pk:
+            raise serializers.ValidationError("No se encontró la ficha del paciente.")
         origen = AgendaCita.OrigenReserva.PUBLICA_PACIENTE_EXISTENTE
     else:
         # NUEVO
@@ -532,13 +578,32 @@ def reservar(request, slug):
                 {"error": "Esta agenda no acepta reservas de pacientes nuevos en este momento."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        paciente, _ = crear_o_reutilizar_paciente(
+        if Paciente.objects.filter(
             psicologo=psicologo,
-            nombre_completo=data["nombre_completo"],
-            rut=data.get("rut", ""),
-            email=data.get("email", ""),
-            whatsapp=data.get("whatsapp", ""),
-            motivo=data.get("motivo_consulta", ""),
+            tipo_documento=data["tipo_documento"],
+            documento_normalizado=data["documento_normalizado"],
+        ).exists():
+            raise serializers.ValidationError(
+                "No pudimos crear la ficha con los datos indicados. Contacta al profesional."
+            )
+        partes = data["nombre_completo"].strip().split()
+        paciente = Paciente.objects.create(
+            psicologo=psicologo,
+            nombre=partes[0],
+            apellido=" ".join(partes[1:]) or "Pendiente",
+            rut=(
+                data["documento_normalizado"]
+                if data["tipo_documento"] == "RUT"
+                else ""
+            ),
+            tipo_documento=data["tipo_documento"],
+            numero_documento=data["numero_documento"].strip(),
+            documento_normalizado=data["documento_normalizado"],
+            email_contacto=verification.email,
+            telefono_whatsapp=data.get("whatsapp", ""),
+            motivo_consulta=data.get("motivo_consulta", ""),
+            origen_consulta="Reserva pública",
+            activo=True,
         )
         origen = AgendaCita.OrigenReserva.PUBLICA_PACIENTE_NUEVO
 
@@ -556,23 +621,34 @@ def reservar(request, slug):
     )
 
     # Trazabilidad
-    AgendaReservaPublica.objects.create(
+    reserva = AgendaReservaPublica(
         cita=cita,
         paciente=paciente,
         perfil=perfil,
         tipo_paciente=tipo,
+        tipo_documento=data["tipo_documento"],
+        documento_digest=document_digest(
+            perfil.pk, data["tipo_documento"], data["documento_normalizado"]
+        ),
+        email_confirmacion=verification.email,
         ip_hash=ip_hash(request),
         user_agent=(request.META.get("HTTP_USER_AGENT", ""))[:300],
     )
+    assign_booking_code(reserva)
+    reserva.save()
+    create_booking_event(reserva, request)
 
-    # Sincronizar con Google Calendar
-    sync_cita_to_google(cita)
+    enqueue_booking_confirmations(cita, verification.email)
+
+    transaction.on_commit(
+        lambda: sync_appointment_to_google.delay(cita.pk), robust=True
+    )
 
     inicio_local = timezone.localtime(cita.inicio)
     return Response(
         {
             "reserva": {
-                "id": cita.id,
+                "codigo": reserva.codigo_reserva,
                 "fecha": inicio_local.strftime("%d/%m/%Y"),
                 "hora": inicio_local.strftime("%H:%M"),
                 "duracion_minutos": perfil.duracion_minutos,
@@ -583,6 +659,69 @@ def reservar(request, slug):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+def _get_perfil_gestion(slug):
+    return AgendaPerfilPublico.objects.select_related("psicologo").filter(slug=slug).first()
+
+
+@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def identificar_reserva(request, slug):
+    perfil = _get_perfil_gestion(slug)
+    if not perfil:
+        return Response({"error": "No se encontró esta agenda."}, status=404)
+    serializer = GestionReservaAuthSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    token, reserva = authenticate_reservation(perfil, serializer.validated_data)
+    return Response({"token": token, "reserva": reserva})
+
+
+@ratelimit(key="ip", rate="20/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def slots_gestion_reserva(request, slug):
+    perfil = _get_perfil_gestion(slug)
+    if not perfil:
+        return Response({"error": "No se encontró esta agenda."}, status=404)
+    serializer = SlotsGestionReservaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    slots = management_slots(perfil, data["token"], data["desde"], data["hasta"])
+    return Response({"slots": slots})
+
+
+@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def reprogramar_reserva(request, slug):
+    perfil = _get_perfil_gestion(slug)
+    if not perfil:
+        return Response({"error": "No se encontró esta agenda."}, status=404)
+    serializer = ReprogramarReservaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        reserva = reschedule_reservation(perfil, serializer.validated_data, request)
+    except ReservationConflict as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response({"reserva": reserva})
+
+
+@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def cancelar_reserva_publica(request, slug):
+    perfil = _get_perfil_gestion(slug)
+    if not perfil:
+        return Response({"error": "No se encontró esta agenda."}, status=404)
+    serializer = CancelarReservaSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        reserva = cancel_reservation(perfil, serializer.validated_data, request)
+    except ReservationConflict as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response({"reserva": reserva})
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -609,7 +748,7 @@ def google_calendar_connect(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def google_calendar_callback(request):
-    frontend_url = settings.PUBLIC_APP_URL.rstrip("/") + "/dashboard/agenda"
+    frontend_url = settings.GOOGLE_CALENDAR_RETURN_URL.rstrip("/") + "/dashboard/agenda"
     if request.query_params.get("error"):
         params = urlencode({"google_calendar": "error"})
         return redirect(f"{frontend_url}?{params}")

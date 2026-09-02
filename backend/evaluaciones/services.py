@@ -6,10 +6,11 @@ from functools import lru_cache
 
 import requests
 from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
+from cuentas.services import get_notification_email
+from notificaciones.services import send_branded_email
 from sesiones.documentos import split_text_into_segments
 from sesiones.embeddings import generate_text_embedding
 from sesiones.models import Sesion, TranscripcionSegmento
@@ -63,7 +64,8 @@ def fixed_email_message(psicologo, paciente, public_url):
         "como parte de tu proceso de atención psicológica.\n\n"
         "Puedes responderlo en el siguiente enlace:\n"
         f"{public_url}\n\n"
-        "El enlace es personal, vence en 7 días y solo puede utilizarse una vez. "
+        f"El enlace es personal, vence en {settings.TEST_LINK_EXPIRATION_DAYS} días "
+        "y solo puede utilizarse una vez. "
         "No necesitas iniciar sesión ni ingresar datos adicionales.\n\n"
         "Este instrumento no reemplaza la evaluación profesional; sus resultados "
         "serán revisados por tu psicólogo/a.\n\n"
@@ -77,17 +79,28 @@ def send_assignment_email(asignacion):
         return False, "SMTP no configurado; se generó el enlace para envío manual."
 
     subject = "Solicitud para completar Test de Creencias Ellis"
+    psychologist_name = (
+        asignacion.psicologo.get_full_name()
+        or asignacion.psicologo.username
+        or "tu psicólogo/a"
+    )
     try:
-        send_mail(
-            subject,
-            asignacion.mensaje_email,
-            settings.DEFAULT_FROM_EMAIL,
-            [asignacion.email_destino],
-            fail_silently=False,
+        send_branded_email(
+            subject=subject,
+            recipient=asignacion.email_destino,
+            template_name="evaluacion",
+            context={
+                "patient_name": asignacion.paciente.nombre,
+                "psychologist_name": psychologist_name,
+                "public_url": asignacion.enlace_generado,
+                "expiration_days": settings.TEST_LINK_EXPIRATION_DAYS,
+            },
+            reply_to=get_notification_email(asignacion.psicologo)
+            or settings.EMAIL_SUPPORT_ADDRESS,
         )
         return True, ""
-    except Exception as exc:
-        return False, str(exc)
+    except Exception:
+        return False, "No fue posible entregar el correo. Se reintentará cuando vuelvas a enviarlo."
 
 
 def find_assignment_by_token(token):

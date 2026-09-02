@@ -1,0 +1,10 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Código de verificación{% endblock %}
+{% block preheader %}Usa este código para confirmar tu correo.{% endblock %}
+{% block eyebrow %}Verificación de correo{% endblock %}
+{% block heading %}Confirma que este correo es tuyo{% endblock %}
+{% block content %}
+<p style="margin:0 0 20px;color:#334155;font-size:16px;line-height:1.7;">Para continuar con tu reserva con <strong>{{ psychologist_name }}</strong>, ingresa este código en Psiconex:</p>
+<p style="margin:0 0 20px;padding:18px;text-align:center;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;color:#1d4ed8;font-size:30px;font-weight:700;letter-spacing:.22em;">{{ verification_code }}</p>
+<p style="margin:0;color:#64748b;font-size:14px;line-height:1.7;">El código vence en {{ expiration_minutes }} minutos. Si no solicitaste una reserva, ignora este mensaje.</p>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Bienvenido/a a Psiconex{% endblock %}
+{% block preheader %}Tu prueba de 14 días ya está activa.{% endblock %}
+{% block eyebrow %}Tu consulta, mejor organizada{% endblock %}
+{% block heading %}Bienvenido/a a Psiconex, {{ first_name }}{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Psiconex te ayuda a reducir el trabajo administrativo de tu consulta para que puedas dedicar más tiempo a la atención clínica.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;">
+  <tr><td style="padding:18px 20px;color:#1e3a8a;font-size:14px;line-height:1.6;"><strong>Tu prueba gratuita está activa hasta el {{ trial_end }}.</strong><br>No necesitas tarjeta y no se realizará ningún cobro automático.</td></tr>
+</table>
+<p style="margin:0 0 12px;color:#0f172a;font-size:15px;font-weight:700;">Puedes comenzar con estos pasos:</p>
+<ol style="margin:0 0 22px;padding-left:22px;color:#334155;font-size:15px;line-height:1.8;">
+  <li>Crea la ficha de tu primer paciente.</li>
+  <li>Configura tu perfil de voz para identificar participantes.</li>
+  <li>Activa tu agenda y comparte tu enlace de reservas.</li>
+  <li>Registra una sesión y genera transcripciones, resúmenes e informes.</li>
+</ol>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Recuerda informar al paciente y obtener su consentimiento antes de grabar una sesión. Las herramientas de IA apoyan tu trabajo profesional, pero no reemplazan tu criterio clínico.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ dashboard_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Comenzar en Psiconex</a></td></tr></table>
+{% endblock %}

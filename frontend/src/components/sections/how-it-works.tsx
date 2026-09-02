@@ -74,8 +74,8 @@ export function HowItWorksSection() {
                   <div
                     className={
                       isReverse
-                        ? "lg:col-start-3 lg:text-left"
-                        : "lg:text-right"
+                        ? "order-2 lg:order-none lg:col-start-3 lg:text-left text-center"
+                        : "order-2 lg:order-none lg:text-right text-center"
                     }
                   >
                     <span className="text-xs font-semibold uppercase tracking-widest text-primary">
@@ -93,7 +93,7 @@ export function HowItWorksSection() {
                   </div>
 
                   {/* Center icon */}
-                  <div className="relative mx-auto lg:col-start-2 lg:row-start-1">
+                  <div className="relative mx-auto order-1 lg:order-none lg:col-start-2 lg:row-start-1">
                     <motion.div
                       whileInView={{ scale: [0.8, 1.1, 1] }}
                       viewport={{ once: true }}

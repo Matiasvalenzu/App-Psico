@@ -1,0 +1,9 @@
+Hola {{ first_name }},
+
+Usa este código para verificar tu correo de notificaciones en Psiconex:
+
+{{ verification_code }}
+
+El código vence en {{ expiration_minutes }} minutos. Si no solicitaste este cambio, no realices ninguna acción y tu correo actual seguirá activo.
+
+Equipo Psiconex

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Psiconex{% endblock %}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f1f5f9;color:#0f172a;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">{% block preheader %}{% endblock %}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f1f5f9;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(15,23,42,.08);">
+            <tr>
+              <td style="height:6px;background:#3b82f6;background-image:linear-gradient(90deg,#3b82f6,#7c3aed);font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:30px 36px 20px;">
+                <img src="{{ email_logo_url }}" width="260" alt="Psiconex - La IA que devuelve tiempo a tu consulta" style="display:block;width:260px;max-width:100%;height:auto;border:0;">
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 42px 38px;">
+                <p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">{% block eyebrow %}Psiconex{% endblock %}</p>
+                <h1 style="margin:0 0 20px;color:#0f172a;font-size:28px;line-height:1.25;letter-spacing:-.02em;">{% block heading %}{% endblock %}</h1>
+                {% block content %}{% endblock %}
+                {% block action %}{% endblock %}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 36px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+                <p style="margin:0 0 8px;color:#64748b;font-size:12px;line-height:1.6;">Este correo fue enviado automáticamente por Psiconex.</p>
+                <p style="margin:0;color:#94a3b8;font-size:11px;line-height:1.6;">© {{ current_year }} Psiconex · <a href="mailto:{{ support_email }}" style="color:#64748b;text-decoration:underline;">{{ support_email }}</a></p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

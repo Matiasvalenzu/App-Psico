@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 
+from .documentos import TIPOS_DOCUMENTO
+
 
 class Paciente(models.Model):
     class Estado(models.TextChoices):
@@ -26,6 +28,11 @@ class Paciente(models.Model):
     apellido = models.CharField(max_length=100)
     fecha_nacimiento = models.DateField(null=True, blank=True)
     rut = models.CharField(max_length=12, blank=True, default="")
+    tipo_documento = models.CharField(
+        max_length=15, choices=TIPOS_DOCUMENTO, default="RUT"
+    )
+    numero_documento = models.CharField(max_length=30, blank=True, default="")
+    documento_normalizado = models.CharField(max_length=30, blank=True, default="", db_index=True)
     edad = models.IntegerField(null=True, blank=True)
     sexo = models.CharField(
         max_length=1,
@@ -68,6 +75,13 @@ class Paciente(models.Model):
 
     class Meta:
         ordering = ["apellido", "nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["psicologo", "tipo_documento", "documento_normalizado"],
+                condition=~models.Q(documento_normalizado=""),
+                name="paciente_documento_unico_por_psicologo",
+            )
+        ]
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"

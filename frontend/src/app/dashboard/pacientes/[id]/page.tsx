@@ -388,6 +388,7 @@ export default function PacienteDetailPage() {
 
   const [loading, setLoading] = useState(true);
 
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editQueryHandledRef = useRef(false);
@@ -402,7 +403,12 @@ export default function PacienteDetailPage() {
   }, [editFechaNacimiento]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTo({
+        top: chatScrollContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages, iaTyping]);
 
   useEffect(() => {
@@ -2218,14 +2224,14 @@ export default function PacienteDetailPage() {
             return (
               <div
                 key={sesion.id}
-                className="group flex items-center rounded-xl border border-border/60 bg-card text-left shadow-subtle transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card"
+                className="group flex flex-col sm:flex-row sm:items-center rounded-xl border border-border/60 bg-card text-left shadow-subtle transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card overflow-hidden"
               >
                 <button
                   type="button"
                   onClick={() =>
                     router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`)
                   }
-                  className="flex min-w-0 flex-1 items-center gap-4 p-4 text-left"
+                  className="flex min-w-0 flex-1 items-start sm:items-center gap-4 p-4 text-left w-full"
                 >
                   <div
                     className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
@@ -2276,23 +2282,25 @@ export default function PacienteDetailPage() {
                     </div>
                   </div>
                 </button>
-                <div className="flex flex-shrink-0 flex-col items-end gap-2 py-4 pr-4">
-                  {isExternalDocument && (
-                    <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-                      Documento
-                    </span>
-                  )}
-                  {!isExternalDocument && (
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      isTest
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                        : isRemote
-                          ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-                          : "bg-primary/10 text-primary"
-                    }`}>
-                      {isTest ? "Test" : isRemote ? "Remota" : "Presencial"}
-                    </span>
-                  )}
+                <div className="flex w-full sm:w-auto flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 border-t sm:border-t-0 border-border/40 bg-muted/10 sm:bg-transparent p-3 sm:p-4 sm:pl-0">
+                  <div className="flex gap-2">
+                    {isExternalDocument && (
+                      <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                        Documento
+                      </span>
+                    )}
+                    {!isExternalDocument && (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        isTest
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : isRemote
+                            ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                            : "bg-primary/10 text-primary"
+                      }`}>
+                        {isTest ? "Test" : isRemote ? "Remota" : "Presencial"}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadge(sesion.estado)}`}
@@ -2711,7 +2719,7 @@ export default function PacienteDetailPage() {
             )}
 
             {/* Message Area */}
-            <div className="flex-1 overflow-y-auto space-y-4 p-5 transition-all">
+            <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto space-y-4 p-5 transition-all">
               {loadingChat ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground pt-4">
                   <Loader2 className="h-4 w-4 animate-spin" />

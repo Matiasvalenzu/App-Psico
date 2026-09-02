@@ -3,9 +3,15 @@ from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR.parent / ".env", override=True)
+
+
+def env_bool(name, default=False):
+    value = os.environ.get(name, str(default))
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "dev-secret-change-me-minimum-32-characters"
@@ -34,6 +40,9 @@ INSTALLED_APPS = [
     "chat",
     "evaluaciones",
     "agenda",
+    "suscripciones",
+    "notificaciones",
+    "cuentas",
 ]
 
 MIDDLEWARE = [
@@ -137,6 +146,16 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Santiago"
+CELERY_TASK_ROUTES = {
+    "notificaciones.tasks.send_notification": {"queue": "email"},
+    "notificaciones.tasks.dispatch_pending_notifications": {"queue": "email"},
+}
+CELERY_BEAT_SCHEDULE = {
+    "dispatch-pending-email-notifications": {
+        "task": "notificaciones.tasks.dispatch_pending_notifications",
+        "schedule": 60.0,
+    },
+}
 
 # Audio storage
 AUDIO_STORAGE_PATH = os.environ.get("AUDIO_STORAGE_PATH", "/data/audio")
@@ -158,19 +177,35 @@ DSM5_DOCUMENT_PATH = os.environ.get(
     "/app/informes/dsm5-manualdiagnsticoyestadisticodelostrastornosmentales-161006005112.pdf",
 )
 
-# Email delivery. Leave EMAIL_HOST empty to generate links without sending mail.
+# Transactional email delivery through Brevo SMTP.
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
+)
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
-EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False").lower() == "true"
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "no-reply@datnexia.com")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Psiconex")
+EMAIL_SUPPORT_ADDRESS = os.environ.get(
+    "EMAIL_SUPPORT_ADDRESS", "psiconex@datnexia.com"
+)
+EMAIL_LOGO_URL = os.environ.get(
+    "EMAIL_LOGO_URL", f"{PUBLIC_APP_URL.rstrip('/')}/logo-psiconex.png"
+)
+
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured("EMAIL_USE_TLS y EMAIL_USE_SSL no pueden estar activos a la vez.")
 
 # Google Calendar sync
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_CALENDAR_REDIRECT_URI = os.environ.get("GOOGLE_CALENDAR_REDIRECT_URI", "")
+GOOGLE_CALENDAR_RETURN_URL = os.environ.get("GOOGLE_CALENDAR_RETURN_URL", PUBLIC_APP_URL)
 GOOGLE_CALENDAR_NAME = os.environ.get("GOOGLE_CALENDAR_NAME", "Agenda Psicológica")
 
 # Audio AI pipeline
@@ -208,3 +243,7 @@ SPEAKER_MAX_SECONDS_PER_LABEL = float(
 EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1024"))
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
 EMBEDDING_USE_MODEL = os.environ.get("EMBEDDING_USE_MODEL", "False").lower() == "true"
+
+# Mercado Pago
+MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
+MERCADOPAGO_WEBHOOK_SECRET = os.environ.get("MERCADOPAGO_WEBHOOK_SECRET", "")

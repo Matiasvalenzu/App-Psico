@@ -11,9 +11,14 @@ from .views import (
     google_calendar_sync,
     perfil_publico,
     perfil_publico_interno,
+    cancelar_reserva_publica,
+    confirmar_otp_reserva,
+    identificar_reserva,
+    reprogramar_reserva,
     reservar,
+    solicitar_otp_reserva,
+    slots_gestion_reserva,
     slots_disponibles,
-    verificar_paciente,
 )
 
 
@@ -32,9 +37,14 @@ urlpatterns = [
     path("perfil-publico/", perfil_publico_interno, name="agenda-perfil-publico-interno"),
     # Endpoints públicos (AllowAny)
     path("publica/<slug:slug>/", perfil_publico, name="agenda-perfil-publico"),
-    path("publica/<slug:slug>/verificar-paciente/", verificar_paciente, name="agenda-verificar-paciente"),
+    path("publica/<slug:slug>/solicitar-otp/", solicitar_otp_reserva, name="agenda-solicitar-otp"),
+    path("publica/<slug:slug>/confirmar-otp/", confirmar_otp_reserva, name="agenda-confirmar-otp"),
     path("publica/<slug:slug>/slots/", slots_disponibles, name="agenda-slots"),
     path("publica/<slug:slug>/reservar/", reservar, name="agenda-reservar"),
+    path("publica/<slug:slug>/gestion/identificar/", identificar_reserva, name="agenda-identificar-reserva"),
+    path("publica/<slug:slug>/gestion/slots/", slots_gestion_reserva, name="agenda-slots-gestion"),
+    path("publica/<slug:slug>/gestion/reprogramar/", reprogramar_reserva, name="agenda-reprogramar-reserva"),
+    path("publica/<slug:slug>/gestion/cancelar/", cancelar_reserva_publica, name="agenda-cancelar-reserva"),
     # Router (citas + disponibilidad)
     path("", include(router.urls)),
 ]

@@ -1,0 +1,8 @@
+Reserva {{ change_action }}
+
+{{ patient_name }} gestionó una reserva desde tu agenda pública.
+Código: {{ booking_code }}
+{% if is_reschedule %}Horario anterior: {{ previous_date }}, {{ previous_start }} hrs
+Nuevo horario: {{ appointment_date }}, {{ appointment_start }} hrs{% else %}Horario cancelado: {{ appointment_date }}, {{ appointment_start }} hrs{% endif %}
+
+Ver agenda: {{ agenda_url }}

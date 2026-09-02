@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from notificaciones.services import enqueue_welcome_email
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -18,11 +20,19 @@ def _is_superuser(user):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def current_user(request):
+    suscripcion_activa = True
+    suscripcion_estado = "trial"
+    if hasattr(request.user, 'suscripcion'):
+        suscripcion_activa = request.user.suscripcion.is_active_or_trial
+        suscripcion_estado = request.user.suscripcion.estado
+
     return Response(
         {
             "username": request.user.username,
             "is_admin": _is_admin_user(request.user),
             "is_superuser": request.user.is_superuser,
+            "suscripcion_activa": suscripcion_activa,
+            "suscripcion_estado": suscripcion_estado,
         }
     )
 
@@ -169,34 +179,39 @@ def google_login(request):
             settings.GOOGLE_CLIENT_ID
         )
 
-        email = idinfo.get("email")
+        email = (idinfo.get("email") or "").strip().lower()
         if not email:
             return Response({"detail": "El token de Google no incluye un correo electrónico."}, status=status.HTTP_400_BAD_REQUEST)
+        if not idinfo.get("email_verified"):
+            return Response(
+                {"detail": "Google no confirmó que el correo electrónico esté verificado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         first_name = idinfo.get("given_name", "")
         last_name = idinfo.get("family_name", "")
 
         User = get_user_model()
-        user = User.objects.filter(email=email).first()
+        with transaction.atomic():
+            user = User.objects.filter(email__iexact=email).first()
 
-        if not user:
-            # Multi-tenant: Create user dynamically if it doesn't exist
-            username = email.split('@')[0]
-            # Ensure uniqueness
-            original_username = username
-            counter = 1
-            while User.objects.filter(username=username).exists():
-                username = f"{original_username}{counter}"
-                counter += 1
+            if not user:
+                username = email.split("@")[0]
+                original_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{original_username}{counter}"
+                    counter += 1
 
-            user = User(
-                username=username,
-                email=email,
-                first_name=first_name,
-                last_name=last_name
-            )
-            user.set_unusable_password()
-            user.save()
+                user = User(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+                user.set_unusable_password()
+                user.save()
+                enqueue_welcome_email(user)
 
         # Generar JWT tokens
         from rest_framework_simplejwt.tokens import RefreshToken

@@ -12,10 +12,15 @@ import {
   UserCog,
   UserPlus,
   Users,
+  Settings,
+  CreditCard,
 } from "lucide-react";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
+import BottomNav from "@/components/layout/bottom-nav";
+import MoreDrawer from "@/components/layout/more-drawer";
+import { useIsMobile } from "@/hooks/use-media-query";
 
 export default function DashboardLayout({
   children,
@@ -28,6 +33,8 @@ export default function DashboardLayout({
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     async function verifySession() {
@@ -48,7 +55,12 @@ export default function DashboardLayout({
     }
 
     verifySession();
-  }, [router]);
+  }, [router, pathname]);
+
+  // Close drawer when navigating
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
 
   if (!ready) return null;
 
@@ -100,6 +112,7 @@ export default function DashboardLayout({
     if (pathname.startsWith("/dashboard/agenda")) return "Agenda";
     if (pathname.startsWith("/dashboard/tests")) return "Tests";
     if (pathname.startsWith("/dashboard/usuarios")) return "Usuarios";
+    if (pathname.startsWith("/dashboard/configuracion")) return "Configuración";
     return "";
   };
 
@@ -107,8 +120,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen w-full bg-background">
+      {/* ── Desktop Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-20 flex flex-col border-r border-sidebar-border bg-sidebar py-6 shadow-xl transition-all duration-300 ${
+        className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col border-r border-sidebar-border bg-sidebar py-6 shadow-xl transition-all duration-300 ${
           isCollapsed ? "w-20" : "w-64 px-4"
         }`}
       >
@@ -152,7 +166,12 @@ export default function DashboardLayout({
           <NavItem href="/dashboard/voz" icon={Mic} label="Voz" />
           <NavItem href="/dashboard/agenda" icon={CalendarDays} label="Agenda" />
           <NavItem href="/dashboard/tests" icon={ClipboardList} label="Tests" />
-
+          <NavItem
+            href="/dashboard/suscripcion"
+            icon={CreditCard}
+            label="Mi Suscripción"
+          />
+          <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" />
           {showAdminSection && (
             <div className="mt-8">
               {!isCollapsed && (
@@ -172,12 +191,32 @@ export default function DashboardLayout({
         </nav>
       </aside>
 
-      <div className={`flex flex-1 flex-col transition-all duration-300 ${isCollapsed ? "pl-20" : "pl-64"}`}>
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground/80">
-            {getSectionTitle()}
+      {/* ── Main content ── */}
+      <div
+        className={`flex flex-1 flex-col transition-all duration-300 ${
+          isMobile ? "pl-0" : isCollapsed ? "pl-20" : "pl-64"
+        }`}
+      >
+        {/* ── Header ── */}
+        <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center justify-between border-b bg-background/95 px-4 md:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          {/* Mobile: logo + title */}
+          <div className="flex items-center gap-3">
+            <div className="flex md:hidden h-7 w-7 items-center justify-center">
+              <Image
+                src="/logo-psiconex-icon.png"
+                alt="Psiconex"
+                width={281}
+                height={282}
+                className="h-7 w-7 object-contain"
+              />
+            </div>
+            <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground/80">
+              {getSectionTitle()}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Desktop: theme toggle + logout */}
+          <div className="hidden md:flex items-center gap-4">
             <ThemeToggle />
             <div className="h-4 w-px bg-border" />
             <button
@@ -194,13 +233,26 @@ export default function DashboardLayout({
         </header>
 
         <main
-          className={`mx-auto w-full flex-1 p-6 lg:p-8 ${
+          className={`mx-auto w-full flex-1 p-4 md:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 ${
             pathname === "/dashboard/agenda" ? "max-w-[1600px]" : "max-w-6xl"
           } animate-fade-in-up`}
         >
           {children}
         </main>
       </div>
+
+      {/* ── Mobile Bottom Nav ── */}
+      {isMobile && (
+        <>
+          <BottomNav onMoreClick={() => setMoreOpen(true)} />
+          <MoreDrawer
+            open={moreOpen}
+            onClose={() => setMoreOpen(false)}
+            isAdmin={isAdmin}
+            isSuperuser={isSuperuser}
+          />
+        </>
+      )}
     </div>
   );
 }

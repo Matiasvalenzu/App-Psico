@@ -1,0 +1,12 @@
+Hola {{ patient_name }},
+
+{{ psychologist_name }} te solicita completar el Test de Creencias Ellis como parte de tu proceso de atención psicológica.
+
+Puedes responderlo aquí:
+{{ public_url }}
+
+El enlace es personal, vence en {{ expiration_days }} días y solo puede utilizarse una vez. No necesitas iniciar sesión ni ingresar datos adicionales.
+
+Este instrumento no reemplaza la evaluación profesional; tus resultados serán revisados por tu psicólogo/a.
+
+Equipo Psiconex

@@ -1,0 +1,7 @@
+Código de verificación Psiconex
+
+Para continuar con tu reserva con {{ psychologist_name }}, ingresa este código:
+
+{{ verification_code }}
+
+El código vence en {{ expiration_minutes }} minutos. Si no solicitaste una reserva, ignora este mensaje.

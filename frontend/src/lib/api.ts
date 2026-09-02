@@ -1,4 +1,9 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const localApiUrl =
+  typeof window === "undefined"
+    ? "http://localhost:8000/api"
+    : `${window.location.protocol}//${window.location.hostname}:8000/api`;
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || localApiUrl;
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -111,12 +116,18 @@ export async function publicApiFetch(
 }
 
 export async function login(username: string, password: string) {
-  const res = await fetch(`${API_URL}/auth/token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("Credenciales inválidas");
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/auth/token/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el servidor.");
+  }
+  if (res.status === 401) throw new Error("Credenciales inválidas");
+  if (!res.ok) throw new Error("No se pudo iniciar sesión. Intenta nuevamente.");
   const data = await res.json();
   setTokens(data.access, data.refresh);
   return data;
@@ -159,6 +170,8 @@ export async function createUser(input: {
   first_name?: string;
   last_name?: string;
   email?: string;
+  is_admin?: boolean;
+  is_superuser?: boolean;
 }) {
   const res = await apiFetch("/auth/users/", {
     method: "POST",

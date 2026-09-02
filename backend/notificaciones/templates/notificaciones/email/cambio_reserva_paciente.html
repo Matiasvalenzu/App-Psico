@@ -1,0 +1,11 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Reserva {{ change_action }}{% endblock %}
+{% block preheader %}Tu reserva con {{ psychologist_name }} fue {{ change_action }}.{% endblock %}
+{% block eyebrow %}Actualización de reserva{% endblock %}
+{% block heading %}Tu reserva fue {{ change_action }}{% endblock %}
+{% block content %}
+<p style="margin:0 0 20px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ patient_name }}, registramos el cambio solicitado para tu reserva con <strong>{{ psychologist_name }}</strong>.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;"><tr><td style="padding:18px 20px;color:#334155;font-size:14px;line-height:1.8;"><strong style="color:#0f172a;">Código:</strong> {{ booking_code }}<br>{% if is_reschedule %}<strong style="color:#0f172a;">Horario anterior:</strong> {{ previous_date }}, {{ previous_start }} hrs<br><strong style="color:#0f172a;">Nuevo horario:</strong> {{ appointment_date }}, {{ appointment_start }} hrs{% else %}<strong style="color:#0f172a;">Horario cancelado:</strong> {{ appointment_date }}, {{ appointment_start }} hrs{% endif %}</td></tr></table>
+<p style="margin:0;color:#64748b;font-size:14px;line-height:1.7;">Si no realizaste este cambio, responde este correo para contactar al profesional.</p>
+{% endblock %}
+{% block action %}{% if management_url %}<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:24px;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ management_url }}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">Gestionar mi reserva</a></td></tr></table>{% endif %}{% endblock %}

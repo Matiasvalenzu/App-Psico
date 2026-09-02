@@ -1,0 +1,19 @@
+Hola {{ first_name }},
+
+Te damos la bienvenida a Psiconex, una plataforma creada para reducir el trabajo administrativo de tu consulta y ayudarte a dedicar más tiempo a la atención clínica.
+
+Tu prueba gratuita está activa hasta el {{ trial_end }}. No necesitas tarjeta y no se realizará ningún cobro automático.
+
+Primeros pasos recomendados:
+1. Crea la ficha de tu primer paciente.
+2. Configura tu perfil de voz.
+3. Activa tu agenda y comparte tu enlace de reservas.
+4. Registra una sesión y genera transcripciones, resúmenes e informes.
+
+Recuerda informar al paciente y obtener su consentimiento antes de grabar. Las herramientas de IA apoyan tu trabajo, pero no reemplazan tu criterio clínico.
+
+Comenzar: {{ dashboard_url }}
+
+Si necesitas ayuda, escribe a {{ support_email }}.
+
+Equipo Psiconex

@@ -25,3 +25,4 @@ pypdf>=4.2.0
 python-docx>=1.1.2
 speechbrain>=1.0.0
 google-auth>=2.29.0
+mercadopago>=2.3.0

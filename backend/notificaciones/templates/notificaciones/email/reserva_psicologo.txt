@@ -1,0 +1,15 @@
+Hola {{ psychologist_name }},
+
+{{ patient_name }} realizó una reserva desde tu enlace público.
+
+Paciente: {{ patient_name }}
+Código: {{ booking_code }}
+Fecha: {{ appointment_date }}
+Horario: {{ appointment_start }} a {{ appointment_end }} hrs, hora de Chile
+Duración: {{ duration_minutes }} minutos
+
+Revisa que las indicaciones de modalidad, dirección o acceso estén actualizadas. Puedes responder este correo si necesitas contactar al paciente.
+
+Ver agenda: {{ agenda_url }}
+
+Equipo Psiconex

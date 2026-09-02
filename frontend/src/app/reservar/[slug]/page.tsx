@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { publicApiFetch } from "@/lib/api";
+import ManageReservation from "./manage-reservation";
 import {
   ArrowLeft,
   Calendar,
@@ -27,6 +28,7 @@ interface PerfilPublico {
   nombre_publico: string;
   subtitulo_publico: string;
   descripcion_publica: string;
+  instrucciones_reserva: string;
   duracion_minutos: number;
   acepta_pacientes_nuevos: boolean;
   disponibilidad: DisponibilidadBloque[];
@@ -39,7 +41,7 @@ interface Slot {
 
 interface ReservaResult {
   reserva: {
-    id: number;
+    codigo: string;
     fecha: string;
     hora: string;
     duracion_minutos: number;
@@ -49,7 +51,8 @@ interface ReservaResult {
   mensaje: string;
 }
 
-type Step = "tipo" | "identificacion" | "calendario" | "resumen" | "confirmado";
+type Step = "tipo" | "identificacion" | "otp" | "calendario" | "resumen" | "confirmado";
+type DocumentType = "RUT" | "PASAPORTE" | "OTRO";
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 
@@ -84,7 +87,11 @@ function formatDate(d: Date) {
 
 function formatHora(isoStr: string) {
   const d = new Date(isoStr);
-  return d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("es-CL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Santiago",
+  });
 }
 
 function dateKey(d: Date) {
@@ -95,6 +102,18 @@ function addDays(d: Date, n: number) {
   const r = new Date(d);
   r.setDate(r.getDate() + n);
   return r;
+}
+
+function apiErrorMessage(data: unknown, fallback: string) {
+  if (typeof data === "string") return data;
+  if (!data || typeof data !== "object") return fallback;
+  const payload = data as Record<string, unknown>;
+  const direct = payload.error ?? payload.detail;
+  if (typeof direct === "string") return direct;
+  const first = Object.values(payload)[0];
+  if (Array.isArray(first) && first.length) return String(first[0]);
+  if (typeof first === "string") return first;
+  return fallback;
 }
 
 /* ─── Component ──────────────────────────────────────────────────── */
@@ -110,21 +129,23 @@ export default function ReservarPage() {
 
   // Step navigation
   const [step, setStep] = useState<Step>("tipo");
+  const [manageMode, setManageMode] = useState(false);
 
   // Step 1: Type selection
   const [tipoPaciente, setTipoPaciente] = useState<"EXISTENTE" | "NUEVO" | null>(null);
 
-  // Step 2a: Existing patient verification
-  const [verificarField, setVerificarField] = useState<"rut" | "email" | "whatsapp">("email");
-  const [verificarValue, setVerificarValue] = useState("");
+  // Step 2: Document and email verification
+  const [tipoDocumento, setTipoDocumento] = useState<DocumentType>("RUT");
+  const [numeroDocumento, setNumeroDocumento] = useState("");
   const [verificando, setVerificando] = useState(false);
-  const [pacienteId, setPacienteId] = useState<number | null>(null);
-  const [pacienteNombre, setPacienteNombre] = useState("");
+  const [verificacionId, setVerificacionId] = useState("");
+  const [verificationToken, setVerificationToken] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
   const [verificarMsg, setVerificarMsg] = useState("");
 
   // Step 2b: New patient form
   const [nombreCompleto, setNombreCompleto] = useState("");
-  const [rut, setRut] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [motivoConsulta, setMotivoConsulta] = useState("");
@@ -146,6 +167,7 @@ export default function ReservarPage() {
 
   useEffect(() => {
     loadPerfil();
+    setManageMode(new URLSearchParams(window.location.search).get("gestionar") === "1");
   }, [slug]);
 
   async function loadPerfil() {
@@ -231,30 +253,56 @@ export default function ReservarPage() {
 
   /* ─── Verify existing patient ──────────────────────────────────── */
 
-  async function handleVerificar() {
-    if (!verificarValue.trim()) return;
+  async function handleSolicitarOtp() {
+    if (!tipoPaciente || !numeroDocumento.trim() || (tipoPaciente === "NUEVO" && !email.trim())) return;
     setVerificando(true);
     setVerificarMsg("");
-    setPacienteId(null);
     try {
-      const body: Record<string, string> = {};
-      body[verificarField] = verificarValue.trim();
-      const res = await publicApiFetch(`/agenda/publica/${slug}/verificar-paciente/`, {
+      const res = await publicApiFetch(`/agenda/publica/${slug}/solicitar-otp/`, {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          tipo_paciente: tipoPaciente,
+          tipo_documento: tipoDocumento,
+          numero_documento: numeroDocumento,
+          email: tipoPaciente === "NUEVO" ? email : "",
+        }),
       });
       const data = await res.json();
-      if (res.ok && data.encontrado) {
-        setPacienteId(data.paciente_id);
-        setPacienteNombre(data.nombre || "");
-        setVerificarMsg("");
-      } else {
-        setVerificarMsg(
-          data.mensaje || "No encontramos una ficha con esos datos. Puedes continuar como primera reserva."
-        );
-      }
-    } catch {
-      setVerificarMsg("Error al verificar. Intenta nuevamente.");
+      if (!res.ok) throw new Error(apiErrorMessage(data, "No pudimos enviar el código."));
+      setVerificacionId(data.verificacion_id);
+      setMaskedEmail(data.email);
+      setOtpCode("");
+      setStep("otp");
+    } catch (caught) {
+      setVerificarMsg(
+        caught instanceof Error
+          ? caught.message
+          : "No pudimos verificar los datos o enviar el código. Revisa la información e intenta nuevamente."
+      );
+    } finally {
+      setVerificando(false);
+    }
+  }
+
+  async function handleConfirmarOtp() {
+    if (otpCode.length !== 6) return;
+    setVerificando(true);
+    setVerificarMsg("");
+    try {
+      const res = await publicApiFetch(`/agenda/publica/${slug}/confirmar-otp/`, {
+        method: "POST",
+        body: JSON.stringify({ verificacion_id: verificacionId, codigo: otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(apiErrorMessage(data, "Código inválido."));
+      setVerificationToken(data.verification_token);
+      setStep("calendario");
+    } catch (caught) {
+      setVerificarMsg(
+        caught instanceof Error
+          ? caught.message
+          : "El código no es válido o expiró. Intenta nuevamente."
+      );
     } finally {
       setVerificando(false);
     }
@@ -270,13 +318,12 @@ export default function ReservarPage() {
       const body: Record<string, unknown> = {
         tipo_paciente: tipoPaciente,
         inicio: selectedSlot.inicio,
+        tipo_documento: tipoDocumento,
+        numero_documento: numeroDocumento,
+        verification_token: verificationToken,
       };
-      if (tipoPaciente === "EXISTENTE") {
-        body.paciente_id = pacienteId;
-      } else {
+      if (tipoPaciente === "NUEVO") {
         body.nombre_completo = nombreCompleto;
-        body.rut = rut;
-        body.email = email;
         body.whatsapp = whatsapp;
         body.motivo_consulta = motivoConsulta;
       }
@@ -286,7 +333,7 @@ export default function ReservarPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "No se pudo completar la reserva.");
+        setError(apiErrorMessage(data, "No se pudo completar la reserva."));
         return;
       }
       setReservaResult(data);
@@ -300,27 +347,16 @@ export default function ReservarPage() {
 
   /* ─── Navigation helpers ───────────────────────────────────────── */
 
-  function canProceedToCalendar() {
-    if (tipoPaciente === "EXISTENTE") return !!pacienteId;
-    if (tipoPaciente === "NUEVO") {
-      return nombreCompleto.trim() && (email.trim() || whatsapp.trim());
-    }
-    return false;
-  }
-
-  function goToCalendar() {
-    if (canProceedToCalendar()) {
-      setStep("calendario");
-    }
-  }
-
   function goBack() {
     if (step === "identificacion") {
       setStep("tipo");
-      setPacienteId(null);
       setVerificarMsg("");
+    } else if (step === "otp") {
+      setStep("identificacion");
+      setOtpCode("");
     } else if (step === "calendario") {
       setStep("identificacion");
+      setVerificationToken("");
       setSelectedDate(null);
       setSelectedSlot(null);
     } else if (step === "resumen") {
@@ -342,6 +378,16 @@ export default function ReservarPage() {
               <span className="text-sm text-[hsl(var(--muted-foreground))]">Cargando agenda...</span>
             </div>
           </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!perfil && manageMode) {
+    return (
+      <main className="min-h-screen bg-muted/30 px-4 py-8">
+        <div className="mx-auto max-w-[480px] rounded-2xl border bg-card p-6 shadow-lg">
+          <ManageReservation slug={slug} onBack={() => setManageMode(false)} />
         </div>
       </main>
     );
@@ -387,6 +433,10 @@ export default function ReservarPage() {
 
         {/* Card */}
         <div className="booking-card animate-fade-in-up" style={{ animationDelay: "0.08s" }}>
+          {manageMode ? (
+            <ManageReservation slug={slug} onBack={() => setManageMode(false)} />
+          ) : (
+          <>
           {/* ── Step: Tipo ──────────────────────────────────────── */}
           {step === "tipo" && (
             <div className="booking-step">
@@ -441,173 +491,101 @@ export default function ReservarPage() {
                 <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                 Sesión de {perfil.duracion_minutos} minutos
               </div>
+              <button onClick={() => setManageMode(true)} className="mt-4 w-full text-center text-sm font-medium text-[hsl(var(--primary))] hover:underline">
+                ¿Ya tienes una hora? Gestiona tu reserva
+              </button>
             </div>
           )}
 
-          {/* ── Step: Identificación (Existente) ───────────────── */}
-          {step === "identificacion" && tipoPaciente === "EXISTENTE" && (
+          {/* ── Step: Identificación ────────────────────────────── */}
+          {step === "identificacion" && tipoPaciente && (
             <div className="booking-step">
               <button onClick={goBack} className="booking-back">
                 <ArrowLeft className="h-4 w-4" />
                 Volver
               </button>
-              <h2 className="booking-title">Identifica tu ficha</h2>
+              <h2 className="booking-title">
+                {tipoPaciente === "EXISTENTE" ? "Identifica tu ficha" : "Primera vez con este profesional"}
+              </h2>
               <p className="booking-subtitle">
-                Ingresa tu email, WhatsApp o RUT para encontrar tu ficha de paciente.
+                Verificaremos tu correo antes de mostrar los horarios disponibles.
               </p>
 
-              <div className="mt-5 space-y-4">
-                <div className="flex gap-2">
-                  {(["email", "whatsapp", "rut"] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => {
-                        setVerificarField(f);
-                        setVerificarValue("");
-                        setPacienteId(null);
-                        setVerificarMsg("");
-                      }}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                        verificarField === f
-                          ? "bg-[hsl(var(--primary))] text-white"
-                          : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                      }`}
-                    >
-                      {f === "email" ? "Email" : f === "whatsapp" ? "WhatsApp" : "RUT"}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type={verificarField === "email" ? "email" : "text"}
-                    value={verificarValue}
-                    onChange={(e) => setVerificarValue(e.target.value)}
-                    placeholder={
-                      verificarField === "email"
-                        ? "tu@email.com"
-                        : verificarField === "whatsapp"
-                          ? "+56 9 1234 5678"
-                          : "12.345.678-9"
-                    }
-                    className="booking-input flex-1"
-                    onKeyDown={(e) => e.key === "Enter" && handleVerificar()}
-                  />
-                  <button
-                    onClick={handleVerificar}
-                    disabled={verificando || !verificarValue.trim()}
-                    className="booking-btn-primary whitespace-nowrap"
-                  >
-                    {verificando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
-                  </button>
-                </div>
-
-                {pacienteId && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-                      ¡Hola, {pacienteNombre}! Encontramos tu ficha.
-                    </p>
-                    <button onClick={goToCalendar} className="booking-btn-primary mt-3 w-full">
-                      Elegir horario
-                    </button>
+              <div className="mt-5 space-y-3">
+                {tipoPaciente === "NUEVO" && (
+                  <div>
+                    <label className="booking-label">Nombre completo *</label>
+                    <input type="text" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} placeholder="Ej: María González Pérez" className="booking-input" />
                   </div>
                 )}
-
-                {verificarMsg && !pacienteId && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30">
-                    <p className="text-sm text-amber-800 dark:text-amber-300">{verificarMsg}</p>
-                    <button
-                      onClick={() => {
-                        setTipoPaciente("NUEVO");
-                        // Don't go back to "tipo", just switch context
-                      }}
-                      className="mt-2 text-xs font-medium text-amber-700 underline hover:no-underline dark:text-amber-400"
-                    >
-                      Continuar como primera reserva →
-                    </button>
+                <div className="grid grid-cols-[130px_1fr] gap-3">
+                  <div>
+                    <label className="booking-label">Documento *</label>
+                    <select value={tipoDocumento} onChange={(e) => { setTipoDocumento(e.target.value as DocumentType); setNumeroDocumento(""); }} className="booking-input">
+                      <option value="RUT">RUT</option>
+                      <option value="PASAPORTE">Pasaporte</option>
+                      <option value="OTRO">Otro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="booking-label">Número *</label>
+                    <input type="text" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} placeholder={tipoDocumento === "RUT" ? "12.345.678-9" : "Número de documento"} className="booking-input" />
+                  </div>
+                </div>
+                {tipoPaciente === "NUEVO" && (
+                  <>
+                    <div>
+                      <label className="booking-label">Email *</label>
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" className="booking-input" />
+                    </div>
+                    <div>
+                      <label className="booking-label">WhatsApp</label>
+                      <input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+56 9 1234 5678" className="booking-input" />
+                    </div>
+                    <div>
+                      <label className="booking-label">Motivo de consulta</label>
+                      <textarea value={motivoConsulta} onChange={(e) => setMotivoConsulta(e.target.value)} placeholder="Cuéntanos brevemente por qué buscas atención (opcional)" rows={3} className="booking-input resize-none" />
+                    </div>
+                  </>
+                )}
+                {tipoPaciente === "EXISTENTE" && (
+                  <div className="rounded-lg bg-[hsl(var(--muted)/0.5)] px-3 py-2.5 text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
+                    Enviaremos el código al correo registrado en tu ficha. No mostraremos ni cambiaremos esa dirección.
                   </div>
                 )}
+                {verificarMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{verificarMsg}</p>}
+                <button onClick={handleSolicitarOtp} disabled={verificando || !numeroDocumento.trim() || (tipoPaciente === "NUEVO" && (!nombreCompleto.trim() || !email.trim()))} className="booking-btn-primary w-full">
+                  {verificando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enviar código de verificación"}
+                </button>
               </div>
             </div>
           )}
 
-          {/* ── Step: Identificación (Nuevo) ───────────────────── */}
-          {step === "identificacion" && tipoPaciente === "NUEVO" && (
+          {/* ── Step: OTP ───────────────────────────────────────── */}
+          {step === "otp" && (
             <div className="booking-step">
-              <button onClick={goBack} className="booking-back">
-                <ArrowLeft className="h-4 w-4" />
-                Volver
-              </button>
-              <h2 className="booking-title">Primera vez con este profesional</h2>
-              <p className="booking-subtitle">
-                Déjanos tus datos básicos para crear tu ficha y reservar tu primera sesión.
-              </p>
-
-              <div className="mt-5 space-y-3">
+              <button onClick={goBack} className="booking-back"><ArrowLeft className="h-4 w-4" />Volver</button>
+              <h2 className="booking-title">Revisa tu correo</h2>
+              <p className="booking-subtitle">Enviamos un código de 6 dígitos a <strong>{maskedEmail}</strong>. Vence en 10 minutos.</p>
+              <div className="mt-5 space-y-4">
                 <div>
-                  <label className="booking-label">Nombre completo *</label>
-                  <input
-                    type="text"
-                    value={nombreCompleto}
-                    onChange={(e) => setNombreCompleto(e.target.value)}
-                    placeholder="Ej: María González Pérez"
-                    className="booking-input"
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="booking-label">RUT</label>
+                  <label className="booking-label">Código de verificación</label>
                     <input
-                      type="text"
-                      value={rut}
-                      onChange={(e) => setRut(e.target.value)}
-                      placeholder="12.345.678-9"
-                      className="booking-input"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                      onKeyDown={(e) => e.key === "Enter" && handleConfirmarOtp()}
+                      placeholder="000000"
+                      className="booking-input text-center text-xl font-semibold tracking-[0.3em]"
                     />
-                  </div>
-                  <div>
-                    <label className="booking-label">Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="tu@email.com"
-                      className="booking-input"
-                    />
-                  </div>
                 </div>
-                <div>
-                  <label className="booking-label">WhatsApp</label>
-                  <input
-                    type="text"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="+56 9 1234 5678"
-                    className="booking-input"
-                  />
-                </div>
-                <div>
-                  <label className="booking-label">Motivo de consulta</label>
-                  <textarea
-                    value={motivoConsulta}
-                    onChange={(e) => setMotivoConsulta(e.target.value)}
-                    placeholder="Cuéntanos brevemente por qué buscas atención (opcional)"
-                    rows={3}
-                    className="booking-input resize-none"
-                  />
-                </div>
-
-                <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                  Ingresa al menos email o WhatsApp como dato de contacto.
-                </p>
-
-                <button
-                  onClick={goToCalendar}
-                  disabled={!canProceedToCalendar()}
-                  className="booking-btn-primary w-full"
-                >
-                  Elegir horario
+                {verificarMsg && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{verificarMsg}</p>}
+                <button onClick={handleConfirmarOtp} disabled={verificando || otpCode.length !== 6} className="booking-btn-primary w-full">
+                  {verificando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verificar y elegir horario"}
                 </button>
+                <button onClick={handleSolicitarOtp} disabled={verificando} className="w-full text-center text-xs font-medium text-[hsl(var(--primary))] hover:underline">Enviar un código nuevo</button>
               </div>
             </div>
           )}
@@ -742,10 +720,19 @@ export default function ReservarPage() {
                   <Calendar className="h-4 w-4 text-[hsl(var(--primary))]" />
                   <div>
                     <p className="text-sm font-medium">{formatDate(selectedDate)}</p>
-                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                      {formatHora(selectedSlot.inicio)} — {formatHora(selectedSlot.fin)}
-                    </p>
-                  </div>
+                     <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                       {formatHora(selectedSlot.inicio)} — {formatHora(selectedSlot.fin)} · hora de Chile
+                     </p>
+               </div>
+
+              {perfil.instrucciones_reserva && (
+                <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200">
+                  <p className="font-medium">Indicaciones del profesional</p>
+                  <p className="mt-1 whitespace-pre-line text-xs leading-relaxed">
+                    {perfil.instrucciones_reserva}
+                  </p>
+                </div>
+              )}
                 </div>
                 <div className="flex items-center gap-3">
                   <Clock className="h-4 w-4 text-[hsl(var(--primary))]" />
@@ -754,7 +741,7 @@ export default function ReservarPage() {
                 <div className="flex items-center gap-3">
                   <User className="h-4 w-4 text-[hsl(var(--primary))]" />
                   <p className="text-sm">
-                    {tipoPaciente === "EXISTENTE" ? pacienteNombre : nombreCompleto}
+                    {tipoPaciente === "EXISTENTE" ? "Paciente verificado" : nombreCompleto}
                   </p>
                 </div>
               </div>
@@ -794,13 +781,18 @@ export default function ReservarPage() {
                 <strong>{reservaResult.reserva.fecha}</strong> a las{" "}
                 <strong>{reservaResult.reserva.hora}</strong> hrs.
                 <br />
-                Tu psicólogo/a verá esta reserva en su agenda.
+                 Tu psicólogo/a verá esta reserva en su agenda.
+                 También enviamos una confirmación al correo que ingresaste.
               </p>
 
               <div className="mt-6 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">
-                Ya puedes cerrar esta ventana. No necesitas realizar ninguna acción adicional.
+                <strong className="block text-sm text-[hsl(var(--foreground))]">Código: {reservaResult.reserva.codigo}</strong>
+                Guarda este código. También lo enviamos por correo y lo necesitarás para reagendar o cancelar.
               </div>
+              <button onClick={() => setManageMode(true)} className="booking-btn-primary mt-4 w-full">Gestionar mi reserva</button>
             </div>
+          )}
+          </>
           )}
         </div>
 

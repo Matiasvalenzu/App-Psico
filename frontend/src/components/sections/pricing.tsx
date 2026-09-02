@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "motion/react"
-import { Check, Sparkles } from "lucide-react"
+import { Check, Clock, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { ROUTES } from "@/lib/config"
@@ -16,49 +16,55 @@ interface Plan {
   cta: string
   features: string[]
   featured?: boolean
+  comingSoon?: boolean
 }
 
 const PLANS: Plan[] = [
   {
-    name: "Solo",
-    price: "$29.000",
+    name: "Estándar",
+    price: "$4.990",
     period: "CLP / mes",
-    description: "Para psicólogos en consulta privada.",
-    cta: "Empezar gratis",
-    features: [
-      "Hasta 40 sesiones / mes",
-      "Transcripción + diarización",
-      "1 perfil de voz",
-      "Informes y resúmenes IA",
-      "Agenda con Google Calendar",
-      "Soporte por correo",
-    ],
-  },
-  {
-    name: "Práctica",
-    price: "$59.000",
-    period: "CLP / mes",
-    description: "Pensado para psicólogos con alto volumen.",
-    cta: "Probar 14 días",
+    description: "Todo lo que necesitas para tu consulta.",
+    cta: "Probar 14 días gratis",
     featured: true,
     features: [
       "Sesiones ilimitadas",
-      "Todo lo de Solo, más:",
+      "Transcripción + diarización",
+      "1 perfil de voz",
+      "Informes y resúmenes IA",
+      "Chat IA independiente por paciente",
+      "Agenda con Google Calendar",
       "Tests psicológicos integrados",
-      "Búsqueda semántica (RAG) en histórico",
       "Sesiones por Meet/Zoom",
-      "Plantillas de informe personalizadas",
+      "Enlace privado para reserva de horas",
       "Soporte prioritario",
     ],
   },
   {
-    name: "Clínica",
-    price: "A medida",
-    period: "facturación anual",
-    description: "Para centros y equipos multidisciplinarios.",
-    cta: "Hablar con ventas",
+    name: "Avanzado",
+    price: "Próximamente",
+    period: "",
+    description: "Para psicólogos con alto volumen.",
+    cta: "Próximamente",
+    comingSoon: true,
     features: [
-      "Todo lo de Práctica, más:",
+      "Todo lo de Estándar, más:",
+      "Múltiples perfiles de voz",
+      "Búsqueda semántica (RAG) en histórico",
+      "Plantillas de informe personalizadas",
+      "Exportación masiva de datos",
+      "Integraciones avanzadas",
+    ],
+  },
+  {
+    name: "Enterprise",
+    price: "Próximamente",
+    period: "",
+    description: "Para centros y equipos multidisciplinarios.",
+    cta: "Próximamente",
+    comingSoon: true,
+    features: [
+      "Todo lo de Avanzado, más:",
       "Multi-usuario con roles",
       "Auditoría de accesos",
       "Hosting dedicado en Chile",
@@ -107,7 +113,8 @@ export function PricingSection() {
                 "relative flex flex-col rounded-3xl p-8",
                 plan.featured
                   ? "card-premium-featured lg:-mt-6 lg:mb-6"
-                  : "card-premium overflow-hidden"
+                  : "card-premium overflow-hidden",
+                plan.comingSoon && "opacity-60"
               )}
             >
               <div className="relative flex items-start justify-between gap-3">
@@ -125,20 +132,35 @@ export function PricingSection() {
                     Más elegido
                   </span>
                 )}
+                {plan.comingSoon && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-border">
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                    Próximamente
+                  </span>
+                )}
               </div>
 
               <div className="relative mt-6 flex items-baseline gap-2">
                 <span
                   className={cn(
-                    "text-5xl font-bold tracking-tight",
-                    plan.featured ? "gradient-primary-text" : "text-foreground"
+                    "font-bold tracking-tight",
+                    plan.comingSoon
+                      ? "text-2xl text-muted-foreground"
+                      : "text-5xl",
+                    plan.featured && !plan.comingSoon
+                      ? "gradient-primary-text"
+                      : !plan.comingSoon
+                        ? "text-foreground"
+                        : ""
                   )}
                 >
                   {plan.price}
                 </span>
-                <span className="text-sm text-muted-foreground">
-                  {plan.period}
-                </span>
+                {plan.period && (
+                  <span className="text-sm text-muted-foreground">
+                    {plan.period}
+                  </span>
+                )}
               </div>
 
               <div className="relative my-8 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
@@ -147,12 +169,17 @@ export function PricingSection() {
                 {plan.features.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-start gap-3 text-sm text-foreground/85"
+                    className={cn(
+                      "flex items-start gap-3 text-sm",
+                      plan.comingSoon
+                        ? "text-muted-foreground"
+                        : "text-foreground/85"
+                    )}
                   >
                     <span
                       className={cn(
                         "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full",
-                        plan.featured
+                        plan.featured && !plan.comingSoon
                           ? "bg-gradient-to-br from-primary to-[hsl(280_75%_64%)] shadow-sm shadow-primary/40"
                           : "bg-primary/10 ring-1 ring-primary/20"
                       )}
@@ -160,7 +187,9 @@ export function PricingSection() {
                       <Check
                         className={cn(
                           "h-2.5 w-2.5",
-                          plan.featured ? "text-white" : "text-primary"
+                          plan.featured && !plan.comingSoon
+                            ? "text-white"
+                            : "text-primary"
                         )}
                         strokeWidth={3}
                         aria-hidden="true"
@@ -172,22 +201,25 @@ export function PricingSection() {
               </ul>
 
               <div className="relative mt-8">
-                <Button
-                  asChild
-                  size="lg"
-                  variant={plan.featured ? "default" : "outline"}
-                  className="w-full"
-                >
-                  <Link
-                    href={
-                      plan.name === "Clínica"
-                        ? "mailto:hola@psiconex.app?subject=Plan%20Cl%C3%ADnica"
-                        : ROUTES.register
-                    }
+                {plan.comingSoon ? (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full cursor-not-allowed opacity-50"
+                    disabled
                   >
                     {plan.cta}
-                  </Link>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    size="lg"
+                    variant={plan.featured ? "default" : "outline"}
+                    className="w-full"
+                  >
+                    <Link href={ROUTES.register}>{plan.cta}</Link>
+                  </Button>
+                )}
               </div>
             </motion.div>
           ))}
@@ -200,8 +232,7 @@ export function PricingSection() {
           transition={{ delay: 0.6 }}
           className="mt-12 text-center text-xs text-muted-foreground"
         >
-          Precios placeholder mientras afinamos el pricing final · Boleta/factura
-          chilena · Sin permanencia
+          Precio real · Sin permanencia
         </motion.p>
       </div>
     </section>
