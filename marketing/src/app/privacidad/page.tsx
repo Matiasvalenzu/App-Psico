@@ -56,7 +56,7 @@ export default function PrivacyPage() {
                 Usamos los datos obtenidos de las APIs de Google exclusivamente para autenticar al profesional y proporcionar la sincronización solicitada. No los vendemos, no los usamos para publicidad y no los transferimos a terceros salvo cuando sea necesario para prestar la integración solicitada o exista una obligación legal.
               </p>
               <p className="mt-3">
-                Los datos obtenidos mediante las APIs de Google, incluidos los de Google Calendar, nunca se envían a DeepSeek ni a otros servicios de inteligencia artificial. La integración solo administra el calendario dedicado creado por Psiconex.
+                Los datos obtenidos mediante las APIs de Google, incluidos los de Google Calendar, nunca se comparten ni se envían a servicios externos de inteligencia artificial. La integración solo administra el calendario dedicado creado por Psiconex.
               </p>
             </section>
 

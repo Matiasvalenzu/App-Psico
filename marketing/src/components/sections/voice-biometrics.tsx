@@ -10,7 +10,7 @@ const BENEFITS = [
   "Identifica al psicólogo y al paciente sin etiquetas manuales",
   "Funciona aunque haya ruido de fondo o cambios de tono",
   "Tu voz se entrena una vez con 30 segundos de muestra",
-  "Embeddings ECAPA-TDNN guardados solo en tu cuenta",
+  "Patrones biométricos cifrados y resguardados solo en tu cuenta",
 ]
 
 export function VoiceBiometricsSection() {
@@ -122,8 +122,8 @@ export function VoiceBiometricsSection() {
               transition={{ duration: 0.6, delay: 0.18 }}
               className="mt-5 text-lg text-white/85"
             >
-              Otros transcriptores adivinan quién habla. Nosotros lo sabemos. La
-              biometría ECAPA-TDNN aprende tu voz una vez y nunca te confunde
+              Otros transcriptores adivinan quién habla. Nosotros lo sabemos. Nuestra
+              tecnología biométrica aprende tu voz una vez y nunca te confunde
               con tu paciente — ni siquiera cuando el audio es difícil.
             </motion.p>
 

@@ -20,7 +20,7 @@ const PILLARS = [
   {
     icon: Eye,
     title: "Google aislado de la IA",
-    body: "Los datos obtenidos desde Google Calendar no se envían a DeepSeek ni a otros servicios de inteligencia artificial.",
+    body: "Los datos obtenidos desde Google Calendar nunca se comparten ni se envían a servicios externos de inteligencia artificial.",
     chip: "Datos segregados",
   },
   {

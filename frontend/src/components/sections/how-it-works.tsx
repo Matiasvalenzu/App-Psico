@@ -16,7 +16,7 @@ const STEPS = [
     icon: Sparkles,
     eyebrow: "Paso 2",
     title: "La IA hace el trabajo pesado",
-    body: "Whisper transcribe, ECAPA identifica voces, DeepSeek resume y pgvector indexa para búsqueda semántica.",
+    body: "Transcribe con alta precisión clínica, separa e identifica las voces de cada participante, sintetiza los puntos clave y estructura la sesión para búsquedas inteligentes al instante.",
     detail: "Tu sesión de 50 min se procesa en menos de 5 min.",
   },
   {

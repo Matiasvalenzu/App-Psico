@@ -28,14 +28,14 @@ const FEATURES: Feature[] = [
   {
     icon: AudioLines,
     title: "Transcripción y diarización clínica",
-    body: "Whisper distingue tu voz de la del paciente y entrega minutas con timestamps en minutos, no en horas.",
+    body: "Distingue con precisión tu voz de la del paciente y entrega minutas estructuradas con marcas de tiempo en minutos.",
     className: "md:col-span-2",
     visual: <WaveformVisual />,
     badge: "IA",
   },
   {
     icon: Fingerprint,
-    title: "Biometría de voz con ECAPA-TDNN",
+    title: "Biometría de voz avanzada",
     body: "Tu perfil de voz se entrena una vez. Después la IA reconoce quién habla aunque cambien de paciente.",
     className: "md:col-span-1",
     visual: <FingerprintVisual />,
@@ -44,12 +44,12 @@ const FEATURES: Feature[] = [
   {
     icon: Search,
     title: "Memoria semántica del paciente",
-    body: "RAG con pgvector: pregunta '¿qué dijo en marzo sobre su madre?' y obtén el fragmento exacto.",
+    body: "Búsqueda contextual inteligente: pregunta '¿qué dijo en marzo sobre su madre?' y obtén el momento exacto al instante.",
   },
   {
     icon: FileText,
     title: "Informes y resúmenes en segundos",
-    body: "Resúmenes de sesión, evolución, derivaciones e informes clínicos generados con DeepSeek y tu plantilla.",
+    body: "Resúmenes de sesión, evolución, derivaciones e informes clínicos generados con IA adaptados a tu plantilla.",
   },
   {
     icon: ClipboardList,

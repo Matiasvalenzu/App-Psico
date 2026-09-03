@@ -16,7 +16,7 @@ const FAQS = [
   },
   {
     q: "¿Qué tan precisa es la transcripción?",
-    a: "Whisper alcanza ~95% de precisión en español chileno con audio de calidad clínica. La diarización (separar voces) llega a ~92% cuando el psicólogo entrena su perfil de voz una vez.",
+    a: "Alcanza ~95% de precisión en español chileno con audio de calidad clínica. La separación y reconocimiento de voces llega a ~92% cuando el psicólogo entrena su perfil de voz una vez.",
   },
   {
     q: "¿Los datos van a OpenAI o a servidores en EE.UU.?",

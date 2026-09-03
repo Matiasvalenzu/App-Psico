@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Psiconex — La IA que devuelve tiempo a tu consulta",
     description:
-      "Transcripción, diarización por voz, RAG clínico, informes automáticos y tests psicológicos. Hecho para psicólogos clínicos.",
+      "Transcripción, diarización por voz, memoria clínica inteligente, informes automáticos y tests psicológicos. Hecho para psicólogos clínicos.",
     type: "website",
     locale: "es_CL",
     siteName: "Psiconex",
