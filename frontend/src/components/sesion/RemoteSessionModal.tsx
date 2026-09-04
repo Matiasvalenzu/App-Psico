@@ -64,6 +64,7 @@ export function RemoteSessionModal({
 }: RemoteSessionModalProps) {
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
   const [checkingGoogle, setCheckingGoogle] = useState(false);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [meetUrl, setMeetUrl] = useState("");
   const [dateTime, setDateTime] = useState(getDateTimeInputValue());
   const [generatingMeet, setGeneratingMeet] = useState(false);
@@ -109,6 +110,29 @@ export function RemoteSessionModal({
     }
     checkGoogleStatus();
   }, [open]);
+
+  // Iniciar flujo OAuth de Google Calendar con autenticación de sesión
+  async function handleConnectGoogle() {
+    setConnectingGoogle(true);
+    setError(null);
+    try {
+      const res = await apiFetch("/agenda/google/connect/");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.detail || data?.error || "No se pudo iniciar la conexión con Google Calendar.");
+        return;
+      }
+      if (data?.auth_url) {
+        window.location.href = data.auth_url;
+      } else {
+        setError("No se recibió la URL de autorización de Google.");
+      }
+    } catch {
+      setError("Error de red al conectar con Google.");
+    } finally {
+      setConnectingGoogle(false);
+    }
+  }
 
   // Generar enlace automático con Google Calendar API
   async function handleGenerateMeet() {
@@ -287,12 +311,15 @@ export function RemoteSessionModal({
                   <Check className="h-3 w-3" /> Conectado
                 </span>
               ) : (
-                <a
-                  href="/api/agenda/google/connect/"
-                  className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+                <button
+                  type="button"
+                  onClick={handleConnectGoogle}
+                  disabled={connectingGoogle}
+                  className="text-xs font-medium text-sky-600 hover:underline dark:text-sky-400 inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
                 >
+                  {connectingGoogle && <Loader2 className="h-3 w-3 animate-spin" />}
                   Conectar Google Calendar &rarr;
-                </a>
+                </button>
               )}
             </div>
 
