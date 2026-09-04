@@ -44,12 +44,7 @@ export function RemoteAudioAssistantModal({
     setErrorMessage(null);
     setErrorType(null);
 
-    // 1. Abrir la sala de Google Meet en su pestaña dedicada
-    if (meetUrl) {
-      window.open(meetUrl, "PsiconexMeetSession", "noopener,noreferrer");
-    }
-
-    // 2. Desplegar inmediatamente el selector de captura de audio de Chrome
+    // 1. Invocar el selector de captura mientras el usuario permanece en Psiconex
     const result = await startRemoteRecording({
       sesionId,
       pacienteId,
@@ -59,8 +54,12 @@ export function RemoteAudioAssistantModal({
     setConnecting(false);
 
     if (result.success) {
+      // 2. Tras confirmar compartir pantalla/audio, abrir Meet inmediatamente
+      if (meetUrl) {
+        window.open(meetUrl, "PsiconexMeetSession", "noopener,noreferrer");
+      }
       if (onRecordingStarted) onRecordingStarted();
-      // Cerrar el modal automáticamente para que el psicólogo quede de inmediato en su sesión
+      // Cerrar el modal para que el usuario quede enfocado en Google Meet
       onClose();
     } else {
       setErrorType(result.error || "UNKNOWN");
@@ -108,10 +107,10 @@ export function RemoteAudioAssistantModal({
               </div>
               <div className="text-sm space-y-1">
                 <h4 className="font-semibold text-foreground">
-                  Inicio con 1 solo clic
+                  Confirmación en 1 solo clic
                 </h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Al presionar el botón abajo, se abrirá tu videollamada en Google Meet y tu navegador te solicitará seleccionar qué pestaña compartir.
+                  Al presionar el botón abajo, tu navegador te pedirá confirmar la grabación en esta pantalla. Al presionar <strong>Compartir</strong>, se abrirá Google Meet automáticamente y quedarás en tu llamada con la sesión ya grabando.
                 </p>
               </div>
             </div>
@@ -121,7 +120,7 @@ export function RemoteAudioAssistantModal({
               <Volume2 className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
               <div className="text-amber-950 dark:text-amber-200 leading-relaxed">
                 <strong className="font-semibold block">Paso clave en Chrome o Edge:</strong>
-                Elige la pestaña <strong>Google Meet</strong> y asegúrate de marcar la casilla <strong>&quot;Compartir audio de la pestaña&quot;</strong> para que Psiconex capture la voz del paciente.
+                Elige <strong>Toda la pantalla</strong> y asegúrate de marcar la casilla <strong>&quot;Compartir también el audio del sistema&quot;</strong> para que Psiconex capture la voz del paciente.
               </div>
             </div>
           </div>
@@ -136,7 +135,7 @@ export function RemoteAudioAssistantModal({
                     No se detectó el audio de la llamada
                   </strong>
                   <p className="mt-1 text-xs leading-relaxed text-destructive/90">
-                    Olvidaste activar la casilla <strong>&quot;Compartir audio de la pestaña&quot;</strong> en la ventana emergente de Chrome. Presiona reintentar y asegúrate de marcarla.
+                    Olvidaste activar la casilla <strong>&quot;Compartir audio del sistema&quot;</strong> en la ventana emergente de Chrome. Presiona reintentar y asegúrate de marcarla.
                   </p>
                 </div>
               </div>
@@ -171,7 +170,7 @@ export function RemoteAudioAssistantModal({
             {connecting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Iniciando Meet y preparando captura...
+                Esperando confirmación...
               </>
             ) : errorType === "NO_TAB_AUDIO" ? (
               <>
@@ -181,7 +180,7 @@ export function RemoteAudioAssistantModal({
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Abrir Meet y comenzar a grabar
+                Iniciar grabación y abrir Meet
               </>
             )}
           </button>

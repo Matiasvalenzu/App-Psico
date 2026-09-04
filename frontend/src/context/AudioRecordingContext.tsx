@@ -252,13 +252,17 @@ export function AudioRecordingProvider({
           };
         }
 
-        // 1. Pedir compartir pestaña de Meet con audio
+        // 1. Pedir compartir pantalla completa o pestaña con audio
         let displayStream: MediaStream;
         try {
           const displayMediaOptions: any = {
-            video: true,
-            audio: true,
-            preferCurrentTab: false,
+            video: {
+              displaySurface: "monitor",
+            },
+            audio: {
+              suppressLocalAudioPlayback: false,
+            },
+            systemAudio: "include",
             selfBrowserSurface: "exclude",
             surfaceSwitching: "exclude",
           };
@@ -270,7 +274,7 @@ export function AudioRecordingProvider({
           return {
             success: false,
             error: "UNKNOWN",
-            message: displayErr?.message || "No se pudo compartir la pestaña de Google Meet.",
+            message: displayErr?.message || "No se pudo iniciar la captura de pantalla.",
           };
         }
 
@@ -280,7 +284,7 @@ export function AudioRecordingProvider({
           return {
             success: false,
             error: "NO_TAB_AUDIO",
-            message: "No se detectó audio en la pestaña. Asegúrate de marcar la casilla 'Compartir audio' en el diálogo del navegador.",
+            message: "No se detectó audio. Asegúrate de marcar la casilla 'Compartir audio' en la ventana emergente.",
           };
         }
 
