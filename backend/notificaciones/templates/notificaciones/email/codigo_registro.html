@@ -1,0 +1,10 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Confirma tu cuenta en Psiconex{% endblock %}
+{% block preheader %}Usa este código para verificar tu correo y comenzar tus 14 días gratis en Psiconex.{% endblock %}
+{% block eyebrow %}Bienvenido a Psiconex{% endblock %}
+{% block heading %}Confirma tu correo electrónico{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ first_name }}, gracias por unirte a Psiconex. Ingresa el siguiente código de verificación para activar tu cuenta y comenzar tus <strong>14 días de prueba gratuita</strong>:</p>
+<div style="margin:0 0 22px;padding:20px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;text-align:center;color:#1e3a8a;font-size:32px;font-weight:700;letter-spacing:.25em;">{{ verification_code }}</div>
+<p style="margin:0;color:#475569;font-size:14px;line-height:1.7;">El código es válido por <strong>{{ expiration_minutes }} minutos</strong>. Si tú no solicitaste crear esta cuenta, puedes desestimar este mensaje con total seguridad.</p>
+{% endblock %}

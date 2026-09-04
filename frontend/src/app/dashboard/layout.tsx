@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ClipboardList,
+  Clock,
   LogOut,
   Mic,
   UserCog,
@@ -36,6 +37,8 @@ export default function DashboardLayout({
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [suscripcionEstado, setSuscripcionEstado] = useState<string | null>(null);
+  const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -51,6 +54,12 @@ export default function DashboardLayout({
         const user = await getCurrentUser();
         setIsAdmin(user.username === "Admin" || user.is_admin === true);
         setIsSuperuser(user.is_superuser === true);
+        setSuscripcionEstado(user.suscripcion_estado || null);
+        setDiasRestantes(
+          typeof user.dias_restantes_prueba === "number"
+            ? user.dias_restantes_prueba
+            : null
+        );
         setReady(true);
       } catch {
         localStorage.clear();
@@ -220,10 +229,32 @@ export default function DashboardLayout({
             <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground/80">
               {getSectionTitle()}
             </div>
+            {suscripcionEstado === "trial" && diasRestantes !== null && (
+              <Link
+                href="/dashboard/suscripcion"
+                className="flex md:hidden items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
+              >
+                <Clock className="h-3 w-3" />
+                <span>{diasRestantes}d prueba</span>
+              </Link>
+            )}
           </div>
 
-          {/* Desktop: theme toggle + logout */}
+          {/* Desktop: trial badge + theme toggle + logout */}
           <div className="hidden md:flex items-center gap-4">
+            {suscripcionEstado === "trial" && diasRestantes !== null && (
+              <Link
+                href="/dashboard/suscripcion"
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+                title="Ver detalles de tu suscripción"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span>
+                  Prueba activa: {diasRestantes}{" "}
+                  {diasRestantes === 1 ? "día restante" : "días restantes"}
+                </span>
+              </Link>
+            )}
             <ThemeToggle />
             <div className="h-4 w-px bg-border" />
             <button

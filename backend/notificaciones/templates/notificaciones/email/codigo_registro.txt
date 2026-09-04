@@ -1,0 +1,10 @@
+Hola {{ first_name }},
+
+Gracias por unirte a Psiconex. Ingresa el siguiente código de verificación para activar tu cuenta y comenzar tus 14 días de prueba gratuita:
+
+{{ verification_code }}
+
+El código es válido por {{ expiration_minutes }} minutos.
+Si tú no solicitaste crear esta cuenta, puedes desestimar este mensaje con total seguridad.
+
+El equipo de Psiconex

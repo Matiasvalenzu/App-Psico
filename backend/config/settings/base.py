@@ -122,6 +122,12 @@ REST_FRAMEWORK = {
     ],
 }
 
+# Authentication Backends
+AUTHENTICATION_BACKENDS = [
+    "cuentas.backends.EmailOrUsernameModelBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 # Simple JWT
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),

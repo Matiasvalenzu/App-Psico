@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser } from "@/lib/api";
-import { CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { getCurrentUser, apiFetch } from "@/lib/api";
+import { CreditCard, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function SuscripcionPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -23,6 +24,23 @@ export default function SuscripcionPage() {
     }
     loadData();
   }, []);
+
+  const handleSubscribe = async () => {
+    setCheckoutLoading(true);
+    try {
+      const res = await apiFetch("/suscripciones/checkout/", { method: "POST" });
+      if (!res.ok) throw new Error("No se pudo iniciar el pago");
+      const data = await res.json();
+      if (data.init_point) {
+        window.location.href = data.init_point;
+      } else {
+        throw new Error("No se devolvió un link de pago");
+      }
+    } catch (err) {
+      setError("Error al procesar la suscripción. Intente nuevamente más tarde.");
+      setCheckoutLoading(false);
+    }
+  };
 
   if (loading) {
     return <div className="p-8 text-center text-muted-foreground">Cargando...</div>;
@@ -56,6 +74,36 @@ export default function SuscripcionPage() {
           </div>
           <p>
             Tu acceso a las funciones premium ha sido bloqueado. Para continuar usando Psiconex y acceder a tus pacientes y sesiones, por favor suscríbete al Plan Estándar.
+          </p>
+        </div>
+      )}
+
+      {isTrial && !isActive && (
+        <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-foreground">
+          <div className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
+            <Clock className="h-5 w-5" />
+            Periodo de prueba gratuito activo
+          </div>
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            {typeof user?.dias_restantes_prueba === "number" ? (
+              <>
+                Te quedan <strong>{user.dias_restantes_prueba} {user.dias_restantes_prueba === 1 ? "día" : "días"}</strong> de acceso gratuito completo sin restricciones.
+              </>
+            ) : (
+              "Disfrutas de acceso gratuito completo a todas las funciones."
+            )}
+            {user?.fin_prueba && (
+              <>
+                {" "}Tu prueba vence el{" "}
+                <strong>
+                  {new Date(user.fin_prueba).toLocaleDateString("es-CL", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </strong>. Puedes suscribirte ahora para garantizar la continuidad sin interrupciones.
+              </>
+            )}
           </p>
         </div>
       )}
@@ -94,22 +142,34 @@ export default function SuscripcionPage() {
               <Button
                 size="lg"
                 className="w-full sm:w-auto"
-                disabled
+                onClick={handleSubscribe}
+                disabled={checkoutLoading}
               >
-                Próximamente
+                {checkoutLoading ? "Procesando..." : "Suscribirme ahora"}
               </Button>
             )}
-
+            
             {isTrial && !isActive && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                <Clock className="h-3.5 w-3.5" />
-                Estás en periodo de prueba
+              <div className="flex flex-col items-center sm:items-end gap-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>
+                    Prueba activa: {user?.dias_restantes_prueba ?? 14}{" "}
+                    {(user?.dias_restantes_prueba ?? 14) === 1 ? "día restante" : "días restantes"}
+                  </span>
+                </div>
+                {user?.fin_prueba && (
+                  <span className="text-[11px] text-muted-foreground font-normal">
+                    Hasta el {new Date(user.fin_prueba).toLocaleDateString("es-CL")}
+                  </span>
+                )}
               </div>
             )}
 
             {!isActive && (
-              <div className="mt-2 text-center text-[11px] text-muted-foreground">
-                Los pagos en línea estarán disponibles próximamente.
+              <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+                <CreditCard className="h-4 w-4" />
+                Pago seguro vía Mercado Pago
               </div>
             )}
           </div>

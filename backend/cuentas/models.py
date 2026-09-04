@@ -41,3 +41,22 @@ class PerfilPsicologo(models.Model):
 
     def __str__(self):
         return self.user.get_full_name() or self.user.username
+
+
+class CodigoVerificacionRegistro(models.Model):
+    email = models.EmailField(unique=True, db_index=True)
+    first_name = models.CharField(max_length=150, blank=True, default="")
+    last_name = models.CharField(max_length=150, blank=True, default="")
+    password_hash = models.CharField(max_length=128)
+    codigo_hash = models.CharField(max_length=64)
+    expira_at = models.DateTimeField()
+    intentos = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Código de Verificación de Registro"
+        verbose_name_plural = "Códigos de Verificación de Registro"
+
+    def __str__(self):
+        return f"Registro pendiente: {self.email}"

@@ -5,13 +5,25 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from .views import create_user, current_user, list_users, change_user_password, google_login
+from .views import (
+    create_user,
+    current_user,
+    list_users,
+    change_user_password,
+    google_login,
+    register_user,
+    verify_registration,
+    resend_registration_code_view,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/google/login/", google_login, name="google_login"),
+    path("api/auth/register/", register_user, name="register_user"),
+    path("api/auth/register/verify/", verify_registration, name="verify_registration"),
+    path("api/auth/register/resend/", resend_registration_code_view, name="resend_registration_code"),
     path("api/auth/me/", current_user, name="current_user"),
     path("api/auth/users/", create_user, name="create_user"),
     path("api/auth/users/<int:user_id>/password/", change_user_password, name="change_user_password"),

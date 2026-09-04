@@ -152,6 +152,61 @@ export async function loginWithGoogle(credential: string) {
   return data;
 }
 
+export async function registerUser(payload: {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+}) {
+  const res = await publicApiFetch("/auth/register/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let message = "Error al solicitar el registro.";
+    try {
+      const data = await res.json();
+      message = data.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function verifyRegistrationCode(email: string, code: string) {
+  const res = await publicApiFetch("/auth/register/verify/", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+  if (!res.ok) {
+    let message = "Error al verificar el código.";
+    try {
+      const data = await res.json();
+      message = data.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  const data = await res.json();
+  setTokens(data.access, data.refresh);
+  return data;
+}
+
+export async function resendRegistrationCode(email: string) {
+  const res = await publicApiFetch("/auth/register/resend/", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    let message = "Error al reenviar el código.";
+    try {
+      const data = await res.json();
+      message = data.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export async function getCurrentUser() {
   const res = await apiFetch("/auth/me/");
   if (!res.ok) throw new Error("No se pudo obtener el usuario actual");

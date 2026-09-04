@@ -2,8 +2,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from notificaciones.services import enqueue_welcome_email
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -22,17 +23,30 @@ def _is_superuser(user):
 def current_user(request):
     suscripcion_activa = True
     suscripcion_estado = "trial"
-    if hasattr(request.user, 'suscripcion'):
-        suscripcion_activa = request.user.suscripcion.is_active_or_trial
-        suscripcion_estado = request.user.suscripcion.estado
+    fin_prueba = None
+    dias_restantes_prueba = None
+
+    if hasattr(request.user, "suscripcion"):
+        suscripcion = request.user.suscripcion
+        suscripcion_activa = suscripcion.is_active_or_trial
+        suscripcion_estado = suscripcion.estado
+        fin_prueba = suscripcion.fin_prueba
+        if fin_prueba and suscripcion.estado == "trial":
+            delta = fin_prueba - timezone.now()
+            dias_restantes_prueba = max(0, delta.days + (1 if delta.seconds > 0 else 0))
 
     return Response(
         {
             "username": request.user.username,
+            "email": request.user.email,
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
             "is_admin": _is_admin_user(request.user),
             "is_superuser": request.user.is_superuser,
             "suscripcion_activa": suscripcion_activa,
             "suscripcion_estado": suscripcion_estado,
+            "fin_prueba": fin_prueba,
+            "dias_restantes_prueba": dias_restantes_prueba,
         }
     )
 
@@ -226,3 +240,86 @@ def google_login(request):
         return Response({"detail": f"Token inválido: {str(exc)}"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as exc:
         return Response({"detail": f"Error de autenticación con Google: {str(exc)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register_user(request):
+    first_name = str(request.data.get("first_name", "")).strip()
+    last_name = str(request.data.get("last_name", "")).strip()
+    email = str(request.data.get("email", "")).strip()
+    password = str(request.data.get("password", ""))
+
+    try:
+        from cuentas.services import request_user_registration
+        request_user_registration(first_name, last_name, email, password)
+        return Response(
+            {"detail": "Código de verificación enviado exitosamente a tu correo."},
+            status=status.HTTP_200_OK,
+        )
+    except serializers.ValidationError as exc:
+        detail = exc.detail
+        if isinstance(detail, dict):
+            msg = next(iter(detail.values()))
+            if isinstance(msg, list):
+                msg = msg[0]
+            return Response({"detail": str(msg)}, status=status.HTTP_400_BAD_REQUEST)
+        msg = detail[0] if isinstance(detail, list) else detail
+        return Response({"detail": str(msg)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:
+        return Response(
+            {"detail": f"Error al procesar el registro: {str(exc)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def verify_registration(request):
+    email = str(request.data.get("email", "")).strip()
+    code = str(request.data.get("code", "")).strip()
+
+    try:
+        from cuentas.services import confirm_user_registration
+        user = confirm_user_registration(email, code)
+
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+
+        return Response(
+            {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "detail": "Cuenta verificada con éxito. ¡Bienvenido a Psiconex!",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+    except serializers.ValidationError as exc:
+        detail = exc.detail
+        msg = detail[0] if isinstance(detail, list) else detail
+        return Response({"detail": str(msg)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:
+        return Response(
+            {"detail": f"Error al verificar código: {str(exc)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def resend_registration_code_view(request):
+    email = str(request.data.get("email", "")).strip()
+
+    try:
+        from cuentas.services import resend_registration_code
+        resend_registration_code(email)
+        return Response({"detail": "Nuevo código enviado a tu correo."}, status=status.HTTP_200_OK)
+    except serializers.ValidationError as exc:
+        detail = exc.detail
+        msg = detail[0] if isinstance(detail, list) else detail
+        return Response({"detail": str(msg)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:
+        return Response(
+            {"detail": f"Error al reenviar código: {str(exc)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
