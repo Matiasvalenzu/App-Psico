@@ -1,0 +1,15 @@
+Hola {{ reporte.usuario.first_name|default:reporte.usuario.username }},
+
+Hemos recibido correctamente tu {{ reporte.get_tipo_display|lower }} titulado "{{ reporte.titulo }}".
+
+Nuestro equipo de producto e ingeniería revisa cada reporte para continuar optimizando Psiconex y garantizar que tu experiencia clínica sea siempre fluida y confiable.
+
+Resumen del reporte:
+- Asunto: {{ reporte.titulo }}
+- Módulo: {{ reporte.get_modulo_display }}
+- Estado actual: {{ reporte.get_estado_display }}
+
+Puedes revisar el estado y las respuestas directamente en: {{ app_url }}/dashboard/feedback
+
+Saludos,
+El equipo de Psiconex

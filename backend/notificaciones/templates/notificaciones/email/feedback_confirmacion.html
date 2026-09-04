@@ -1,0 +1,37 @@
+{% extends "notificaciones/email/base.html" %}
+
+{% block title %}Hemos recibido tu feedback: {{ reporte.titulo }}{% endblock %}
+{% block preheader %}Gracias por ayudarnos a mejorar Psiconex. Tu reporte ha sido registrado exitosamente.{% endblock %}
+{% block eyebrow %}Confirmación de Reporte #{{ reporte.id }}{% endblock %}
+{% block heading %}¡Gracias por tu feedback!{% endblock %}
+
+{% block content %}
+  <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">
+    Hola {{ reporte.usuario.first_name|default:reporte.usuario.username }},
+  </p>
+  <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">
+    Hemos recibido correctamente tu <strong>{{ reporte.get_tipo_display|lower }}</strong> titulado <em>"{{ reporte.titulo }}"</em>.
+  </p>
+  <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">
+    Nuestro equipo de producto e ingeniería revisa cada reporte para continuar optimizando Psiconex y garantizar que tu experiencia clínica sea siempre fluida y confiable.
+  </p>
+
+  <div style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;padding:16px 20px;margin:20px 0;">
+    <p style="margin:0 0 8px;font-size:13px;color:#64748b;font-weight:600;text-transform:uppercase;">Resumen del reporte:</p>
+    <p style="margin:0 0 6px;color:#1e293b;font-size:14px;"><strong>Asunto:</strong> {{ reporte.titulo }}</p>
+    <p style="margin:0 0 6px;color:#1e293b;font-size:14px;"><strong>Módulo:</strong> {{ reporte.get_modulo_display }}</p>
+    <p style="margin:0;color:#1e293b;font-size:14px;"><strong>Estado actual:</strong> <span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">{{ reporte.get_estado_display }}</span></p>
+  </div>
+
+  <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.6;">
+    Puedes revisar el estado y las respuestas a tus reportes directamente en la sección de <strong>Feedback y Ayuda</strong> de tu cuenta.
+  </p>
+{% endblock %}
+
+{% block action %}
+  <div style="margin-top:25px;text-align:center;">
+    <a href="{{ app_url }}/dashboard/feedback" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+      Ver mis reportes en Psiconex
+    </a>
+  </div>
+{% endblock %}

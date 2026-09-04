@@ -1,0 +1,21 @@
+Nuevo Reporte #{{ reporte.id }} · {{ reporte.get_tipo_display }}
+
+Título: {{ reporte.titulo }}
+Usuario: {{ reporte.usuario.get_full_name|default:reporte.usuario.username }} ({{ reporte.usuario.email }})
+Módulo: {{ reporte.get_modulo_display }}
+Severidad: {{ reporte.get_severidad_display }}
+Fecha: {{ reporte.created_at|date:"d/m/Y H:i" }}
+
+Descripción:
+{{ reporte.descripcion }}
+
+{% if reporte.pasos_reproducir %}
+Pasos para reproducir:
+{{ reporte.pasos_reproducir }}
+{% endif %}
+
+URL Origen: {{ reporte.url_origen|default:"N/A" }}
+Navegador/SO: {{ reporte.user_agent|default:"N/A" }}
+Resolución: {{ reporte.resolucion_pantalla|default:"N/A" }}
+
+Gestionar en: {{ app_url }}/dashboard/feedback

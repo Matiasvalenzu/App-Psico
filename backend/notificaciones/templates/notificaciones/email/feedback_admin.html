@@ -1,0 +1,50 @@
+{% extends "notificaciones/email/base.html" %}
+
+{% block title %}Nuevo Feedback / Reporte: {{ reporte.titulo }}{% endblock %}
+{% block preheader %}Se ha recibido un nuevo reporte de {{ reporte.usuario.get_full_name|default:reporte.usuario.username }}{% endblock %}
+{% block eyebrow %}Nuevo Reporte #{{ reporte.id }} · {{ reporte.get_tipo_display }}{% endblock %}
+{% block heading %}{{ reporte.titulo }}{% endblock %}
+
+{% block content %}
+  <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">
+    <strong>Usuario:</strong> {{ reporte.usuario.get_full_name|default:reporte.usuario.username }} ({{ reporte.usuario.email }})<br>
+    <strong>Módulo:</strong> {{ reporte.get_modulo_display }}<br>
+    <strong>Severidad:</strong> {{ reporte.get_severidad_display }}<br>
+    <strong>Fecha:</strong> {{ reporte.created_at|date:"d/m/Y H:i" }}
+  </p>
+
+  <div style="background:#f8fafc;border-left:4px solid #3b82f6;padding:16px 20px;border-radius:8px;margin:20px 0;">
+    <h3 style="margin:0 0 8px;font-size:14px;color:#1e293b;text-transform:uppercase;letter-spacing:0.05em;">Descripción:</h3>
+    <p style="margin:0;color:#334155;font-size:14px;line-height:1.6;white-space:pre-wrap;">{{ reporte.descripcion }}</p>
+  </div>
+
+  {% if reporte.pasos_reproducir %}
+  <div style="background:#fef2f2;border-left:4px solid #ef4444;padding:16px 20px;border-radius:8px;margin:20px 0;">
+    <h3 style="margin:0 0 8px;font-size:14px;color:#991b1b;text-transform:uppercase;letter-spacing:0.05em;">Pasos para reproducir:</h3>
+    <p style="margin:0;color:#7f1d1d;font-size:14px;line-height:1.6;white-space:pre-wrap;">{{ reporte.pasos_reproducir }}</p>
+  </div>
+  {% endif %}
+
+  {% if reporte.impacto_mejora %}
+  <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.6;">
+    <strong>Impacto esperado:</strong> {{ reporte.impacto_mejora }}
+  </p>
+  {% endif %}
+
+  <table style="width:100%;margin-top:20px;border-collapse:collapse;font-size:12px;color:#64748b;">
+    <tr><td style="padding:4px 0;font-weight:bold;">URL Origen:</td><td style="padding:4px 0;">{{ reporte.url_origen|default:"N/A" }}</td></tr>
+    <tr><td style="padding:4px 0;font-weight:bold;">Navegador/SO:</td><td style="padding:4px 0;">{{ reporte.user_agent|default:"N/A" }}</td></tr>
+    <tr><td style="padding:4px 0;font-weight:bold;">Resolución:</td><td style="padding:4px 0;">{{ reporte.resolucion_pantalla|default:"N/A" }}</td></tr>
+    {% if reporte.archivo_adjunto %}
+    <tr><td style="padding:4px 0;font-weight:bold;">Archivo adjunto:</td><td style="padding:4px 0;"><a href="{{ app_url }}{{ reporte.archivo_adjunto.url }}" target="_blank" style="color:#2563eb;">Ver archivo adjunto</a></td></tr>
+    {% endif %}
+  </table>
+{% endblock %}
+
+{% block action %}
+  <div style="margin-top:30px;text-align:center;">
+    <a href="{{ app_url }}/dashboard/feedback" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+      Gestionar en Panel de Psiconex
+    </a>
+  </div>
+{% endblock %}

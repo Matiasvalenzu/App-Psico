@@ -24,4 +24,12 @@ urlpatterns = [
     path("api/agenda/", include("agenda.urls")),
     path("api/suscripciones/", include("suscripciones.urls")),
     path("api/cuenta/", include("cuentas.urls")),
+    path("api/feedback/", include("feedback.urls")),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

@@ -1,0 +1,12 @@
+Hola {{ reporte.usuario.first_name|default:reporte.usuario.username }},
+
+Te informamos que tu reporte "{{ reporte.titulo }}" ahora se encuentra en estado: {{ reporte.get_estado_display }}.
+
+{% if reporte.respuesta_admin %}
+Respuesta del equipo Psiconex:
+{{ reporte.respuesta_admin }}
+{% endif %}
+
+Gracias por ayudarnos continuamente a hacer de Psiconex la mejor herramienta para tu consulta psicológica.
+
+Ver reporte en la plataforma: {{ app_url }}/dashboard/feedback

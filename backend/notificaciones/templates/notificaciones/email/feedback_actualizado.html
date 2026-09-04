@@ -1,0 +1,35 @@
+{% extends "notificaciones/email/base.html" %}
+
+{% block title %}Actualización sobre tu reporte #{{ reporte.id }}{% endblock %}
+{% block preheader %}Tu reporte ha sido actualizado por el equipo de Psiconex.{% endblock %}
+{% block eyebrow %}Estado de Reporte #{{ reporte.id }}{% endblock %}
+{% block heading %}Actualización de tu reporte{% endblock %}
+
+{% block content %}
+  <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">
+    Hola {{ reporte.usuario.first_name|default:reporte.usuario.username }},
+  </p>
+  <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">
+    Te informamos que tu reporte <em>"{{ reporte.titulo }}"</em> ahora se encuentra en estado:
+    <strong style="color:#2563eb;">{{ reporte.get_estado_display }}</strong>.
+  </p>
+
+  {% if reporte.respuesta_admin %}
+  <div style="background:#f8fafc;border-left:4px solid #10b981;padding:16px 20px;border-radius:8px;margin:20px 0;">
+    <h3 style="margin:0 0 8px;font-size:14px;color:#065f46;text-transform:uppercase;letter-spacing:0.05em;">Respuesta del equipo Psiconex:</h3>
+    <p style="margin:0;color:#1e293b;font-size:14px;line-height:1.6;white-space:pre-wrap;">{{ reporte.respuesta_admin }}</p>
+  </div>
+  {% endif %}
+
+  <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.6;">
+    Gracias por ayudarnos continuamente a hacer de Psiconex la mejor herramienta para tu consulta psicológica.
+  </p>
+{% endblock %}
+
+{% block action %}
+  <div style="margin-top:25px;text-align:center;">
+    <a href="{{ app_url }}/dashboard/feedback" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+      Ver reporte en la plataforma
+    </a>
+  </div>
+{% endblock %}

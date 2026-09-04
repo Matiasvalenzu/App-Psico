@@ -14,12 +14,14 @@ import {
   Users,
   Settings,
   CreditCard,
+  MessageSquarePlus,
 } from "lucide-react";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
 import BottomNav from "@/components/layout/bottom-nav";
 import MoreDrawer from "@/components/layout/more-drawer";
+import FloatingFeedbackButton from "@/components/feedback/FloatingFeedbackButton";
 import { useIsMobile } from "@/hooks/use-media-query";
 
 export default function DashboardLayout({
@@ -113,6 +115,7 @@ export default function DashboardLayout({
     if (pathname.startsWith("/dashboard/tests")) return "Tests";
     if (pathname.startsWith("/dashboard/usuarios")) return "Usuarios";
     if (pathname.startsWith("/dashboard/configuracion")) return "Configuración";
+    if (pathname.startsWith("/dashboard/feedback")) return "Feedback y Ayuda";
     return "";
   };
 
@@ -172,6 +175,7 @@ export default function DashboardLayout({
             label="Mi Suscripción"
           />
           <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" />
+          <NavItem href="/dashboard/feedback" icon={MessageSquarePlus} label="Feedback y Ayuda" />
           {showAdminSection && (
             <div className="mt-8">
               {!isCollapsed && (
@@ -253,6 +257,9 @@ export default function DashboardLayout({
           />
         </>
       )}
+
+      {/* ── Botón Flotante Global de Feedback y Ayuda ── */}
+      <FloatingFeedbackButton />
     </div>
   );
 }

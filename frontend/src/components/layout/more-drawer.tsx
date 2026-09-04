@@ -11,6 +11,7 @@ import {
   UserPlus,
   CreditCard,
   X,
+  MessageSquarePlus,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -184,11 +185,17 @@ export default function MoreDrawer({
             <div className="my-2 h-px bg-border mx-2" />
 
             <MenuItem
+              href="/dashboard/feedback"
+              icon={MessageSquarePlus}
+              label="Feedback y Ayuda"
+            />
+
+            <MenuItem
               href="/dashboard/suscripcion"
               icon={CreditCard}
               label="Mi Suscripción"
             />
-
+            
             <MenuItem
               icon={theme === "dark" ? Sun : Moon}
               label={theme === "dark" ? "Modo claro" : "Modo oscuro"}
