@@ -302,3 +302,42 @@ def notification_content(notification):
             "context": context,
         }
     raise ValueError(f"Tipo de notificación no soportado: {notification.tipo}")
+
+
+def send_meet_invitation_to_patient(*, sesion, recipient_email=None):
+    from cuentas.services import get_notification_email
+
+    paciente = sesion.paciente
+    psicologo = sesion.psicologo
+    recipient = (recipient_email or paciente.email_contacto or "").strip()
+    if not recipient:
+        raise ValueError("El paciente no tiene un correo electrónico registrado.")
+
+    if not sesion.url_reunion:
+        raise ValueError("La sesión no tiene un enlace de reunión configurado.")
+
+    psychologist_name = psicologo.get_full_name() or psicologo.username or "Tu profesional"
+    psychologist_email = get_notification_email(psicologo)
+
+    fecha_str = ""
+    hora_str = ""
+    if sesion.fecha_hora_inicio:
+        local_dt = timezone.localtime(sesion.fecha_hora_inicio)
+        fecha_str = date_format(local_dt, "l j \\d\\e F \\d\\e Y").capitalize()
+        hora_str = local_dt.strftime("%H:%M")
+
+    context = {
+        "patient_name": paciente.nombre or "Estimado/a",
+        "psychologist_name": psychologist_name,
+        "meet_url": sesion.url_reunion,
+        "session_date": fecha_str,
+        "session_time": hora_str,
+    }
+
+    return send_branded_email(
+        subject=f"Enlace para tu sesión psicológica con {psychologist_name}",
+        recipient=recipient,
+        template_name="invitacion_meet",
+        context=context,
+        reply_to=psychologist_email or None,
+    )

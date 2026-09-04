@@ -1,0 +1,43 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Enlace para tu sesión por Google Meet{% endblock %}
+{% block preheader %}Tu enlace para conectarte a la sesión con {{ psychologist_name }}.{% endblock %}
+{% block eyebrow %}Sesión remota{% endblock %}
+{% block heading %}Enlace para tu sesión psicológica{% endblock %}
+{% block content %}
+<p style="margin:0 0 20px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ patient_name }},</p>
+<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.7;"><strong>{{ psychologist_name }}</strong> ha preparado el enlace de Google Meet para tu sesión de atención psicológica.</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+  <tr>
+    <td style="padding:18px 20px;color:#334155;font-size:14px;line-height:1.8;">
+      <strong style="color:#0f172a;">Profesional:</strong> {{ psychologist_name }}<br>
+      {% if session_date %}<strong style="color:#0f172a;">Fecha:</strong> {{ session_date }}<br>{% endif %}
+      {% if session_time %}<strong style="color:#0f172a;">Hora:</strong> {{ session_time }} hrs (Chile)<br>{% endif %}
+      <strong style="color:#0f172a;">Plataforma:</strong> Google Meet
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+  <tr>
+    <td style="border-radius:10px;background:#0284c7;">
+      <a href="{{ meet_url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;border-radius:10px;">
+        Unirse a la sesión por Google Meet &rarr;
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.5;">O copia este enlace directamente en tu navegador:</p>
+<p style="margin:0 0 22px;color:#0284c7;font-size:14px;word-break:break-all;"><a href="{{ meet_url }}" style="color:#0284c7;">{{ meet_url }}</a></p>
+
+<div style="margin:0 0 22px;padding:16px 18px;border-left:4px solid #0284c7;background:#f0f9ff;color:#0369a1;font-size:13px;line-height:1.65;border-radius:0 8px 8px 0;">
+  <strong>Recomendaciones para tu sesión:</strong>
+  <ul style="margin:8px 0 0;padding-left:18px;">
+    <li>Conéctate desde un lugar tranquilo, privado y sin interrupciones.</li>
+    <li>Utiliza audífonos con micrófono para una mejor calidad de audio.</li>
+    <li>Comprueba tu conexión a internet unos minutos antes de ingresar.</li>
+  </ul>
+</div>
+{% endblock %}
+{% block action %}{% endblock %}

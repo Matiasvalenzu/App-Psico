@@ -185,17 +185,78 @@ class SesionViewSet(viewsets.ModelViewSet):
         segmento.save()
         return Response(TranscripcionSegmentoSerializer(segmento).data)
 
+    @action(detail=False, methods=["get"], url_path="google_meet_status")
+    def google_meet_status(self, request):
+        from agenda.google_calendar import get_connection_status
+        return Response(get_connection_status(request.user))
+
+    @action(detail=False, methods=["post"], url_path="generar_meet")
+    def generar_meet(self, request):
+        paciente_id = request.data.get("paciente")
+        fecha_hora_inicio = request.data.get("fecha_hora_inicio")
+
+        from pacientes.models import Paciente
+        paciente_nombre = "Paciente"
+        if paciente_id:
+            try:
+                paciente = Paciente.objects.get(id=paciente_id, psicologo=request.user)
+                paciente_nombre = paciente.nombre_completo
+            except Paciente.DoesNotExist:
+                return Response({"error": "Paciente no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        from django.utils.dateparse import parse_datetime
+        dt = parse_datetime(fecha_hora_inicio) if fecha_hora_inicio else None
+
+        from agenda.google_calendar import create_meet_conference, GoogleCalendarError
+        try:
+            result = create_meet_conference(request.user, paciente_nombre, dt)
+            return Response(result, status=status.HTTP_200_OK)
+        except GoogleCalendarError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response(
+                {"error": f"Error inesperado al generar enlace de Google Meet: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"], url_path="enviar_enlace_paciente")
+    def enviar_enlace_paciente(self, request, pk=None):
+        sesion = self.get_object()
+        recipient_email = request.data.get("email")
+
+        if not sesion.url_reunion:
+            return Response(
+                {"error": "Esta sesión no tiene un enlace de reunión registrado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from notificaciones.services import send_meet_invitation_to_patient
+        try:
+            send_meet_invitation_to_patient(sesion=sesion, recipient_email=recipient_email)
+            dest = recipient_email or (sesion.paciente.email_contacto if sesion.paciente else "")
+            return Response({
+                "success": True,
+                "message": f"Enlace de reunión enviado exitosamente a {dest}.",
+            })
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response(
+                {"error": f"No se pudo enviar el correo: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=["post"], url_path="crear_virtual")
     def crear_virtual(self, request):
         paciente_id = request.data.get("paciente")
-        plataforma = request.data.get("plataforma")
+        plataforma = request.data.get("plataforma") or Sesion.Plataforma.GOOGLE_MEET
         url_reunion = request.data.get("url_reunion", "")
         fecha_hora_inicio = request.data.get("fecha_hora_inicio")
 
         if not paciente_id:
             return Response({"error": "El campo paciente es requerido."}, status=status.HTTP_400_BAD_REQUEST)
         if plataforma not in [Sesion.Plataforma.GOOGLE_MEET, Sesion.Plataforma.ZOOM]:
-            return Response({"error": "Plataforma inválida. Usa GOOGLE_MEET o ZOOM."}, status=status.HTTP_400_BAD_REQUEST)
+            plataforma = Sesion.Plataforma.GOOGLE_MEET
 
         from pacientes.models import Paciente
         try:

@@ -17,8 +17,15 @@ interface StartRecordingParams {
   numeroSesion?: number | null;
 }
 
+export interface RemoteRecordingResult {
+  success: boolean;
+  error?: "NO_TAB_AUDIO" | "MIC_PERMISSION_DENIED" | "CANCELLED" | "UNKNOWN";
+  message?: string;
+}
+
 interface AudioRecordingContextType {
   isRecording: boolean;
+  isRemote: boolean;
   elapsed: number;
   recordingSessionId: string | number | null;
   recordingPacienteId: string | number | null;
@@ -27,7 +34,10 @@ interface AudioRecordingContextType {
   isUploading: boolean;
   uploadError: string | null;
   lastUploadedSessionId: string | number | null;
+  tabAudioActive: boolean;
+  micAudioActive: boolean;
   startRecording: (params: StartRecordingParams) => Promise<boolean>;
+  startRemoteRecording: (params: StartRecordingParams) => Promise<RemoteRecordingResult>;
   stopRecording: () => Promise<boolean>;
   clearUploadError: () => void;
 }
@@ -57,6 +67,9 @@ export function AudioRecordingProvider({
   children: React.ReactNode;
 }) {
   const [isRecording, setIsRecording] = useState(false);
+  const [isRemote, setIsRemote] = useState(false);
+  const [tabAudioActive, setTabAudioActive] = useState(false);
+  const [micAudioActive, setMicAudioActive] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [recordingSessionId, setRecordingSessionId] = useState<
     string | number | null
@@ -78,6 +91,8 @@ export function AudioRecordingProvider({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const extraStreamsRef = useRef<MediaStream[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const elapsedRef = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -103,6 +118,10 @@ export function AudioRecordingProvider({
       window.removeEventListener("beforeunload", handleBeforeUnload);
       if (timerRef.current) clearInterval(timerRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      extraStreamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+      }
     };
   }, []);
 
@@ -215,6 +234,163 @@ export function AudioRecordingProvider({
     [uploadAudioBlob]
   );
 
+  const startRemoteRecording = useCallback(
+    async ({
+      sesionId,
+      pacienteId,
+      pacienteNombre = "Paciente",
+      numeroSesion = null,
+    }: StartRecordingParams): Promise<RemoteRecordingResult> => {
+      try {
+        setUploadError(null);
+
+        if (typeof window === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+          return {
+            success: false,
+            error: "UNKNOWN",
+            message: "Tu navegador no soporta la captura de audio de videollamadas. Usa Chrome o Edge en computador.",
+          };
+        }
+
+        // 1. Pedir compartir pestaña de Meet con audio
+        let displayStream: MediaStream;
+        try {
+          displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true,
+          });
+        } catch (displayErr: any) {
+          if (displayErr?.name === "NotAllowedError" || displayErr?.name === "AbortError") {
+            return { success: false, error: "CANCELLED" };
+          }
+          return {
+            success: false,
+            error: "UNKNOWN",
+            message: displayErr?.message || "No se pudo compartir la pestaña de Google Meet.",
+          };
+        }
+
+        const audioTracks = displayStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          displayStream.getTracks().forEach((t) => t.stop());
+          return {
+            success: false,
+            error: "NO_TAB_AUDIO",
+            message: "No se detectó audio en la pestaña. Asegúrate de marcar la casilla 'Compartir audio' en el diálogo del navegador.",
+          };
+        }
+
+        // 2. Capturar micrófono del psicólogo
+        let micStream: MediaStream;
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (micErr: any) {
+          displayStream.getTracks().forEach((t) => t.stop());
+          return {
+            success: false,
+            error: "MIC_PERMISSION_DENIED",
+            message: "No se pudo acceder al micrófono. Revisa los permisos en tu navegador.",
+          };
+        }
+
+        // 3. Mezclar con Web Audio API
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioCtxClass();
+        audioContextRef.current = audioCtx;
+
+        const destination = audioCtx.createMediaStreamDestination();
+        const tabSource = audioCtx.createMediaStreamSource(displayStream);
+        const micSource = audioCtx.createMediaStreamSource(micStream);
+
+        tabSource.connect(destination);
+        micSource.connect(destination);
+
+        const mixedStream = destination.stream;
+        const mimeType = getAudioMimeType();
+        const rec = new MediaRecorder(mixedStream, mimeType ? { mimeType } : undefined);
+
+        streamRef.current = mixedStream;
+        extraStreamsRef.current = [displayStream, micStream];
+        mediaRecorderRef.current = rec;
+        chunksRef.current = [];
+        elapsedRef.current = 0;
+        sessionIdRef.current = sesionId;
+
+        setRecordingSessionId(sesionId);
+        setRecordingPacienteId(pacienteId);
+        setRecordingPacienteNombre(pacienteNombre);
+        setRecordingNumeroSesion(numeroSesion);
+        setIsRemote(true);
+        setTabAudioActive(true);
+        setMicAudioActive(true);
+
+        // Si el psicólogo finaliza la compartición desde Chrome:
+        displayStream.getVideoTracks().forEach((track) => {
+          track.onended = () => {
+            setTabAudioActive(false);
+          };
+        });
+
+        rec.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        rec.onstop = async () => {
+          const finalDuration = elapsedRef.current;
+          const currentMime = rec.mimeType || "audio/webm";
+          const currentChunks = [...chunksRef.current];
+          const targetId = sessionIdRef.current;
+
+          mixedStream.getTracks().forEach((t) => t.stop());
+          displayStream.getTracks().forEach((t) => t.stop());
+          micStream.getTracks().forEach((t) => t.stop());
+          if (audioCtx.state !== "closed") {
+            audioCtx.close().catch(() => {});
+          }
+          streamRef.current = null;
+          extraStreamsRef.current = [];
+          audioContextRef.current = null;
+
+          if (targetId) {
+            await uploadAudioBlob(targetId, finalDuration, currentMime, currentChunks);
+          }
+
+          setRecordingSessionId(null);
+          setRecordingPacienteId(null);
+          setRecordingPacienteNombre(null);
+          setRecordingNumeroSesion(null);
+          setIsRemote(false);
+          setTabAudioActive(false);
+          setMicAudioActive(false);
+        };
+
+        rec.start(1000);
+        setIsRecording(true);
+        setElapsed(0);
+
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setElapsed((prev) => {
+            const next = prev + 1;
+            elapsedRef.current = next;
+            return next;
+          });
+        }, 1000);
+
+        return { success: true };
+      } catch (err: any) {
+        console.error("Error al iniciar grabación remota:", err);
+        setUploadError("Error al iniciar la grabación remota.");
+        return {
+          success: false,
+          error: "UNKNOWN",
+          message: err?.message || "Error inesperado al iniciar grabación remota.",
+        };
+      }
+    },
+    [uploadAudioBlob]
+  );
+
   const stopRecording = useCallback(async () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
@@ -235,6 +411,7 @@ export function AudioRecordingProvider({
     <AudioRecordingContext.Provider
       value={{
         isRecording,
+        isRemote,
         elapsed,
         recordingSessionId,
         recordingPacienteId,
@@ -243,7 +420,10 @@ export function AudioRecordingProvider({
         isUploading,
         uploadError,
         lastUploadedSessionId,
+        tabAudioActive,
+        micAudioActive,
         startRecording,
+        startRemoteRecording,
         stopRecording,
         clearUploadError,
       }}

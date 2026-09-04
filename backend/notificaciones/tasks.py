@@ -101,3 +101,16 @@ def dispatch_pending_notifications():
     for notification_id in pending_ids:
         send_notification.delay(notification_id)
     return len(pending_ids)
+
+
+@shared_task
+def send_meet_invitation_task(sesion_id, recipient_email=None):
+    from sesiones.models import Sesion
+    try:
+        sesion = Sesion.objects.select_related("paciente", "psicologo").get(pk=sesion_id)
+        from .services import send_meet_invitation_to_patient
+        send_meet_invitation_to_patient(sesion=sesion, recipient_email=recipient_email)
+        return "sent"
+    except Exception as exc:
+        logger.exception("Error enviando invitación de Meet para la sesión %s: %s", sesion_id, exc)
+        return "failed"

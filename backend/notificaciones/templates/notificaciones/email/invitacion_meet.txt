@@ -1,0 +1,21 @@
+Enlace para tu sesión por Google Meet
+
+Hola {{ patient_name }},
+
+{{ psychologist_name }} ha preparado el enlace de Google Meet para tu sesión de atención psicológica.
+
+Detalles de la sesión:
+- Profesional: {{ psychologist_name }}
+{% if session_date %}- Fecha: {{ session_date }}{% endif %}
+{% if session_time %}- Hora: {{ session_time }} hrs (Chile){% endif %}
+- Plataforma: Google Meet
+
+Enlace de acceso a la reunión:
+{{ meet_url }}
+
+Recomendaciones para tu sesión:
+- Conéctate desde un lugar tranquilo, privado y sin interrupciones.
+- Utiliza audífonos con micrófono para una mejor calidad de audio.
+- Comprueba tu conexión a internet unos minutos antes de ingresar.
+
+Equipo Psiconex

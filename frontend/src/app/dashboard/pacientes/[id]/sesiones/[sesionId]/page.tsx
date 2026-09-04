@@ -5,9 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { ArrowLeft, ClipboardList, Download, FileText, Loader2, Mic, Save, Square, Trash2, Video } from "lucide-react";
+import { ArrowLeft, ClipboardList, Download, ExternalLink, FileText, Loader2, Mic, Save, Square, Trash2, Video } from "lucide-react";
 import { useAudioRecording } from "@/context/AudioRecordingContext";
 import SessionRecordingTips from "@/components/sesion/SessionRecordingTips";
+import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
 
 interface Sesion {
   id: number;
@@ -18,6 +19,8 @@ interface Sesion {
   duracion_segundos: number | null;
   audio_path: string;
   origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
+  plataforma_virtual?: string;
+  url_reunion?: string;
   documento_nombre_original: string;
   estado: string;
   notas_sesion: string;
@@ -198,6 +201,7 @@ export default function SesionDetailPage() {
   const [deletingSession, setDeletingSession] = useState(false);
   const [deleteSessionError, setDeleteSessionError] = useState("");
   const [downloadingTestSection, setDownloadingTestSection] = useState<string | null>(null);
+  const [remoteAssistantOpen, setRemoteAssistantOpen] = useState(false);
 
   const {
     isRecording: isGlobalRecording,
@@ -459,9 +463,47 @@ export default function SesionDetailPage() {
               <FileText className="h-4 w-4" /> Exportar Word
             </button>
             {isVirtual && sesion.estado === "PENDIENTE" && (
-              <div className="flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
-                <Video className="h-4 w-4 flex-shrink-0" />
-                Sesión remota pendiente — activa la extensión Chrome durante la reunión
+              <div className="flex flex-wrap items-center gap-2">
+                {sesion.url_reunion && (
+                  <a
+                    href={sesion.url_reunion}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100 transition-colors dark:bg-sky-950/40 dark:text-sky-300"
+                  >
+                    <Video className="h-4 w-4 text-sky-600" />
+                    Abrir Google Meet
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+                {isCurrentSessionRecording ? (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-mono tabular-nums text-sky-600 animate-pulse flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                      </span>
+                      {formatSeconds(globalElapsed)}
+                    </span>
+                    <button
+                      onClick={handleStopRecording}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-subtle transition-all hover:bg-destructive/90 cursor-pointer"
+                    >
+                      <Square className="h-4 w-4" /> Detener grabación
+                    </button>
+                  </div>
+                ) : isCurrentSessionUploading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Subiendo audio...
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setRemoteAssistantOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white shadow-subtle transition-all hover:bg-sky-700 cursor-pointer"
+                  >
+                    <Mic className="h-4 w-4" /> Grabar llamada Meet
+                  </button>
+                )}
               </div>
             )}
             {!isExternalDoc && !isVirtual && !isTest && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
@@ -642,6 +684,23 @@ export default function SesionDetailPage() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-border/60 bg-card py-16 text-center shadow-subtle">
           <p className="text-sm text-muted-foreground">{isExternalDoc ? "Documento cargado sin texto extraído." : "Transcripción completada sin segmentos detectados."}</p>
         </div>
+      )}
+
+      {remoteAssistantOpen && (
+        <RemoteAudioAssistantModal
+          open={remoteAssistantOpen}
+          onClose={() => {
+            setRemoteAssistantOpen(false);
+            loadSesion();
+          }}
+          sesionId={sesion.id}
+          pacienteId={sesion.paciente}
+          pacienteNombre={sesion.paciente_nombre || "Paciente"}
+          meetUrl={sesion.url_reunion || undefined}
+          onRecordingStarted={() => {
+            loadSesion();
+          }}
+        />
       )}
     </div>
   );

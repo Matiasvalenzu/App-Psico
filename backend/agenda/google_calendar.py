@@ -189,6 +189,58 @@ def sync_cita_to_google(cita):
         return None
 
 
+def create_meet_conference(user, paciente_nombre, fecha_inicio=None, duracion_minutos=60):
+    connection = _get_active_connection(user)
+    if not connection:
+        raise GoogleCalendarError("Tu cuenta de Google no está conectada o necesita reautorización.")
+
+    calendar_id = ensure_dedicated_calendar(connection)
+    now = timezone.now()
+    inicio = fecha_inicio or now
+    fin = inicio + timedelta(minutes=duracion_minutos)
+    request_id = secrets.token_urlsafe(16)
+
+    body = {
+        "summary": f"Sesión Google Meet - {paciente_nombre}".strip(),
+        "description": "Sesión remota generada desde Psiconex.",
+        "start": {
+            "dateTime": timezone.localtime(inicio).isoformat(),
+            "timeZone": settings.TIME_ZONE,
+        },
+        "end": {
+            "dateTime": timezone.localtime(fin).isoformat(),
+            "timeZone": settings.TIME_ZONE,
+        },
+        "transparency": "transparent",
+        "conferenceData": {
+            "createRequest": {
+                "requestId": request_id,
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        },
+    }
+
+    url = f"{GOOGLE_CALENDAR_API}/calendars/{calendar_id}/events?conferenceDataVersion=1"
+    event = _google_request(connection, "POST", url, json=body)
+
+    meet_url = (
+        event.get("hangoutLink")
+        or (
+            event.get("conferenceData", {})
+            .get("entryPoints", [{}])[0]
+            .get("uri")
+        )
+    )
+    if not meet_url:
+        raise GoogleCalendarError("Google no retornó un enlace de Google Meet para este evento.")
+
+    return {
+        "meet_url": meet_url,
+        "event_id": event.get("id"),
+        "calendar_id": calendar_id,
+    }
+
+
 def sync_app_to_google(user):
     connection = _get_active_connection(user)
     if not connection:
