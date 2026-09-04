@@ -6,6 +6,8 @@ import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ArrowLeft, ClipboardList, Download, FileText, Loader2, Mic, Save, Square, Trash2, Video } from "lucide-react";
+import { useAudioRecording } from "@/context/AudioRecordingContext";
+import SessionRecordingTips from "@/components/sesion/SessionRecordingTips";
 
 interface Sesion {
   id: number;
@@ -185,9 +187,6 @@ export default function SesionDetailPage() {
 
   const [sesion, setSesion] = useState<Sesion | null>(null);
   const [loading, setLoading] = useState(true);
-  const [recording, setRecording] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
@@ -200,11 +199,21 @@ export default function SesionDetailPage() {
   const [deleteSessionError, setDeleteSessionError] = useState("");
   const [downloadingTestSection, setDownloadingTestSection] = useState<string | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const elapsedRef = useRef(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const {
+    isRecording: isGlobalRecording,
+    elapsed: globalElapsed,
+    recordingSessionId,
+    isUploading: isGlobalUploading,
+    uploadError: globalUploadError,
+    lastUploadedSessionId,
+    startRecording: startGlobalRecording,
+    stopRecording: stopGlobalRecording,
+  } = useAudioRecording();
+
+  const isCurrentSessionRecording =
+    isGlobalRecording && String(recordingSessionId) === String(sesionId);
+  const isCurrentSessionUploading =
+    isGlobalUploading && String(recordingSessionId) === String(sesionId);
 
   const loadSesion = useCallback(async () => {
     try {
@@ -223,6 +232,12 @@ export default function SesionDetailPage() {
   useEffect(() => { loadSesion(); }, [loadSesion]);
 
   useEffect(() => {
+    if (lastUploadedSessionId && String(lastUploadedSessionId) === String(sesionId)) {
+      loadSesion();
+    }
+  }, [lastUploadedSessionId, sesionId, loadSesion]);
+
+  useEffect(() => {
     if (sesion?.segmentos) setTranscriptText(buildTranscriptText(sesion.segmentos));
   }, [sesion?.id, sesion?.segmentos]);
 
@@ -232,70 +247,22 @@ export default function SesionDetailPage() {
     return () => clearInterval(poll);
   }, [sesion?.estado, loadSesion]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
-
-  async function startRecording() {
-    try {
-      setError("");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = getAudioMimeType();
-      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      streamRef.current = stream;
-      mediaRecorderRef.current = rec;
-      chunksRef.current = [];
-      elapsedRef.current = 0;
-      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        await uploadAudio();
-      };
-      rec.start(1000);
-      setRecording(true);
-      setElapsed(0);
-      timerRef.current = setInterval(() => setElapsed((prev) => {
-        const next = prev + 1;
-        elapsedRef.current = next;
-        return next;
-      }), 1000);
-    } catch {
-      setError("No se pudo acceder al micrófono. Revisa permisos del navegador.");
+  async function handleStartRecording() {
+    if (!sesion) return;
+    setError("");
+    const ok = await startGlobalRecording({
+      sesionId: sesion.id,
+      pacienteId: id,
+      pacienteNombre: sesion.paciente_nombre,
+      numeroSesion: sesion.numero_sesion,
+    });
+    if (!ok && globalUploadError) {
+      setError(globalUploadError);
     }
   }
 
-  function stopRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    setRecording(false);
-    setUploading(true);
-  }
-
-  async function uploadAudio() {
-    if (chunksRef.current.length === 0) { setUploading(false); return; }
-    try {
-      const mimeType = mediaRecorderRef.current?.mimeType || "audio/webm";
-      const blob = new Blob(chunksRef.current, { type: mimeType });
-      const extension = getAudioExtension(mimeType);
-      const formData = new FormData();
-      formData.append("audio", blob, `sesion-${sesionId}.${extension}`);
-      formData.append("duracion_segundos", String(elapsedRef.current));
-      const res = await apiFetch(`/sesiones/${sesionId}/upload_audio/`, { method: "POST", body: formData });
-      if (!res.ok) { setError("No se pudo guardar el audio de la sesión."); return; }
-      await loadSesion();
-    } catch (err) {
-      console.error(err);
-      setError("No se pudo subir el audio.");
-    } finally {
-      setUploading(false);
-      chunksRef.current = [];
-    }
+  async function handleStopRecording() {
+    await stopGlobalRecording();
   }
 
   async function saveNotes() {
@@ -399,8 +366,9 @@ export default function SesionDetailPage() {
         setDeleteSessionError("No se pudo eliminar la sesión. Inténtalo nuevamente.");
         return;
       }
-      if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      if (isCurrentSessionRecording) {
+        await stopGlobalRecording();
+      }
       router.replace(`/dashboard/pacientes/${id}`);
     } catch (err) {
       console.error(err);
@@ -431,6 +399,11 @@ export default function SesionDetailPage() {
       <button onClick={() => router.push(`/dashboard/pacientes/${id}`)} className="-ml-1 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Volver al paciente
       </button>
+
+      {/* Guía y tips para grabación presencial */}
+      {!isExternalDoc && !isVirtual && !isTest && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
+        <SessionRecordingTips />
+      )}
 
       {/* Session header */}
       <div className="rounded-xl border border-border/60 bg-card p-6 shadow-card">
@@ -493,17 +466,17 @@ export default function SesionDetailPage() {
             )}
             {!isExternalDoc && !isVirtual && !isTest && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
               <div className="flex items-center gap-3">
-                {uploading ? (
+                {isCurrentSessionUploading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Subiendo audio...</div>
-                ) : recording ? (
+                ) : isCurrentSessionRecording ? (
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-mono tabular-nums text-primary animate-pulse">{formatSeconds(elapsed)}</span>
-                    <button onClick={stopRecording} className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-subtle transition-all hover:bg-destructive/90">
+                    <span className="text-sm font-mono tabular-nums text-primary animate-pulse">{formatSeconds(globalElapsed)}</span>
+                    <button onClick={handleStopRecording} className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-subtle transition-all hover:bg-destructive/90 cursor-pointer">
                       <Square className="h-4 w-4" /> Detener
                     </button>
                   </div>
                 ) : (
-                  <button onClick={startRecording} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card">
+                  <button onClick={handleStartRecording} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card cursor-pointer">
                     <Mic className="h-4 w-4" /> Iniciar grabación
                   </button>
                 )}

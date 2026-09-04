@@ -23,6 +23,8 @@ import BottomNav from "@/components/layout/bottom-nav";
 import MoreDrawer from "@/components/layout/more-drawer";
 import FloatingFeedbackButton from "@/components/feedback/FloatingFeedbackButton";
 import { useIsMobile } from "@/hooks/use-media-query";
+import { AudioRecordingProvider } from "@/context/AudioRecordingContext";
+import PersistentRecordingBar from "@/components/recording/PersistentRecordingBar";
 
 export default function DashboardLayout({
   children,
@@ -122,7 +124,8 @@ export default function DashboardLayout({
   const showAdminSection = isAdmin || isSuperuser;
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <AudioRecordingProvider>
+      <div className="flex min-h-screen w-full bg-background">
       {/* ── Desktop Sidebar ── */}
       <aside
         className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col border-r border-sidebar-border bg-sidebar py-6 shadow-xl transition-all duration-300 ${
@@ -260,6 +263,10 @@ export default function DashboardLayout({
 
       {/* ── Botón Flotante Global de Feedback y Ayuda ── */}
       <FloatingFeedbackButton />
+
+      {/* ── Barra Flotante Global de Grabación Persistente ── */}
+      <PersistentRecordingBar />
     </div>
+    </AudioRecordingProvider>
   );
 }
