@@ -41,6 +41,7 @@ export function RemoteAudioAssistantModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [meetOpened, setMeetOpened] = useState(false);
 
   if (!open) return null;
 
@@ -60,10 +61,10 @@ export function RemoteAudioAssistantModal({
     if (result.success) {
       setReady(true);
       if (onRecordingStarted) onRecordingStarted();
-      // Si hay meetUrl, abrirlo en pestaña nueva si aún no está abierta
-      if (meetUrl) {
-        window.open(meetUrl, "_blank", "noopener,noreferrer");
-      }
+      // NOTA: NO llamamos a window.open() aquí.
+      // La pestaña de Google Meet ya fue abierta en el Paso 1 y seleccionada
+      // por el psicólogo en el diálogo del navegador. Abrir otra pestaña
+      // generaba un duplicado confuso con doble Meet.
     } else {
       setErrorType(result.error || "UNKNOWN");
       setErrorMessage(
@@ -123,14 +124,31 @@ export function RemoteAudioAssistantModal({
                         Inicia o únete a la videollamada con tu paciente en una pestaña de Chrome o Edge.
                       </p>
                       {meetUrl && (
-                        <a
-                          href={meetUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
-                        >
-                          Abrir enlace de Meet <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
+                        <div className="mt-2.5">
+                          <a
+                            href={meetUrl}
+                            target="PsiconexMeetSession"
+                            rel="noopener noreferrer"
+                            onClick={() => setMeetOpened(true)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-all ${
+                              meetOpened
+                                ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/20 dark:text-emerald-300"
+                                : "bg-sky-600 text-white hover:bg-sky-700"
+                            }`}
+                          >
+                            {meetOpened ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                Pestaña de Meet abierta (clic para ver)
+                              </>
+                            ) : (
+                              <>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                Abrir enlace de Meet
+                              </>
+                            )}
+                          </a>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -248,9 +266,9 @@ export function RemoteAudioAssistantModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+            className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent cursor-pointer"
           >
-            {ready || isRecording ? "Cerrar ventana y continuar" : "Cancelar"}
+            {ready || isRecording ? "Cerrar ventana" : "Cancelar"}
           </button>
 
           {!ready && !isRecording && (
@@ -279,15 +297,26 @@ export function RemoteAudioAssistantModal({
             </button>
           )}
 
-          {(ready || isRecording) && meetUrl && (
-            <a
-              href={meetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-sky-700 transition-all cursor-pointer"
-            >
-              Ir a la llamada en Google Meet <ExternalLink className="h-4 w-4" />
-            </a>
+          {(ready || isRecording) && (
+            <div className="flex items-center gap-3">
+              {meetUrl && (
+                <a
+                  href={meetUrl}
+                  target="PsiconexMeetSession"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-600 hover:underline dark:text-sky-400"
+                >
+                  Ver videollamada <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-700 transition-all cursor-pointer"
+              >
+                Entendido, continuar en Meet
+              </button>
+            </div>
           )}
         </div>
       </div>

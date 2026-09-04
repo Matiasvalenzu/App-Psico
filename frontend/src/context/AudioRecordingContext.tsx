@@ -255,10 +255,14 @@ export function AudioRecordingProvider({
         // 1. Pedir compartir pestaña de Meet con audio
         let displayStream: MediaStream;
         try {
-          displayStream = await navigator.mediaDevices.getDisplayMedia({
+          const displayMediaOptions: any = {
             video: true,
             audio: true,
-          });
+            preferCurrentTab: false,
+            selfBrowserSurface: "exclude",
+            surfaceSwitching: "exclude",
+          };
+          displayStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
         } catch (displayErr: any) {
           if (displayErr?.name === "NotAllowedError" || displayErr?.name === "AbortError") {
             return { success: false, error: "CANCELLED" };
