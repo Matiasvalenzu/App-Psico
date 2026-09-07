@@ -363,10 +363,9 @@ export default function DashboardPage() {
             setSuccess("");
             setShowForm(!showForm);
           }}
-          className="gap-2 rounded-xl shadow-xs transition-all hover:shadow-md hover:-translate-y-0.5 bg-primary text-primary-foreground font-semibold px-4.5 h-10.5"
-          size="lg"
+          className="gap-2.5 rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 bg-primary text-primary-foreground font-semibold !px-6 !h-11 text-sm shrink-0"
         >
-          <UserPlus className="h-4 w-4" />
+          <UserPlus className="h-4.5 w-4.5" />
           <span>Nuevo paciente</span>
         </Button>
       </div>

@@ -231,12 +231,30 @@ function getStatusLabel(status: string) {
   return status;
 }
 
-function DetailItem({ label, value }: { label: string; value: string | number | null | undefined }) {
+function DetailItem({
+  label,
+  value,
+  icon: Icon,
+  action,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  icon?: React.ElementType;
+  action?: React.ReactNode;
+}) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium whitespace-pre-wrap">{value}</p>
+    <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-muted/20 p-3.5 transition-colors hover:bg-muted/40">
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        {Icon && <Icon className="h-3.5 w-3.5 text-primary/60" />}
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground tracking-tight break-words">{value}</p>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
     </div>
   );
 }
@@ -1099,156 +1117,241 @@ export default function PacienteDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Back navigation */}
-      <div className="sticky top-14 md:top-16 z-10 -mx-4 -mt-4 mb-4 px-4 py-2.5 bg-background/90 backdrop-blur-md border-b border-border/40 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between">
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-95"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver a Pacientes
-        </button>
+      {/* Back navigation & Status bar */}
+      <div className="sticky top-14 md:top-16 z-10 -mx-4 -mt-4 mb-6 px-4 py-3 bg-background/85 backdrop-blur-md border-b border-border/60 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:border-primary/40 active:scale-95"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-primary" />
+            <span>Volver a Pacientes</span>
+          </button>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+            <span>/</span>
+            <span className="font-semibold text-foreground tracking-tight truncate max-w-[240px]">
+              {paciente.nombre_completo}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>
+          </span>
+        </div>
       </div>
 
-      {/* Patient header */}
-      <div className="rounded-xl border border-border/60 bg-card shadow-card overflow-hidden">
-        <div className="flex items-start gap-5 p-6">
-          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary shadow-sm">
-            {paciente.nombre.charAt(0).toUpperCase()}
-            {paciente.apellido.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">
+      {/* Bloque 1: Tarjeta Principal de Identidad & Acciones Rápidas */}
+      <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-7 shadow-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div className="flex items-center gap-4 sm:gap-5">
+            <div className="flex h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl sm:text-2xl font-bold text-primary border border-primary/20 shadow-xs">
+              {paciente.nombre.charAt(0).toUpperCase()}
+              {paciente.apellido.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                   {paciente.nombre_completo}
                 </h1>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {paciente.rut && <span>{paciente.rut}</span>}
-                  {paciente.rut && (paciente.edad || paciente.sexo !== "N") && <span className="mx-2">·</span>}
-                  {paciente.edad && <span>{paciente.edad} años</span>}
-                  {(paciente.edad || paciente.rut) && paciente.sexo && paciente.sexo !== "N" && <span className="mx-2">·</span>}
-                  {paciente.sexo && paciente.sexo !== "N" && <span>{getSexoLabel(paciente.sexo)}</span>}
+                {paciente.activo === false && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
+                    Inactivo
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {paciente.rut && (
+                  <span className="inline-flex items-center font-mono font-medium text-foreground/80 bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70">
+                    {paciente.rut}
+                  </span>
+                )}
+                {paciente.edad && (
+                  <span className="bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70 text-foreground/80 font-medium">
+                    {paciente.edad} años
+                  </span>
+                )}
+                {paciente.sexo && paciente.sexo !== "N" && (
+                  <span className="bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70 text-foreground/80 font-medium">
+                    {getSexoLabel(paciente.sexo)}
+                  </span>
+                )}
+                {paciente.ocupacion_laboral && (
+                  <span className="bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70 text-foreground/80 font-medium">
+                    {paciente.ocupacion_laboral}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Botones de Acción Rápida */}
+          <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
+            {paciente.telefono_whatsapp && (
+              <a
+                href={`https://wa.me/${paciente.telefono_whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50/70 px-3.5 py-2 text-xs font-semibold text-emerald-700 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-subtle dark:bg-emerald-950/40 dark:text-emerald-300"
+              >
+                <MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span>WhatsApp</span>
+              </a>
+            )}
+            <button
+              onClick={openTestModal}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 hover:shadow-subtle"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>Enviar test</span>
+            </button>
+            <button
+              onClick={openEditModal}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:shadow-subtle"
+            >
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Editar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bloque 2: Expediente y Datos Demográficos */}
+      <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Expediente y Datos Personales
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+          <DetailItem label="RUT" value={paciente.rut} />
+          <DetailItem label="Edad" value={paciente.edad ? `${paciente.edad} años` : null} />
+          <DetailItem label="Sexo" value={paciente.sexo !== "N" ? getSexoLabel(paciente.sexo) : null} />
+          <DetailItem label="Fecha de nacimiento" value={paciente.fecha_nacimiento ? formatDate(paciente.fecha_nacimiento) : null} />
+          <DetailItem label="Ocupación" value={paciente.ocupacion_laboral} />
+          <DetailItem label="Nacionalidad" value={paciente.nacionalidad} />
+          <DetailItem label="Religión" value={paciente.religion} />
+          <DetailItem label="Previsión de Salud" value={paciente.prevision} />
+        </div>
+      </div>
+
+      {/* Bloque 3: Motivo de consulta y Objetivos Terapéuticos */}
+      {(paciente.motivo_consulta || paciente.objetivos_intervencion) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {paciente.motivo_consulta && (
+            <div className="rounded-2xl border border-primary/25 bg-primary/[0.02] p-6 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="mb-3 flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
+                  <ClipboardList className="h-4 w-4" />
+                  <span>Motivo de consulta</span>
+                </div>
+                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                  {paciente.motivo_consulta}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={openTestModal}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 shadow-subtle transition-all hover:bg-emerald-100 hover:shadow-card dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
-                >
-                  <Send className="h-4 w-4" />
-                  Enviar test
-                </button>
-                <button
-                  onClick={openEditModal}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </button>
+            </div>
+          )}
+          {paciente.objetivos_intervencion && (
+            <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="mb-3 flex items-center gap-2 text-muted-foreground font-semibold text-xs uppercase tracking-wider">
+                  <Brain className="h-4 w-4 text-primary/70" />
+                  <span>Objetivos de intervención</span>
+                </div>
+                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                  {paciente.objetivos_intervencion}
+                </p>
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Bloque 4: Contacto y Ubicación */}
+      {hasContactData && (
+        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Contacto y Ubicación
+            </h2>
+          </div>
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailItem
+              label="WhatsApp"
+              value={paciente.telefono_whatsapp}
+              action={
+                paciente.telefono_whatsapp ? (
+                  <a
+                    href={`https://wa.me/${paciente.telefono_whatsapp.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-semibold text-emerald-600 hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Abrir chat</span>
+                  </a>
+                ) : undefined
+              }
+            />
+            <DetailItem
+              label="Correo electrónico"
+              value={paciente.email_contacto}
+              action={
+                paciente.email_contacto ? (
+                  <a
+                    href={`mailto:${paciente.email_contacto}`}
+                    className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Escribir</span>
+                  </a>
+                ) : undefined
+              }
+            />
+            <DetailItem label="Dirección" value={paciente.direccion} />
+            <DetailItem label="Comuna" value={paciente.comuna} />
           </div>
         </div>
-        <div className="border-t border-border/60 px-6 py-4">
-          <div className="grid grid-cols-2 gap-y-5 gap-x-8 sm:grid-cols-4">
-            {paciente.rut && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">RUT</p>
-                <p className="mt-1 text-sm font-medium">{paciente.rut}</p>
-              </div>
-            )}
-            {paciente.edad && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Edad</p>
-                <p className="mt-1 text-sm font-medium">{paciente.edad} años</p>
-              </div>
-            )}
-            {paciente.sexo && paciente.sexo !== "N" && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Sexo</p>
-                <p className="mt-1 text-sm font-medium">{getSexoLabel(paciente.sexo)}</p>
-              </div>
-            )}
-            {paciente.fecha_nacimiento && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Fecha de nacimiento</p>
-                <p className="mt-1 text-sm font-medium">{formatDate(paciente.fecha_nacimiento)}</p>
-              </div>
-            )}
-            {paciente.ocupacion_laboral && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ocupación</p>
-                <p className="mt-1 text-sm font-medium">{paciente.ocupacion_laboral}</p>
-              </div>
-            )}
+      )}
+
+      {/* Bloque 5: Información Clínica Ampliada */}
+      {hasClinicalData && (
+        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Información Clínica Complementaria
+            </h2>
+          </div>
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <DetailItem label="Frecuencia de atención" value={paciente.frecuencia_atencion} />
+            <DetailItem label="Origen de consulta" value={paciente.origen_consulta} />
+            <DetailItem label="Diagnóstico sospechado" value={paciente.diagnostico_sospechado} />
+            <DetailItem label="Medicación actual" value={paciente.medicacion_actual} />
+            <DetailItem label="Derivación / Interconsulta" value={paciente.derivacion_interconsulta} />
           </div>
         </div>
-        {paciente.motivo_consulta && (
-          <div className="border-t border-border/60 bg-muted/30 px-6 py-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Motivo de consulta
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed">{paciente.motivo_consulta}</p>
+      )}
+
+      {/* Bloque 6: Alertas Clínicas, Riesgo y Tutor */}
+      {hasRiskData && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-50/30 p-6 shadow-sm dark:bg-amber-950/20 dark:border-amber-900/50">
+          <div className="mb-4 flex items-center gap-2 border-b border-amber-500/20 pb-3 text-amber-800 dark:text-amber-300">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider">
+              Alertas Clínicas, Red de Emergencia y Tutor
+            </h2>
           </div>
-        )}
-        {paciente.objetivos_intervencion && (
-          <div className="border-t border-border/60 px-6 py-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Objetivos de intervención
-            </p>
-            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed">
-              {paciente.objetivos_intervencion}
-            </p>
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailItem label="Riesgo suicida" value={paciente.riesgo_suicida ? "Sí" : ""} />
+            <DetailItem label="Ideación suicida" value={paciente.ideacion_suicida_nivel} />
+            <DetailItem label="Contacto emergencia" value={paciente.contacto_emergencia_nombre} />
+            <DetailItem label="Tel. emergencia" value={paciente.contacto_emergencia_telefono} />
+            <DetailItem label="Menor de edad" value={paciente.es_menor_edad ? "Sí" : ""} />
+            <DetailItem label="Nombre Tutor" value={paciente.nombre_tutor} />
+            <DetailItem label="Teléfono Tutor" value={paciente.telefono_tutor} />
           </div>
-        )}
-        {hasContactData && (
-          <div className="border-t border-border/60 px-6 py-4">
-            <p className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Contacto y datos administrativos
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <DetailItem label="WhatsApp" value={paciente.telefono_whatsapp} />
-              <DetailItem label="Correo" value={paciente.email_contacto} />
-              <DetailItem label="Dirección" value={paciente.direccion} />
-              <DetailItem label="Comuna" value={paciente.comuna} />
-              <DetailItem label="Nacionalidad" value={paciente.nacionalidad} />
-              <DetailItem label="Religión" value={paciente.religion} />
-              <DetailItem label="Previsión" value={paciente.prevision} />
-            </div>
-          </div>
-        )}
-        {hasClinicalData && (
-          <div className="border-t border-border/60 bg-muted/30 px-6 py-4">
-            <p className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Información clínica ampliada
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <DetailItem label="Frecuencia" value={paciente.frecuencia_atencion} />
-              <DetailItem label="Origen" value={paciente.origen_consulta} />
-              <DetailItem label="Diagnóstico sospechado" value={paciente.diagnostico_sospechado} />
-              <DetailItem label="Medicación actual" value={paciente.medicacion_actual} />
-              <DetailItem label="Derivación/interconsulta" value={paciente.derivacion_interconsulta} />
-            </div>
-          </div>
-        )}
-        {hasRiskData && (
-          <div className="border-t border-amber-200 bg-amber-50/60 px-6 py-4 dark:border-amber-900 dark:bg-amber-950/20">
-            <p className="mb-4 text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300">
-              Riesgo, emergencia y responsable
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <DetailItem label="Riesgo suicida" value={paciente.riesgo_suicida ? "Sí" : ""} />
-              <DetailItem label="Ideación suicida" value={paciente.ideacion_suicida_nivel} />
-              <DetailItem label="Contacto emergencia" value={paciente.contacto_emergencia_nombre} />
-              <DetailItem label="Tel. emergencia" value={paciente.contacto_emergencia_telefono} />
-              <DetailItem label="Menor de edad" value={paciente.es_menor_edad ? "Sí" : ""} />
-              <DetailItem label="Tutor" value={paciente.nombre_tutor} />
-              <DetailItem label="Tel. tutor" value={paciente.telefono_tutor} />
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Send test modal */}
       {testModalOpen && (
@@ -1692,86 +1795,102 @@ export default function PacienteDetailPage() {
       )}
 
       {/* External documents */}
-      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-subtle">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Documentos externos
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-foreground">Documentos Externos</h2>
+              <span className="rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                {documentosExternos.length}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
               Archivos cargados como contexto del paciente, separados de las sesiones clínicas.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-              {documentosExternos.length} documento{documentosExternos.length !== 1 ? "s" : ""}
-            </span>
             <button
               onClick={openDocumentModal}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-subtle transition-all hover:bg-accent hover:shadow-card"
+              className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-4 py-2 text-xs font-semibold shadow-xs transition-all hover:bg-accent hover:border-primary/40"
             >
-              <Upload className="h-4 w-4" />
-              Cargar documento
+              <Upload className="h-3.5 w-3.5 text-primary" />
+              <span>Cargar documento</span>
             </button>
           </div>
         </div>
         {documentError && (
-          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs text-destructive">
             {documentError}
           </div>
         )}
         {documentosExternos.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
+          <div className="mt-4 rounded-xl border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">
             Aún no hay documentos externos cargados para este paciente.
-          </p>
+          </div>
         ) : (
           <div className="mt-4 grid gap-3">
             {documentosExternos.map((documento) => (
-              <div key={documento.id} className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium">
-                      {documento.documento_nombre_original || `Documento ${documento.id}`}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatDate(documento.fecha_hora_inicio)} · {getStatusLabel(documento.estado)}
-                    </p>
+              <div
+                key={documento.id}
+                className="rounded-xl border border-border/70 bg-muted/20 p-4 transition-all hover:border-primary/30 hover:bg-muted/30"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/70 text-primary shrink-0">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm text-foreground">
+                        {documento.documento_nombre_original || `Documento ${documento.id}`}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatDate(documento.fecha_hora_inicio)} · {getStatusLabel(documento.estado)}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => openExternalDocument(documento)}
                       disabled={openingDocumentId === documento.id}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
                     >
-                      {openingDocumentId === documento.id && <Loader2 className="h-3 w-3 animate-spin" />}
-                      Abrir
+                      {openingDocumentId === documento.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      <span>Abrir</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => downloadExternalDocument(documento, "pdf")}
                       disabled={downloadingDocument === `${documento.id}-pdf`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50"
                     >
-                      {downloadingDocument === `${documento.id}-pdf` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                      PDF
+                      {downloadingDocument === `${documento.id}-pdf` ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <span>PDF</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => downloadExternalDocument(documento, "docx")}
                       disabled={downloadingDocument === `${documento.id}-docx`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50"
                     >
-                      {downloadingDocument === `${documento.id}-docx` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                      Word
+                      {downloadingDocument === `${documento.id}-docx` ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <span>Word</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSessionToDelete(documento)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
                     >
-                      <Trash2 className="h-3 w-3" />
-                      Eliminar
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Eliminar</span>
                     </button>
                   </div>
                 </div>
