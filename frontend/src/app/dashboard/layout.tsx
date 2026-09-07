@@ -98,22 +98,22 @@ export default function DashboardLayout({
       <Link
         href={href}
         title={isCollapsed ? label : undefined}
-        className={`group flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-all ${
-          isCollapsed ? "justify-center px-0 mx-2" : "px-3"
+        className={`group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 ${
+          isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
         } ${
           active
-            ? "bg-sidebar-primary/10 text-sidebar-primary"
-            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            ? "bg-primary/10 text-primary font-semibold shadow-xs border border-primary/20"
+            : "text-muted-foreground hover:bg-accent/80 hover:text-foreground"
         }`}
       >
         <Icon
-          className={`h-5 w-5 shrink-0 transition-colors ${
+          className={`h-4.5 w-4.5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
             active
-              ? "text-sidebar-primary"
-              : "text-sidebar-foreground/50 group-hover:text-sidebar-accent-foreground"
+              ? "text-primary"
+              : "text-muted-foreground/70 group-hover:text-foreground"
           }`}
         />
-        {!isCollapsed && <span>{label}</span>}
+        {!isCollapsed && <span className="tracking-tight">{label}</span>}
       </Link>
     );
   };
@@ -137,16 +137,17 @@ export default function DashboardLayout({
       <div className="flex min-h-screen w-full bg-background">
       {/* ── Desktop Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col border-r border-sidebar-border bg-sidebar py-6 shadow-xl transition-all duration-300 ${
+        className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col border-r border-border/70 bg-card/95 py-6 backdrop-blur-md transition-all duration-300 ${
           isCollapsed ? "w-20" : "w-64 px-4"
         }`}
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-4 top-7 z-50 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-md transition-all hover:scale-110 hover:bg-primary/90"
+          className="absolute -right-3.5 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm transition-all hover:scale-110 hover:bg-accent hover:border-primary/40"
+          aria-label={isCollapsed ? "Expandir menú" : "Colapsar menú"}
         >
           <ChevronLeft
-            className={`h-5 w-5 transition-transform duration-300 ${
+            className={`h-4 w-4 transition-transform duration-300 ${
               isCollapsed ? "rotate-180" : ""
             }`}
           />
@@ -169,7 +170,7 @@ export default function DashboardLayout({
                 alt="Psiconex"
                 width={1951}
                 height={393}
-                className="h-full w-auto object-contain drop-shadow-md"
+                className="h-full w-auto object-contain drop-shadow-sm"
                 priority
               />
             )}
@@ -191,11 +192,11 @@ export default function DashboardLayout({
           {showAdminSection && (
             <div className="mt-8">
               {!isCollapsed && (
-                <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   Administración
                 </div>
               )}
-              {isCollapsed && <div className="mb-2 h-px w-full bg-sidebar-border" />}
+              {isCollapsed && <div className="mb-2 h-px w-full bg-border/60" />}
               {isAdmin && (
                 <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" />
               )}
@@ -214,7 +215,7 @@ export default function DashboardLayout({
         }`}
       >
         {/* ── Header ── */}
-        <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center justify-between border-b bg-background/95 px-4 md:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center justify-between border-b border-border/70 bg-card/75 px-4 md:px-6 backdrop-blur-md">
           {/* Mobile: logo + title */}
           <div className="flex items-center gap-3">
             <div className="flex md:hidden h-7 w-7 items-center justify-center">
@@ -226,43 +227,51 @@ export default function DashboardLayout({
                 className="h-7 w-7 object-contain"
               />
             </div>
-            <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground/80">
-              {getSectionTitle()}
+            <div className="flex items-center gap-2">
+              <span className="hidden md:inline-block text-xs font-medium text-muted-foreground/60">Psiconex</span>
+              <span className="hidden md:inline-block text-xs text-muted-foreground/40">/</span>
+              <span className="text-sm font-semibold tracking-tight text-foreground">
+                {getSectionTitle()}
+              </span>
             </div>
             {suscripcionEstado === "trial" && diasRestantes !== null && (
               <Link
                 href="/dashboard/suscripcion"
-                className="flex md:hidden items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
+                className="flex md:hidden items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
               >
-                <Clock className="h-3 w-3" />
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span>{diasRestantes}d prueba</span>
               </Link>
             )}
           </div>
 
           {/* Desktop: trial badge + theme toggle + logout */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3.5">
             {suscripcionEstado === "trial" && diasRestantes !== null && (
               <Link
                 href="/dashboard/suscripcion"
-                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+                className="inline-flex items-center gap-2 rounded-full border border-amber-500/25 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-500/15 transition-all dark:text-amber-300 dark:border-amber-500/30"
                 title="Ver detalles de tu suscripción"
               >
-                <Clock className="h-3.5 w-3.5" />
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
                 <span>
-                  Prueba activa: {diasRestantes}{" "}
+                  Prueba activa: <strong className="font-bold">{diasRestantes}</strong>{" "}
                   {diasRestantes === 1 ? "día restante" : "días restantes"}
                 </span>
               </Link>
             )}
+            <div className="h-4 w-px bg-border/80" />
             <ThemeToggle />
-            <div className="h-4 w-px bg-border" />
+            <div className="h-4 w-px bg-border/80" />
             <button
               onClick={() => {
                 localStorage.clear();
                 router.replace("/login");
               }}
-              className="group flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
+              className="group flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
             >
               <LogOut className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
               Salir
