@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useAudioRecording } from "@/context/AudioRecordingContext";
 import { formatSeconds } from "@/lib/utils";
-import { Loader2, Square, ExternalLink, AlertCircle, X } from "lucide-react";
+import { Loader2, Square, ExternalLink, AlertCircle, X, VolumeX } from "lucide-react";
 
 export default function PersistentRecordingBar() {
   const {
@@ -16,6 +16,8 @@ export default function PersistentRecordingBar() {
     recordingNumeroSesion,
     isUploading,
     uploadError,
+    silenceWarning,
+    dismissSilenceWarning,
     stopRecording,
     clearUploadError,
   } = useAudioRecording();
@@ -34,6 +36,25 @@ export default function PersistentRecordingBar() {
       aria-label="Estado de grabación de sesión activa"
       className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-xl animate-in slide-in-from-bottom-5 duration-300"
     >
+      {/* Banner de cuenta regresiva por silencio */}
+      {silenceWarning?.active && (
+        <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/15 p-3 text-xs text-amber-950 backdrop-blur-xl shadow-lg dark:bg-amber-950/80 dark:text-amber-200 animate-in fade-in-50">
+          <div className="flex items-center gap-2 min-w-0">
+            <VolumeX className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 animate-pulse" />
+            <span className="truncate">
+              Llamada en silencio. Finalizando en <strong>{silenceWarning.remainingSeconds}s</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={dismissSilenceWarning}
+            className="shrink-0 rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-amber-700 transition-all cursor-pointer"
+          >
+            Continuar grabando
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3.5 rounded-2xl border border-red-500/30 bg-background/95 p-3.5 sm:px-5 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10">
         {/* Info & Timer */}
         <div className="flex items-center gap-3 w-full sm:w-auto">

@@ -23,6 +23,11 @@ export interface RemoteRecordingResult {
   message?: string;
 }
 
+export interface SilenceWarningState {
+  active: boolean;
+  remainingSeconds: number;
+}
+
 interface AudioRecordingContextType {
   isRecording: boolean;
   isRemote: boolean;
@@ -36,10 +41,50 @@ interface AudioRecordingContextType {
   lastUploadedSessionId: string | number | null;
   tabAudioActive: boolean;
   micAudioActive: boolean;
+  silenceWarning: SilenceWarningState;
+  dismissSilenceWarning: () => void;
   startRecording: (params: StartRecordingParams) => Promise<boolean>;
   startRemoteRecording: (params: StartRecordingParams) => Promise<RemoteRecordingResult>;
   stopRecording: () => Promise<boolean>;
   clearUploadError: () => void;
+}
+
+function notifySessionEnded(pacienteNombre: string | null) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission === "granted" && document.hidden) {
+    try {
+      new Notification("Psiconex — Sesión finalizada", {
+        body: pacienteNombre
+          ? `La llamada con ${pacienteNombre} terminó y la sesión se está procesando con IA.`
+          : "La videollamada ha terminado y la sesión se está procesando con IA.",
+        icon: "/logo-psiconex-sidebar.png",
+      });
+    } catch {
+      // Ignorar si falla la notificación
+    }
+  }
+}
+
+function playAlertChime() {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.6);
+  } catch {
+    // Ignorar si el navegador bloquea audio sin gesto
+  }
 }
 
 const AudioRecordingContext = createContext<AudioRecordingContextType | null>(null);
@@ -88,6 +133,10 @@ export function AudioRecordingProvider({
   const [lastUploadedSessionId, setLastUploadedSessionId] = useState<
     string | number | null
   >(null);
+  const [silenceWarning, setSilenceWarning] = useState<SilenceWarningState>({
+    active: false,
+    remainingSeconds: 0,
+  });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -97,6 +146,11 @@ export function AudioRecordingProvider({
   const elapsedRef = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const sessionIdRef = useRef<string | number | null>(null);
+
+  const continuousSilenceSecondsRef = useRef(0);
+  const silenceCountdownRef = useRef(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const stopRecordingRef = useRef<() => Promise<boolean>>(() => Promise.resolve(true));
 
   // Keep ref updated
   useEffect(() => {
@@ -163,6 +217,33 @@ export function AudioRecordingProvider({
     },
     []
   );
+
+  const stopRecording = useCallback(async () => {
+    continuousSilenceSecondsRef.current = 0;
+    silenceCountdownRef.current = 0;
+    setSilenceWarning({ active: false, remainingSeconds: 0 });
+    analyserRef.current = null;
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
+
+  const dismissSilenceWarning = useCallback(() => {
+    continuousSilenceSecondsRef.current = 0;
+    silenceCountdownRef.current = 0;
+    setSilenceWarning({ active: false, remainingSeconds: 0 });
+  }, []);
 
   const startRecording = useCallback(
     async ({
@@ -252,6 +333,10 @@ export function AudioRecordingProvider({
           };
         }
 
+        if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
+
         // 1. Pedir compartir pantalla completa o pestaña con audio
         let displayStream: MediaStream;
         try {
@@ -313,6 +398,12 @@ export function AudioRecordingProvider({
         tabSource.connect(destination);
         micSource.connect(destination);
 
+        // Conectar AnalyserNode para monitorear silencio de la sesión remota
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        destination.connect(analyser);
+        analyserRef.current = analyser;
+
         const mixedStream = destination.stream;
         const mimeType = getAudioMimeType();
         const rec = new MediaRecorder(mixedStream, mimeType ? { mimeType } : undefined);
@@ -332,11 +423,17 @@ export function AudioRecordingProvider({
         setTabAudioActive(true);
         setMicAudioActive(true);
 
-        // Si el psicólogo finaliza la compartición desde Chrome:
-        displayStream.getVideoTracks().forEach((track) => {
-          track.onended = () => {
-            setTabAudioActive(false);
-          };
+        // Si el psicólogo cierra la pestaña o finaliza la compartición desde el navegador:
+        const handleDisplayTrackEnded = () => {
+          setTabAudioActive(false);
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            stopRecordingRef.current();
+            notifySessionEnded(pacienteNombre);
+          }
+        };
+
+        displayStream.getTracks().forEach((track) => {
+          track.onended = handleDisplayTrackEnded;
         });
 
         rec.ondataavailable = (e) => {
@@ -348,6 +445,11 @@ export function AudioRecordingProvider({
           const currentMime = rec.mimeType || "audio/webm";
           const currentChunks = [...chunksRef.current];
           const targetId = sessionIdRef.current;
+
+          analyserRef.current = null;
+          continuousSilenceSecondsRef.current = 0;
+          silenceCountdownRef.current = 0;
+          setSilenceWarning({ active: false, remainingSeconds: 0 });
 
           mixedStream.getTracks().forEach((t) => t.stop());
           displayStream.getTracks().forEach((t) => t.stop());
@@ -375,12 +477,68 @@ export function AudioRecordingProvider({
         rec.start(1000);
         setIsRecording(true);
         setElapsed(0);
+        continuousSilenceSecondsRef.current = 0;
+        silenceCountdownRef.current = 0;
 
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
           setElapsed((prev) => {
             const next = prev + 1;
             elapsedRef.current = next;
+
+            // 1. Techo máximo de seguridad (75 minutos = 4500 segundos)
+            if (next >= 4500) {
+              stopRecordingRef.current();
+              notifySessionEnded(pacienteNombre);
+              return next;
+            }
+
+            // 2. Monitoreo de silencio continuo en videollamada remota
+            if (analyserRef.current) {
+              try {
+                const buffer = new Float32Array(analyserRef.current.fftSize);
+                analyserRef.current.getFloatTimeDomainData(buffer);
+                let sumSquares = 0;
+                for (let i = 0; i < buffer.length; i++) {
+                  sumSquares += buffer[i] * buffer[i];
+                }
+                const rms = Math.sqrt(sumSquares / buffer.length);
+
+                // Si se detecta señal audible (RMS > 0.01)
+                if (rms > 0.01) {
+                  continuousSilenceSecondsRef.current = 0;
+                  if (silenceCountdownRef.current > 0) {
+                    silenceCountdownRef.current = 0;
+                    setSilenceWarning({ active: false, remainingSeconds: 0 });
+                  }
+                } else {
+                  continuousSilenceSecondsRef.current += 1;
+                  // Si hay 3 minutos continuos de silencio (180 segundos):
+                  if (continuousSilenceSecondsRef.current >= 180) {
+                    if (silenceCountdownRef.current === 0) {
+                      silenceCountdownRef.current = 30;
+                      playAlertChime();
+                      setSilenceWarning({ active: true, remainingSeconds: 30 });
+                    } else {
+                      silenceCountdownRef.current -= 1;
+                      if (silenceCountdownRef.current <= 0) {
+                        stopRecordingRef.current();
+                        notifySessionEnded(pacienteNombre);
+                        setSilenceWarning({ active: false, remainingSeconds: 0 });
+                      } else {
+                        setSilenceWarning({
+                          active: true,
+                          remainingSeconds: silenceCountdownRef.current,
+                        });
+                      }
+                    }
+                  }
+                }
+              } catch {
+                // Si falla la lectura del buffer, ignorar
+              }
+            }
+
             return next;
           });
         }, 1000);
@@ -398,18 +556,6 @@ export function AudioRecordingProvider({
     },
     [uploadAudioBlob]
   );
-
-  const stopRecording = useCallback(async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setIsRecording(false);
-    return true;
-  }, []);
 
   const clearUploadError = useCallback(() => {
     setUploadError(null);
@@ -430,6 +576,8 @@ export function AudioRecordingProvider({
         lastUploadedSessionId,
         tabAudioActive,
         micAudioActive,
+        silenceWarning,
+        dismissSilenceWarning,
         startRecording,
         startRemoteRecording,
         stopRecording,
