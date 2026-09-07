@@ -1100,13 +1100,15 @@ export default function PacienteDetailPage() {
   return (
     <div className="space-y-6">
       {/* Back navigation */}
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="-ml-1 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a pacientes
-      </button>
+      <div className="sticky top-14 md:top-16 z-10 -mx-4 -mt-4 mb-4 px-4 py-2.5 bg-background/90 backdrop-blur-md border-b border-border/40 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between">
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-95"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver a Pacientes
+        </button>
+      </div>
 
       {/* Patient header */}
       <div className="rounded-xl border border-border/60 bg-card shadow-card overflow-hidden">
