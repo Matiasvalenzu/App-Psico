@@ -32,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { ClientPortal } from "@/components/ui/ClientPortal";
 
 type AgendaEstado =
   | "PROGRAMADA"
@@ -174,6 +175,7 @@ export default function AgendaPage() {
   const [disponibilidad, setDisponibilidad] = useState<DisponibilidadBloque[]>([]);
   const [showDisponibilidad, setShowDisponibilidad] = useState(false);
   const [dispSaving, setDispSaving] = useState(false);
+  const [dispError, setDispError] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [instruccionesReserva, setInstruccionesReserva] = useState("");
   const [instruccionesSaving, setInstruccionesSaving] = useState(false);
@@ -351,6 +353,7 @@ export default function AgendaPage() {
         const data = await res.json();
         setPerfilPublico(data);
         setInstruccionesReserva(data.instrucciones_reserva || "");
+        await loadDisponibilidad();
         setSuccess("Perfil público creado. Configura tu disponibilidad semanal.");
       }
     } catch {
@@ -411,32 +414,55 @@ export default function AgendaPage() {
     } catch { /* silent */ }
   }
 
+  async function openDisponibilidadModal() {
+    setDispError("");
+    await loadDisponibilidad();
+    setShowDisponibilidad(true);
+  }
+
   const DIAS_SEMANA_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
   async function addDisponibilidad(dia: number, horaInicio: string, horaFin: string) {
     setDispSaving(true);
+    setDispError("");
     try {
       const res = await apiFetch("/agenda/disponibilidad/", {
         method: "POST",
         body: JSON.stringify({ dia_semana: dia, hora_inicio: horaInicio, hora_fin: horaFin }),
       });
-      if (res.ok) await loadDisponibilidad();
-      else {
+      if (res.ok) {
+        await loadDisponibilidad();
+      } else {
         const data = await res.json().catch(() => ({}));
-        setError(data?.hora_fin?.[0] || data?.non_field_errors?.[0] || "Error al agregar bloque.");
+        const msg =
+          data?.hora_inicio?.[0] ||
+          data?.hora_fin?.[0] ||
+          data?.non_field_errors?.[0] ||
+          data?.detail ||
+          data?.error ||
+          "Error al agregar bloque de disponibilidad.";
+        setDispError(msg);
       }
     } catch {
-      setError("Error al agregar bloque.");
+      setDispError("Error al agregar bloque.");
     } finally {
       setDispSaving(false);
     }
   }
 
   async function deleteDisponibilidad(id: number) {
+    setDispError("");
     try {
-      await apiFetch(`/agenda/disponibilidad/${id}/`, { method: "DELETE" });
-      await loadDisponibilidad();
-    } catch { /* silent */ }
+      const res = await apiFetch(`/agenda/disponibilidad/${id}/`, { method: "DELETE" });
+      if (res.ok) {
+        await loadDisponibilidad();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDispError(data?.detail || "No se pudo eliminar el bloque.");
+      }
+    } catch {
+      setDispError("Error al eliminar el bloque.");
+    }
   }
 
   function openCreateModal(startDate: Date) {
@@ -842,7 +868,7 @@ export default function AgendaPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowDisponibilidad(!showDisponibilidad)}
+                    onClick={openDisponibilidadModal}
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
                   >
                     <Clock className="h-3.5 w-3.5" />
@@ -1010,7 +1036,8 @@ export default function AgendaPage() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <ClientPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card shadow-card">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <div>
@@ -1285,73 +1312,86 @@ export default function AgendaPage() {
             </form>
           </div>
         </div>
+        </ClientPortal>
       )}
 
       {/* ── Disponibilidad configurator modal ── */}
       {showDisponibilidad && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setShowDisponibilidad(false)}>
-          <div className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-elevated animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Disponibilidad semanal</h2>
-              <button type="button" onClick={() => setShowDisponibilidad(false)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Configura los bloques horarios en que aceptas reservas públicas. Los pacientes solo verán estas horas como disponibles.
-            </p>
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              {DIAS_SEMANA_LABELS.map((label, dia) => {
-                const bloques = disponibilidad.filter((d) => d.dia_semana === dia);
-                return (
-                  <div key={dia} className="rounded-lg border border-border/60 p-3">
-                    <p className="text-sm font-medium mb-2">{label}</p>
-                    {bloques.length > 0 && (
-                      <div className="space-y-1 mb-2">
-                        {bloques.map((b) => (
-                          <div key={b.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-1.5 text-sm">
-                            <span>{b.hora_inicio.slice(0, 5)} — {b.hora_fin.slice(0, 5)}</span>
-                            <button
-                              type="button"
-                              onClick={() => deleteDisponibilidad(b.id)}
-                              className="text-destructive/70 hover:text-destructive text-xs"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const form = e.currentTarget;
-                        const hi = (form.elements.namedItem("hora_inicio") as HTMLInputElement).value;
-                        const hf = (form.elements.namedItem("hora_fin") as HTMLInputElement).value;
-                        if (hi && hf) {
-                          addDisponibilidad(dia, hi, hf);
-                          form.reset();
-                        }
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <input type="time" name="hora_inicio" defaultValue="09:00" className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
-                      <span className="text-xs text-muted-foreground">a</span>
-                      <input type="time" name="hora_fin" defaultValue="18:00" className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
-                      <button
-                        type="submit"
-                        disabled={dispSaving}
-                        className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        <ClientPortal>
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setShowDisponibilidad(false)}>
+            <div className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-elevated animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Disponibilidad semanal</h2>
+                <button type="button" onClick={() => setShowDisponibilidad(false)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configura los bloques horarios en que aceptas reservas públicas. Los pacientes solo verán estas horas como disponibles.
+              </p>
+              {dispError && (
+                <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive flex items-center justify-between">
+                  <span>{dispError}</span>
+                  <button type="button" onClick={() => setDispError("")} className="hover:opacity-75">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {DIAS_SEMANA_LABELS.map((label, dia) => {
+                  const bloques = disponibilidad.filter((d) => d.dia_semana === dia);
+                  return (
+                    <div key={dia} className="rounded-lg border border-border/60 p-3">
+                      <p className="text-sm font-medium mb-2">{label}</p>
+                      {bloques.length > 0 && (
+                        <div className="space-y-1 mb-2">
+                          {bloques.map((b) => (
+                            <div key={b.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-1.5 text-sm">
+                              <span>{b.hora_inicio.slice(0, 5)} — {b.hora_fin.slice(0, 5)}</span>
+                              <button
+                                type="button"
+                                onClick={() => deleteDisponibilidad(b.id)}
+                                className="text-destructive/70 hover:text-destructive text-xs p-1"
+                                title="Eliminar bloque"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
+                          const hi = (form.elements.namedItem("hora_inicio") as HTMLInputElement).value;
+                          const hf = (form.elements.namedItem("hora_fin") as HTMLInputElement).value;
+                          if (hi && hf) {
+                            addDisponibilidad(dia, hi, hf);
+                            form.reset();
+                          }
+                        }}
+                        className="flex items-center gap-2"
                       >
-                        {dispSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                      </button>
-                    </form>
-                  </div>
-                );
-              })}
+                        <input type="time" name="hora_inicio" defaultValue={bloques.length > 0 ? "" : "09:00"} required className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+                        <span className="text-xs text-muted-foreground">a</span>
+                        <input type="time" name="hora_fin" defaultValue={bloques.length > 0 ? "" : "18:00"} required className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+                        <button
+                          type="submit"
+                          disabled={dispSaving}
+                          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          title="Agregar bloque"
+                        >
+                          {dispSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                        </button>
+                      </form>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        </ClientPortal>
       )}
 
       <style jsx global>{`

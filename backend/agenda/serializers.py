@@ -243,8 +243,8 @@ class ReservaPublicaSerializer(serializers.Serializer):
             whatsapp = normalizar_telefono(attrs.get("whatsapp", ""))
             attrs["whatsapp"] = whatsapp
             attrs["rut"] = normalizar_rut(attrs.get("rut", ""))
+        
         return attrs
-
 
 
 # ─── Cálculo de slots ────────────────────────────────────────────────
@@ -362,10 +362,32 @@ class DisponibilidadSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         hora_inicio = attrs.get("hora_inicio")
         hora_fin = attrs.get("hora_fin")
+        dia_semana = attrs.get("dia_semana")
         if hora_inicio and hora_fin and hora_inicio >= hora_fin:
             raise serializers.ValidationError(
                 {"hora_fin": "La hora de fin debe ser posterior a la hora de inicio."}
             )
+
+        request = self.context.get("request")
+        if request and request.user and request.user.is_authenticated:
+            qs = AgendaDisponibilidad.objects.filter(
+                psicologo=request.user,
+                dia_semana=dia_semana,
+            )
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+
+            if qs.filter(hora_inicio=hora_inicio).exists():
+                raise serializers.ValidationError(
+                    {"hora_inicio": "Ya existe un bloque con esta hora de inicio para este día."}
+                )
+
+            solapados = qs.filter(hora_inicio__lt=hora_fin, hora_fin__gt=hora_inicio)
+            if solapados.exists():
+                raise serializers.ValidationError(
+                    {"non_field_errors": ["El bloque horario se solapa con otro horario ya configurado para este día."]}
+                )
+
         return attrs
 
 

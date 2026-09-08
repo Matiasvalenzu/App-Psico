@@ -4,7 +4,7 @@ from datetime import timedelta
 from urllib.parse import quote, urlencode
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -233,6 +233,7 @@ class AgendaCitaViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+
     def _parse_datetime_param(self, value):
         if not value:
             return None
@@ -324,7 +325,12 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
         return AgendaDisponibilidad.objects.filter(psicologo=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(psicologo=self.request.user)
+        try:
+            serializer.save(psicologo=self.request.user)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Ya existe un bloque con esta hora de inicio para este día."]}
+            )
 
 
 @api_view(["GET", "PATCH", "POST"])
@@ -782,3 +788,5 @@ def google_calendar_sync(request):
 def google_calendar_disconnect(request):
     disconnect_google_calendar(request.user)
     return Response({"connected": False})
+
+
