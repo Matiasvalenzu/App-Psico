@@ -333,10 +333,20 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
             )
 
 
-@api_view(["GET", "PATCH", "POST"])
+@api_view(["GET", "PATCH", "POST", "DELETE"])
 @permission_classes([IsAuthenticated])
 def perfil_publico_interno(request):
-    """GET: obtener perfil público. PATCH: actualizar. POST: crear si no existe."""
+    """GET: obtener perfil público. PATCH: actualizar. POST: crear si no existe. DELETE: resetear perfil y disponibilidad."""
+    if request.method == "DELETE":
+        try:
+            perfil = request.user.agenda_perfil_publico
+            perfil.delete()
+        except AgendaPerfilPublico.DoesNotExist:
+            pass
+        AgendaDisponibilidad.objects.filter(psicologo=request.user).delete()
+        AgendaBloqueo.objects.filter(psicologo=request.user).delete()
+        return Response({"existe": False, "detail": "Perfil público y disponibilidad eliminados exitosamente."})
+
     if request.method == "GET":
         try:
             perfil = request.user.agenda_perfil_publico

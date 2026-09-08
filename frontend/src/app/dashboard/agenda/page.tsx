@@ -14,6 +14,7 @@ import type {
   EventInput,
 } from "@fullcalendar/core";
 import {
+  AlertTriangle,
   CalendarDays,
   Check,
   ChevronLeft,
@@ -25,6 +26,7 @@ import {
   Loader2,
   Link2,
   MessageCircle,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -176,6 +178,12 @@ export default function AgendaPage() {
   const [showDisponibilidad, setShowDisponibilidad] = useState(false);
   const [dispSaving, setDispSaving] = useState(false);
   const [dispError, setDispError] = useState("");
+  const [editingDispId, setEditingDispId] = useState<number | null>(null);
+  const [editHoraInicio, setEditHoraInicio] = useState("");
+  const [editHoraFin, setEditHoraFin] = useState("");
+  const [dispUpdating, setDispUpdating] = useState(false);
+  const [showDeletePerfilModal, setShowDeletePerfilModal] = useState(false);
+  const [deletingPerfil, setDeletingPerfil] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [instruccionesReserva, setInstruccionesReserva] = useState("");
   const [instruccionesSaving, setInstruccionesSaving] = useState(false);
@@ -416,8 +424,79 @@ export default function AgendaPage() {
 
   async function openDisponibilidadModal() {
     setDispError("");
+    setEditingDispId(null);
     await loadDisponibilidad();
     setShowDisponibilidad(true);
+  }
+
+  function startEditingDisponibilidad(b: DisponibilidadBloque) {
+    setDispError("");
+    setEditingDispId(b.id);
+    setEditHoraInicio(b.hora_inicio.slice(0, 5));
+    setEditHoraFin(b.hora_fin.slice(0, 5));
+  }
+
+  function cancelEditingDisponibilidad() {
+    setEditingDispId(null);
+    setEditHoraInicio("");
+    setEditHoraFin("");
+  }
+
+  async function saveEditingDisponibilidad(id: number, dia: number) {
+    if (!editHoraInicio || !editHoraFin) return;
+    setDispUpdating(true);
+    setDispError("");
+    try {
+      const res = await apiFetch(`/agenda/disponibilidad/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ dia_semana: dia, hora_inicio: editHoraInicio, hora_fin: editHoraFin }),
+      });
+      if (res.ok) {
+        await loadDisponibilidad();
+        cancelEditingDisponibilidad();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          data?.hora_inicio?.[0] ||
+          data?.hora_fin?.[0] ||
+          data?.non_field_errors?.[0] ||
+          data?.detail ||
+          data?.error ||
+          "Error al actualizar bloque de disponibilidad.";
+        setDispError(msg);
+      }
+    } catch {
+      setDispError("Error al conectar con el servidor.");
+    } finally {
+      setDispUpdating(false);
+    }
+  }
+
+  async function eliminarPerfilPublico() {
+    setDeletingPerfil(true);
+    setError("");
+    try {
+      const res = await apiFetch("/agenda/perfil-publico/", { method: "DELETE" });
+      if (res.ok) {
+        setPerfilPublico({
+          existe: false,
+          activo: false,
+          nombre_publico: "",
+          url_reserva: "",
+          instrucciones_reserva: "",
+        });
+        setDisponibilidad([]);
+        setShowDeletePerfilModal(false);
+        setSuccess("Enlace público eliminado. Puedes volver a generarlo cuando lo desees.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.detail || "No se pudo eliminar el enlace público.");
+      }
+    } catch {
+      setError("Error al conectar con el servidor para eliminar el enlace.");
+    } finally {
+      setDeletingPerfil(false);
+    }
   }
 
   const DIAS_SEMANA_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -873,6 +952,14 @@ export default function AgendaPage() {
                   >
                     <Clock className="h-3.5 w-3.5" />
                     Configurar disponibilidad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePerfilModal(true)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/15"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Eliminar enlace
                   </button>
                 </div>
                 <div className="mt-3 border-t border-border/60 pt-3">
@@ -1341,21 +1428,91 @@ export default function AgendaPage() {
                 {DIAS_SEMANA_LABELS.map((label, dia) => {
                   const bloques = disponibilidad.filter((d) => d.dia_semana === dia);
                   return (
-                    <div key={dia} className="rounded-lg border border-border/60 p-3">
-                      <p className="text-sm font-medium mb-2">{label}</p>
+                    <div key={dia} className="rounded-xl border border-border/70 bg-card/60 p-3.5 shadow-2xs">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <p className="text-sm font-semibold text-foreground">{label}</p>
+                        {bloques.length > 0 && (
+                          <span className="text-[11px] text-muted-foreground">
+                            {bloques.length} {bloques.length === 1 ? "bloque activo" : "bloques activos"}
+                          </span>
+                        )}
+                      </div>
                       {bloques.length > 0 && (
-                        <div className="space-y-1 mb-2">
+                        <div className="space-y-2 mb-3">
                           {bloques.map((b) => (
-                            <div key={b.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-1.5 text-sm">
-                              <span>{b.hora_inicio.slice(0, 5)} — {b.hora_fin.slice(0, 5)}</span>
-                              <button
-                                type="button"
-                                onClick={() => deleteDisponibilidad(b.id)}
-                                className="text-destructive/70 hover:text-destructive text-xs p-1"
-                                title="Eliminar bloque"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                            <div
+                              key={b.id}
+                              className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm shadow-xs transition-colors"
+                            >
+                              {editingDispId === b.id ? (
+                                <div className="flex flex-1 items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={editHoraInicio}
+                                    onChange={(e) => setEditHoraInicio(e.target.value)}
+                                    className="rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                    required
+                                  />
+                                  <span className="text-xs text-muted-foreground">a</span>
+                                  <input
+                                    type="time"
+                                    value={editHoraFin}
+                                    onChange={(e) => setEditHoraFin(e.target.value)}
+                                    className="rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                    required
+                                  />
+                                  <div className="flex items-center gap-1 ml-auto">
+                                    <button
+                                      type="button"
+                                      onClick={() => saveEditingDisponibilidad(b.id, dia)}
+                                      disabled={dispUpdating}
+                                      className="rounded-md bg-primary p-1.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                      title="Guardar cambios"
+                                    >
+                                      {dispUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditingDisponibilidad}
+                                      disabled={dispUpdating}
+                                      className="rounded-md border border-border bg-background p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                      title="Cancelar"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+                                    <span className="font-semibold text-foreground tracking-wide">
+                                      {b.hora_inicio.slice(0, 5)} — {b.hora_fin.slice(0, 5)}
+                                    </span>
+                                    <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                      Horario activo
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingDisponibilidad(b)}
+                                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                                      title="Modificar horario"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteDisponibilidad(b.id)}
+                                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                      title="Eliminar horario"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1371,23 +1528,82 @@ export default function AgendaPage() {
                             form.reset();
                           }
                         }}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 pt-1"
                       >
-                        <input type="time" name="hora_inicio" defaultValue={bloques.length > 0 ? "" : "09:00"} required className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
-                        <span className="text-xs text-muted-foreground">a</span>
-                        <input type="time" name="hora_fin" defaultValue={bloques.length > 0 ? "" : "18:00"} required className="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+                        <input type="time" name="hora_inicio" defaultValue={bloques.length > 0 ? "" : "09:00"} required className="rounded-md border border-border bg-background px-2.5 py-1.5 text-sm" />
+                        <span className="text-xs text-muted-foreground font-medium">a</span>
+                        <input type="time" name="hora_fin" defaultValue={bloques.length > 0 ? "" : "18:00"} required className="rounded-md border border-border bg-background px-2.5 py-1.5 text-sm" />
                         <button
                           type="submit"
                           disabled={dispSaving}
-                          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                          title="Agregar bloque"
+                          className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 ml-auto"
+                          title="Agregar nuevo bloque"
                         >
                           {dispSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                          <span>Agregar</span>
                         </button>
                       </form>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        </ClientPortal>
+      )}
+
+      {/* ── Modal confirmación eliminar perfil público ── */}
+      {showDeletePerfilModal && (
+        <ClientPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => !deletingPerfil && setShowDeletePerfilModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-elevated animate-fade-in-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    ¿Eliminar enlace de reserva pública?
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Esta acción desactivará y eliminará tu enlace público actual junto con su configuración de disponibilidad.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 p-3.5 text-xs text-destructive leading-relaxed">
+                <p className="font-semibold mb-1.5">Ten en cuenta:</p>
+                <ul className="list-disc list-inside space-y-1 text-[11px] opacity-90">
+                  <li>Los pacientes que ya tengan guardado este enlace no podrán volver a agendar con él.</li>
+                  <li>Si luego generas otro enlace, cambiará la dirección web y tendrás que compartir la nueva URL.</li>
+                  <li>Tus citas agendadas y fichas de pacientes <strong>no</strong> se verán afectadas.</li>
+                </ul>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeletePerfilModal(false)}
+                  disabled={deletingPerfil}
+                  className="rounded-lg border border-border px-4 py-2 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={eliminarPerfilPublico}
+                  disabled={deletingPerfil}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-4 py-2 text-xs font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+                >
+                  {deletingPerfil ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Eliminar definitivamente
+                </button>
               </div>
             </div>
           </div>
