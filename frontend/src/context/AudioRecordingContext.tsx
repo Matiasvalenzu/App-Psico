@@ -322,6 +322,8 @@ export function AudioRecordingProvider({
       pacienteNombre = "Paciente",
       numeroSesion = null,
     }: StartRecordingParams): Promise<RemoteRecordingResult> => {
+      let displayStream: MediaStream | null = null;
+      let micStream: MediaStream | null = null;
       try {
         setUploadError(null);
 
@@ -338,7 +340,6 @@ export function AudioRecordingProvider({
         }
 
         // 1. Pedir compartir pantalla completa o pestaña con audio
-        let displayStream: MediaStream;
         try {
           const displayMediaOptions: any = {
             video: {
@@ -374,7 +375,6 @@ export function AudioRecordingProvider({
         }
 
         // 2. Capturar micrófono del psicólogo
-        let micStream: MediaStream;
         try {
           micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } catch (micErr: any) {
@@ -391,17 +391,26 @@ export function AudioRecordingProvider({
         const audioCtx = new AudioCtxClass();
         audioContextRef.current = audioCtx;
 
+        if (audioCtx.state === "suspended") {
+          await audioCtx.resume();
+        }
+
         const destination = audioCtx.createMediaStreamDestination();
         const tabSource = audioCtx.createMediaStreamSource(displayStream);
         const micSource = audioCtx.createMediaStreamSource(micStream);
 
-        tabSource.connect(destination);
-        micSource.connect(destination);
+        // Mezclar ambas fuentes de audio en un nodo de ganancia (mixer)
+        const mixer = audioCtx.createGain();
+        tabSource.connect(mixer);
+        micSource.connect(mixer);
 
-        // Conectar AnalyserNode para monitorear silencio de la sesión remota
+        // Enviar la mezcla al destino para la grabación (destination es un sink sin salidas)
+        mixer.connect(destination);
+
+        // Conectar AnalyserNode al mezclador para monitorear silencio de la llamada
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 512;
-        destination.connect(analyser);
+        mixer.connect(analyser);
         analyserRef.current = analyser;
 
         const mixedStream = destination.stream;
@@ -452,8 +461,8 @@ export function AudioRecordingProvider({
           setSilenceWarning({ active: false, remainingSeconds: 0 });
 
           mixedStream.getTracks().forEach((t) => t.stop());
-          displayStream.getTracks().forEach((t) => t.stop());
-          micStream.getTracks().forEach((t) => t.stop());
+          displayStream?.getTracks().forEach((t) => t.stop());
+          micStream?.getTracks().forEach((t) => t.stop());
           if (audioCtx.state !== "closed") {
             audioCtx.close().catch(() => {});
           }
@@ -546,6 +555,16 @@ export function AudioRecordingProvider({
         return { success: true };
       } catch (err: any) {
         console.error("Error al iniciar grabación remota:", err);
+        if (displayStream) {
+          (displayStream as MediaStream).getTracks().forEach((t) => t.stop());
+        }
+        if (micStream) {
+          (micStream as MediaStream).getTracks().forEach((t) => t.stop());
+        }
+        if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+          audioContextRef.current.close().catch(() => {});
+          audioContextRef.current = null;
+        }
         setUploadError("Error al iniciar la grabación remota.");
         return {
           success: false,
