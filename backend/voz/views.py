@@ -21,6 +21,19 @@ class VoiceProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return VoiceProfile.objects.filter(user=self.request.user)
 
+    @action(detail=False, methods=["delete", "post"])
+    def reset(self, request):
+        deleted_count, _ = VoiceProfile.objects.filter(user=request.user).delete()
+        if deleted_count > 0:
+            return Response(
+                {"detail": "Perfil de voz eliminado correctamente."},
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {"detail": "No se encontró un perfil de voz activo para eliminar."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
     @action(detail=False, methods=["post"])
     def enroll(self, request):
         samples = request.FILES.getlist("samples")
