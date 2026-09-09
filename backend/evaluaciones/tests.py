@@ -78,7 +78,7 @@ class EvaluacionesTestCase(TestCase):
     def test_assign_and_submit_rueda_creencias(self):
         # 1. Psychologist assigns Rueda test
         res = self.client.post(
-            "/evaluaciones/asignaciones/",
+            "/api/evaluaciones/asignaciones/",
             {"paciente": self.paciente.id, "test_slug": RUEDA_CREENCIAS_SLUG},
             format="json",
             secure=True,
@@ -93,7 +93,7 @@ class EvaluacionesTestCase(TestCase):
 
         # 2. Public view load
         public_client = APIClient()
-        pub_res = public_client.get(f"/evaluaciones/publicas/{token}/", secure=True)
+        pub_res = public_client.get(f"/api/evaluaciones/publicas/{token}/", secure=True)
         self.assertEqual(pub_res.status_code, 200)
         self.assertEqual(pub_res.data["test"]["slug"], RUEDA_CREENCIAS_SLUG)
         self.assertEqual(len(pub_res.data["test"]["questions"]), 10)
@@ -104,7 +104,7 @@ class EvaluacionesTestCase(TestCase):
             for i in range(1, 11)
         }
         submit_res = public_client.post(
-            f"/evaluaciones/publicas/{token}/responder/",
+            f"/api/evaluaciones/publicas/{token}/responder/",
             {"respuestas": responses},
             format="json",
             secure=True,
@@ -125,7 +125,7 @@ class EvaluacionesTestCase(TestCase):
 
         # Psychologist starts test immediately (in session / remote)
         res = self.client.post(
-            "/evaluaciones/asignaciones/",
+            "/api/evaluaciones/asignaciones/",
             {
                 "paciente": self.paciente.id,
                 "test_slug": RUEDA_CREENCIAS_SLUG,
@@ -141,7 +141,7 @@ class EvaluacionesTestCase(TestCase):
 
         token = res.data["token"]
         public_client = APIClient()
-        pub_res = public_client.get(f"/evaluaciones/publicas/{token}/", secure=True)
+        pub_res = public_client.get(f"/api/evaluaciones/publicas/{token}/", secure=True)
         self.assertEqual(pub_res.status_code, 200)
 
         responses = {
@@ -149,7 +149,7 @@ class EvaluacionesTestCase(TestCase):
             for i in range(1, 11)
         }
         submit_res = public_client.post(
-            f"/evaluaciones/publicas/{token}/responder/",
+            f"/api/evaluaciones/publicas/{token}/responder/",
             {"respuestas": responses},
             format="json",
             secure=True,
