@@ -81,6 +81,7 @@ class EvaluacionesTestCase(TestCase):
             "/evaluaciones/asignaciones/",
             {"paciente": self.paciente.id, "test_slug": RUEDA_CREENCIAS_SLUG},
             format="json",
+            secure=True,
         )
         self.assertEqual(res.status_code, 201)
         asignacion_id = res.data["id"]
@@ -92,7 +93,7 @@ class EvaluacionesTestCase(TestCase):
 
         # 2. Public view load
         public_client = APIClient()
-        pub_res = public_client.get(f"/evaluaciones/publicas/{token}/")
+        pub_res = public_client.get(f"/evaluaciones/publicas/{token}/", secure=True)
         self.assertEqual(pub_res.status_code, 200)
         self.assertEqual(pub_res.data["test"]["slug"], RUEDA_CREENCIAS_SLUG)
         self.assertEqual(len(pub_res.data["test"]["questions"]), 10)
@@ -106,6 +107,7 @@ class EvaluacionesTestCase(TestCase):
             f"/evaluaciones/publicas/{token}/responder/",
             {"respuestas": responses},
             format="json",
+            secure=True,
         )
         self.assertEqual(submit_res.status_code, 200)
 
@@ -130,6 +132,7 @@ class EvaluacionesTestCase(TestCase):
                 "enviar_email": False,
             },
             format="json",
+            secure=True,
         )
         self.assertEqual(res.status_code, 201)
         self.assertIn("token", res.data)
@@ -138,7 +141,7 @@ class EvaluacionesTestCase(TestCase):
 
         token = res.data["token"]
         public_client = APIClient()
-        pub_res = public_client.get(f"/evaluaciones/publicas/{token}/")
+        pub_res = public_client.get(f"/evaluaciones/publicas/{token}/", secure=True)
         self.assertEqual(pub_res.status_code, 200)
 
         responses = {
@@ -149,6 +152,7 @@ class EvaluacionesTestCase(TestCase):
             f"/evaluaciones/publicas/{token}/responder/",
             {"respuestas": responses},
             format="json",
+            secure=True,
         )
         self.assertEqual(submit_res.status_code, 200)
         self.assertEqual(submit_res.data["paciente_id"], self.paciente.id)
