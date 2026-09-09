@@ -8,12 +8,10 @@ import {
   ArrowRight,
   CheckCircle2,
   ClipboardList,
-  Flame,
   LayoutGrid,
   ListOrdered,
   Loader2,
   Sparkles,
-  Target,
 } from "lucide-react";
 
 interface TestQuestion {
@@ -22,6 +20,7 @@ interface TestQuestion {
   name?: string;
   phrase?: string;
   text: string;
+  description?: string;
   belief?: string;
 }
 
@@ -40,10 +39,7 @@ interface PublicTestPayload {
     scale_info?: {
       min: number;
       max: number;
-      labels: {
-        actual: string;
-        deseado: string;
-      };
+      labels: Record<string, string>;
     };
   };
 }
@@ -56,10 +52,8 @@ export default function PublicTestPage() {
   // Standard radio responses (for Ellis)
   const [responses, setResponses] = useState<Record<string, string>>({});
 
-  // Rueda dual responses: { [questionId]: { actual: number, deseado: number } }
-  const [ruedaResponses, setRuedaResponses] = useState<
-    Record<string, { actual?: number; deseado?: number }>
-  >({});
+  // Rueda single 1-10 present satisfaction: { [questionId]: number }
+  const [ruedaResponses, setRuedaResponses] = useState<Record<string, number>>({});
   const [ruedaStep, setRuedaStep] = useState(0);
   const [ruedaViewAll, setRuedaViewAll] = useState(false);
 
@@ -77,15 +71,14 @@ export default function PublicTestPage() {
     loadTest();
   }, [token]);
 
-  const isRueda = payload?.test?.slug === "rueda-creencias";
+  const isRueda =
+    payload?.test?.slug === "rueda-vida" || payload?.test?.slug === "rueda-creencias";
   const totalQuestions = payload?.test?.questions.length || 0;
 
   const answeredCount = useMemo(() => {
     if (isRueda) {
       return Object.keys(ruedaResponses).filter(
-        (key) =>
-          ruedaResponses[key]?.actual !== undefined &&
-          ruedaResponses[key]?.deseado !== undefined
+        (key) => ruedaResponses[key] !== undefined && ruedaResponses[key] >= 1
       ).length;
     }
     return Object.keys(responses).filter((key) => responses[key]).length;
@@ -114,17 +107,11 @@ export default function PublicTestPage() {
     }
   }
 
-  function handleRuedaSelect(questionId: number, field: "actual" | "deseado", value: number) {
-    setRuedaResponses((prev) => {
-      const current = prev[String(questionId)] || {};
-      return {
-        ...prev,
-        [String(questionId)]: {
-          ...current,
-          [field]: value,
-        },
-      };
-    });
+  function handleRuedaSelect(questionId: number, value: number) {
+    setRuedaResponses((prev) => ({
+      ...prev,
+      [String(questionId)]: value,
+    }));
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -229,9 +216,7 @@ export default function PublicTestPage() {
   if (!test) return null;
 
   const currentQ = test.questions[ruedaStep];
-  const currentQResponses = currentQ ? ruedaResponses[String(currentQ.id)] : null;
-  const isCurrentStepComplete =
-    currentQResponses?.actual !== undefined && currentQResponses?.deseado !== undefined;
+  const currentVal = currentQ ? ruedaResponses[String(currentQ.id)] : undefined;
 
   return (
     <main className="min-h-screen bg-muted/40 px-4 py-8">
@@ -257,7 +242,7 @@ export default function PublicTestPage() {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 text-xs">
             <span className="font-medium text-muted-foreground">
-              Progreso: {answeredCount} de {totalQuestions} creencias completadas
+              Progreso: {answeredCount} de {totalQuestions} {isRueda ? "áreas" : "preguntas"} evaluadas
             </span>
             {isRueda && (
               <button
@@ -273,7 +258,7 @@ export default function PublicTestPage() {
                 ) : (
                   <>
                     <LayoutGrid className="h-3.5 w-3.5" />
-                    Ver todas las creencias
+                    Ver todas las áreas
                   </>
                 )}
               </button>
@@ -289,20 +274,18 @@ export default function PublicTestPage() {
           </div>
         </section>
 
-        {/* RUEDA DE CREENCIAS: Modo Paso a Paso */}
+        {/* RUEDA DE LA VIDA: Modo Paso a Paso */}
         {isRueda && !ruedaViewAll && currentQ && (
           <section className="space-y-6">
             <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-card space-y-6 transition-all duration-200">
               {/* Step indicator header */}
               <div className="flex items-center justify-between border-b border-border/60 pb-4">
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                  Creencia {ruedaStep + 1} de {totalQuestions}
+                <span className="rounded-full bg-cyan-500/15 px-3 py-1 text-xs font-bold text-cyan-700 dark:text-cyan-300">
+                  Área {ruedaStep + 1} de {totalQuestions}
                 </span>
                 <div className="flex gap-1">
                   {test.questions.map((q, idx) => {
-                    const isAnswered =
-                      ruedaResponses[String(q.id)]?.actual !== undefined &&
-                      ruedaResponses[String(q.id)]?.deseado !== undefined;
+                    const isAnswered = ruedaResponses[String(q.id)] !== undefined;
                     return (
                       <button
                         key={q.id}
@@ -310,7 +293,7 @@ export default function PublicTestPage() {
                         onClick={() => setRuedaStep(idx)}
                         className={`h-2.5 rounded-full transition-all cursor-pointer ${
                           idx === ruedaStep
-                            ? "w-6 bg-primary"
+                            ? "w-6 bg-cyan-600 dark:bg-cyan-400"
                             : isAnswered
                             ? "w-2.5 bg-emerald-500"
                             : "w-2.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
@@ -322,77 +305,53 @@ export default function PublicTestPage() {
                 </div>
               </div>
 
-              {/* Belief info */}
+              {/* Area info */}
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-foreground">
-                  {currentQ.name || `Creencia ${currentQ.id}`}
+                  {currentQ.name || `Área ${currentQ.id}`}
                 </h2>
                 {currentQ.phrase && (
-                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
                     <p className="text-sm font-medium italic text-foreground leading-relaxed">
                       &ldquo;{currentQ.phrase}&rdquo;
                     </p>
                   </div>
                 )}
+                {currentQ.description && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {currentQ.description}
+                  </p>
+                )}
               </div>
 
-              {/* Question 1: Presencia Actual (1-10) */}
+              {/* Question: Satisfacción Actual (1-10) */}
               <div className="rounded-xl border border-border/70 bg-muted/20 p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-rose-500" />
+                <div className="flex items-center justify-between">
                   <label className="text-sm font-semibold text-foreground">
-                    1. ¿Qué tan presente o influyente está esta creencia en tu vida hoy?
+                    ¿Cómo evalúas tu satisfacción o situación en esta área hoy?
                   </label>
+                  {currentVal !== undefined && (
+                    <span className="rounded-md bg-cyan-500/20 px-2 py-0.5 text-xs font-bold text-cyan-700 dark:text-cyan-300">
+                      Seleccionado: {currentVal}/10
+                    </span>
+                  )}
                 </div>
                 <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
-                  <span>1 = Nada presente</span>
-                  <span>10 = Totalmente presente</span>
+                  <span>1 = Muy insatisfecho / Crítico</span>
+                  <span>10 = Totalmente pleno / Satisfecho</span>
                 </div>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 pt-1">
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 pt-1">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                    const isSelected = currentQResponses?.actual === val;
+                    const isSelected = currentVal === val;
                     return (
                       <button
                         key={`act-${val}`}
                         type="button"
-                        onClick={() => handleRuedaSelect(currentQ.id, "actual", val)}
-                        className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold transition-all cursor-pointer ${
+                        onClick={() => handleRuedaSelect(currentQ.id, val)}
+                        className={`flex h-12 items-center justify-center rounded-xl border text-sm font-bold transition-all cursor-pointer ${
                           isSelected
-                            ? "border-rose-500 bg-rose-500 text-white shadow-sm scale-105"
-                            : "border-border bg-card text-foreground hover:border-rose-300 hover:bg-rose-50/50 dark:hover:bg-rose-950/30"
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Question 2: Meta terapéutica / deseada (1-10) */}
-              <div className="rounded-xl border border-border/70 bg-muted/20 p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-sky-500" />
-                  <label className="text-sm font-semibold text-foreground">
-                    2. ¿A qué nivel te gustaría reducirla o transformarla como meta personal?
-                  </label>
-                </div>
-                <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
-                  <span>1 = Deseo reducirla al mínimo</span>
-                  <span>10 = Deseo mantenerla igual</span>
-                </div>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 pt-1">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                    const isSelected = currentQResponses?.deseado === val;
-                    return (
-                      <button
-                        key={`des-${val}`}
-                        type="button"
-                        onClick={() => handleRuedaSelect(currentQ.id, "deseado", val)}
-                        className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? "border-sky-500 bg-sky-500 text-white shadow-sm scale-105"
-                            : "border-border bg-card text-foreground hover:border-sky-300 hover:bg-sky-50/50 dark:hover:bg-sky-950/30"
+                            ? "border-cyan-500 bg-cyan-600 text-white shadow-md scale-105"
+                            : "border-border bg-card text-foreground hover:border-cyan-400 hover:bg-cyan-50/50 dark:hover:bg-cyan-950/30"
                         }`}
                       >
                         {val}
@@ -418,14 +377,14 @@ export default function PublicTestPage() {
                   <button
                     type="button"
                     onClick={() => setRuedaStep((prev) => Math.min(totalQuestions - 1, prev + 1))}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-5 py-2.5 text-xs font-semibold text-white shadow-subtle transition-all cursor-pointer"
                   >
                     Siguiente
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 ) : (
                   <span className="text-xs text-muted-foreground font-medium">
-                    Última creencia del cuestionario
+                    Última área del cuestionario
                   </span>
                 )}
               </div>
@@ -433,18 +392,25 @@ export default function PublicTestPage() {
           </section>
         )}
 
-        {/* RUEDA DE CREENCIAS: Modo Ver Todas */}
+        {/* RUEDA DE LA VIDA: Modo Ver Todas */}
         {isRueda && ruedaViewAll && (
           <section className="space-y-4">
             {test.questions.map((q, idx) => {
-              const qResp = ruedaResponses[String(q.id)];
+              const qVal = ruedaResponses[String(q.id)];
               return (
-                <div key={q.id} className="rounded-2xl border border-border/60 bg-card p-5 shadow-card space-y-4">
+                <div key={q.id} className="rounded-2xl border border-border/60 bg-card p-5 shadow-card space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="text-xs font-bold text-primary">Creencia {idx + 1} de {totalQuestions}</span>
+                      <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">
+                        Área {idx + 1} de {totalQuestions}
+                      </span>
                       <h3 className="text-base font-bold text-foreground mt-0.5">{q.name || q.text}</h3>
                     </div>
+                    {qVal !== undefined && (
+                      <span className="rounded-md bg-cyan-500/20 px-2.5 py-0.5 text-xs font-bold text-cyan-700 dark:text-cyan-300">
+                        {qVal}/10
+                      </span>
+                    )}
                   </div>
 
                   {q.phrase && (
@@ -453,50 +419,22 @@ export default function PublicTestPage() {
                     </p>
                   )}
 
-                  {/* Escala 1: Actual */}
+                  {/* Escala 1 a 10 */}
                   <div className="space-y-1.5 pt-1">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="flex items-center gap-1 text-foreground">
-                        <Flame className="h-3.5 w-3.5 text-rose-500" /> Presencia actual:
-                      </span>
-                      <span className="text-muted-foreground text-[11px]">(1 = Mínima, 10 = Máxima)</span>
+                    <div className="flex justify-between text-xs font-medium text-muted-foreground">
+                      <span>1 = Muy insatisfecho</span>
+                      <span>10 = Pleno</span>
                     </div>
-                    <div className="grid grid-cols-10 gap-1">
+                    <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
                         <button
                           key={`act-all-${q.id}-${v}`}
                           type="button"
-                          onClick={() => handleRuedaSelect(q.id, "actual", v)}
-                          className={`h-9 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                            qResp?.actual === v
-                              ? "border-rose-500 bg-rose-500 text-white shadow-xs"
-                              : "border-border bg-background hover:bg-rose-50/40"
-                          }`}
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Escala 2: Deseado */}
-                  <div className="space-y-1.5 pt-1 border-t border-border/40">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="flex items-center gap-1 text-foreground">
-                        <Target className="h-3.5 w-3.5 text-sky-500" /> Meta terapéutica:
-                      </span>
-                      <span className="text-muted-foreground text-[11px]">(1 = Reducir al mín, 10 = Mantener)</span>
-                    </div>
-                    <div className="grid grid-cols-10 gap-1">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-                        <button
-                          key={`des-all-${q.id}-${v}`}
-                          type="button"
-                          onClick={() => handleRuedaSelect(q.id, "deseado", v)}
-                          className={`h-9 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                            qResp?.deseado === v
-                              ? "border-sky-500 bg-sky-500 text-white shadow-xs"
-                              : "border-border bg-background hover:bg-sky-50/40"
+                          onClick={() => handleRuedaSelect(q.id, v)}
+                          className={`h-10 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                            qVal === v
+                              ? "border-cyan-500 bg-cyan-600 text-white shadow-xs scale-105"
+                              : "border-border bg-background hover:bg-cyan-50/40 dark:hover:bg-cyan-950/30"
                           }`}
                         >
                           {v}
@@ -559,13 +497,17 @@ export default function PublicTestPage() {
             <div>
               <p className="text-sm font-medium text-foreground">
                 {isComplete
-                  ? "Todas las creencias han sido evaluadas."
-                  : `Faltan ${totalQuestions - answeredCount} creencias por evaluar.`}
+                  ? isRueda
+                    ? "Todas las áreas de la vida han sido evaluadas."
+                    : "Todas las preguntas han sido respondidas."
+                  : `Faltan ${totalQuestions - answeredCount} ${isRueda ? "áreas" : "preguntas"} por evaluar.`}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isComplete
                   ? "Ya puedes enviar tus respuestas a tu psicólogo/a."
-                  : "Por favor, completa ambas preguntas para cada una de las 10 creencias."}
+                  : isRueda
+                  ? "Califica cada una de las 10 áreas del 1 al 10 según tu situación actual."
+                  : "Por favor, responde todas las preguntas del instrumento."}
               </p>
             </div>
             <button
@@ -582,3 +524,4 @@ export default function PublicTestPage() {
     </main>
   );
 }
+

@@ -196,99 +196,104 @@ ELLIS_TEST = {
 }
 
 
-RUEDA_CREENCIAS_SLUG = "rueda-creencias"
+RUEDA_VIDA_SLUG = "rueda-vida"
+RUEDA_CREENCIAS_SLUG = "rueda-creencias"  # Alias de compatibilidad
 
-RUEDA_CREENCIAS_DIMENSIONS = [
+RUEDA_VIDA_DIMENSIONS = [
     {
         "id": 1,
-        "name": "Necesidad de aprobación",
-        "phrase": "Siento una constante necesidad de ser aprobado y querido por los demás para validar mi propio valor.",
-        "belief": "Para ser feliz y sentirme valioso necesito absolutamente la aprobación y el afecto de las personas que me rodean.",
+        "name": "Salud",
+        "phrase": "¿Cómo evalúas tu salud física, energía y bienestar corporal actualmente?",
+        "description": "Cuidado físico, descanso, vitalidad y salud general.",
     },
     {
         "id": 2,
-        "name": "Perfeccionismo",
-        "phrase": "Me exijo ser completamente impecable y competente en todo lo que hago; equivocarme me resulta inaceptable.",
-        "belief": "Debo ser indefectiblemente competente y perfecto en todo lo que emprendo; los errores son signo de debilidad o fracaso.",
+        "name": "Dinero",
+        "phrase": "¿Cómo evalúas tu tranquilidad financiera y capacidad económica hoy?",
+        "description": "Estabilidad económica, administración de ingresos y solvencia.",
     },
     {
         "id": 3,
-        "name": "Etiquetas/Justiciero",
-        "phrase": "Tiendo a juzgar con dureza a quienes cometen errores o actúan mal, creyendo que merecen castigo severo.",
-        "belief": "Ciertas personas son malas, viles o injustas y deben ser severamente juzgadas y castigadas por sus acciones.",
+        "name": "Trabajo",
+        "phrase": "¿Cómo te sientes con tu ocupación, desarrollo laboral o actividad actual?",
+        "description": "Satisfacción laboral, desarrollo profesional y vocación.",
     },
     {
         "id": 4,
-        "name": "Magnificación",
-        "phrase": "Cuando algo no resulta como esperaba o se frustran mis planes, lo siento como una catástrofe insoportable.",
-        "belief": "Es una desgracia terrible e insoportable cuando las cosas no salen exactamente como a mí me gustaría que fueran.",
+        "name": "Amor",
+        "phrase": "¿Cómo evalúas tu vida sentimental, afectiva o de pareja en este momento?",
+        "description": "Vínculo de pareja, intimidad, apertura afectiva y afecto.",
     },
     {
         "id": 5,
-        "name": "Externalización/Racionalización",
-        "phrase": "Siento que mi malestar o infelicidad son causados solo por factores externos sobre los que no tengo control.",
-        "belief": "La causa de mi malestar y sufrimiento proviene del exterior y de otras personas, por lo que tengo poco o ningún poder para cambiarlo.",
+        "name": "Familia",
+        "phrase": "¿Cómo sientes la calidad y apoyo en tus relaciones familiares hoy?",
+        "description": "Comunicación, armonía y lazos con el núcleo familiar.",
     },
     {
         "id": 6,
-        "name": "Adivinación/Catastrofismo",
-        "phrase": "Pienso frecuentemente en peligros futuros o escenarios negativos, anticipándome constantemente a lo peor.",
-        "belief": "Si algo malo o peligroso puede ocurrir, debo preocuparme continuamente y obsesionarme con esa posibilidad.",
+        "name": "Amigos",
+        "phrase": "¿Cómo evalúas tu vida social y el tiempo que compartes con tus amistades?",
+        "description": "Vida social, lealtad y conexión con tus círculos de pares.",
     },
     {
         "id": 7,
-        "name": "Evitación",
-        "phrase": "Prefiero postergar o eludir los problemas y decisiones difíciles porque enfrentarlos me genera incomodidad.",
-        "belief": "Es más fácil eludir o posponer las dificultades y responsabilidades de la vida que hacerles frente.",
+        "name": "Ocio",
+        "phrase": "¿Cómo evalúas el tiempo que dedicas a divertirte, descansar y desconectar?",
+        "description": "Recreación, pasatiempos, distensión y descanso.",
     },
     {
         "id": 8,
-        "name": "Grandiosidad",
-        "phrase": "Siento que merezco un trato especial, que las cosas deberían ser más fáciles para mí o que necesito a alguien superior que me respalde.",
-        "belief": "Tengo derecho a un trato preferencial o necesito apoyarme en personas más fuertes y con mayor autoridad que yo.",
+        "name": "Hogar",
+        "phrase": "¿Cómo te sientes en tu vivienda, espacio personal y orden del entorno?",
+        "description": "Comodidad habitacional, tranquilidad y ambiente cotidiano.",
     },
     {
         "id": 9,
-        "name": "Sobregeneralización/Influencia del pasado",
-        "phrase": "Creo que los errores y vivencias de mi pasado me condenan y determinan que las cosas seguirán saliendo igual.",
-        "belief": "El pasado determina irreversiblemente mi presente; si algo afectó fuertemente mi vida antes, lo seguirá haciendo siempre.",
+        "name": "Crecimiento personal",
+        "phrase": "¿Cómo sientes tu desarrollo personal, aprendizaje y evolución como persona?",
+        "description": "Autoconocimiento, nuevos aprendizajes, lectura y metas propias.",
     },
     {
         "id": 10,
-        "name": "Hedonismo",
-        "phrase": "Busco la satisfacción o comodidad inmediata por encima de mis metas a largo plazo, rehuyendo del esfuerzo.",
-        "belief": "La verdadera comodidad y bienestar se logran evitando el esfuerzo y eligiendo el placer pasivo o inmediato.",
+        "name": "Espiritualidad",
+        "phrase": "¿Cómo sientes tu paz interior, valores y conexión con el sentido de tu vida?",
+        "description": "Paz mental, coherencia valórica y propósito vital.",
     },
 ]
 
-RUEDA_CREENCIAS_QUESTIONS = [
+RUEDA_CREENCIAS_DIMENSIONS = RUEDA_VIDA_DIMENSIONS
+
+RUEDA_VIDA_QUESTIONS = [
     {
         "id": dim["id"],
         "dimension_id": dim["id"],
         "name": dim["name"],
         "phrase": dim["phrase"],
         "text": f"{dim['name']}: {dim['phrase']}",
-        "belief": dim["belief"],
+        "description": dim["description"],
     }
-    for dim in RUEDA_CREENCIAS_DIMENSIONS
+    for dim in RUEDA_VIDA_DIMENSIONS
 ]
 
-RUEDA_CREENCIAS_TEST = {
-    "slug": RUEDA_CREENCIAS_SLUG,
-    "name": "Rueda de Creencias Limitantes",
-    "short_name": "Rueda de Creencias",
+RUEDA_CREENCIAS_QUESTIONS = RUEDA_VIDA_QUESTIONS
+
+RUEDA_VIDA_TEST = {
+    "slug": RUEDA_VIDA_SLUG,
+    "name": "Rueda de la Vida",
+    "short_name": "Rueda de la Vida",
     "version": "1.0",
-    "duration_minutes": 5,
+    "duration_minutes": 2,
     "tipo_evaluacion": "rueda_polar",
     "description": (
-        "Instrumento reflexivo interactivo basado en las 10 creencias limitantes "
-        "y distorsiones cognitivas centrales (TREC / Beck). Evalúa la presencia actual "
-        "y la meta de transformación deseada de cada creencia en escala del 1 al 10."
+        "Herramienta integral de exploración del bienestar y satisfacción vital en las 10 áreas clave de la vida "
+        "(Salud, Dinero, Trabajo, Amor, Familia, Amigos, Ocio, Hogar, Crecimiento personal y Espiritualidad). "
+        "Evalúa la situación actual del paciente en una escala del 1 al 10 y genera un gráfico de telaraña/radar."
     ),
     "instructions": (
-        "Para cada una de las 10 creencias, reflexiona y responde con dos valores del 1 al 10:\n"
-        "1. Presencia actual: ¿Qué tan presente o influyente está esta creencia en tu vida hoy? (1 = Nada presente, 10 = Totalmente presente).\n"
-        "2. Meta deseada: ¿A qué nivel desearías reducirla o transformarla como objetivo personal? (1 = Eliminar su influencia, 10 = Mantenerla igual)."
+        "Para cada una de las 10 áreas de tu vida, evalúa tu nivel de satisfacción actual en una escala del 1 al 10:\n"
+        "• 1 = Muy insatisfecho / Crítico\n"
+        "• 10 = Totalmente pleno / Satisfecho"
     ),
     "response_options": [
         {"value": str(i), "label": str(i)} for i in range(1, 11)
@@ -297,23 +302,31 @@ RUEDA_CREENCIAS_TEST = {
         "min": 1,
         "max": 10,
         "labels": {
-            "actual": "Presencia actual en mi vida",
-            "deseado": "Meta terapéutica de transformación",
+            "1": "Muy bajo",
+            "10": "Pleno",
         },
     },
-    "questions": RUEDA_CREENCIAS_QUESTIONS,
-    "dimensions": RUEDA_CREENCIAS_DIMENSIONS,
+    "questions": RUEDA_VIDA_QUESTIONS,
+    "dimensions": RUEDA_VIDA_DIMENSIONS,
 }
 
+RUEDA_CREENCIAS_TEST = RUEDA_VIDA_TEST
 
 TESTS = {
-    RUEDA_CREENCIAS_SLUG: RUEDA_CREENCIAS_TEST,
+    RUEDA_VIDA_SLUG: RUEDA_VIDA_TEST,
+    RUEDA_CREENCIAS_SLUG: RUEDA_VIDA_TEST,
     ELLIS_SLUG: ELLIS_TEST,
 }
 
 
 def list_tests():
-    return [without_scoring(test) for test in TESTS.values()]
+    seen = set()
+    result = []
+    for test in TESTS.values():
+        if test["slug"] not in seen:
+            seen.add(test["slug"])
+            result.append(without_scoring(test))
+    return result
 
 
 def get_test(slug):
@@ -329,7 +342,7 @@ def without_scoring(test):
                 "name": question["name"],
                 "phrase": question["phrase"],
                 "text": question["text"],
-                "belief": question["belief"],
+                "description": question.get("description", ""),
             }
             for question in test["questions"]
         ]
@@ -361,20 +374,20 @@ def get_level(score):
     }
 
 
-def get_rueda_level(actual_score):
-    if actual_score >= 8:
+def get_rueda_level(score):
+    if score >= 8:
         return {
             "level": "ALTO",
-            "label": "Creencia predominante / Foco terapéutico prioritario",
+            "label": "Área de fortaleza y alta satisfacción",
         }
-    if actual_score >= 5:
+    if score >= 5:
         return {
             "level": "MODERADO",
-            "label": "Presencia moderada en situaciones específicas",
+            "label": "Nivel funcional con margen de mejora",
         }
     return {
         "level": "BAJO",
-        "label": "Sin impacto limitante significativo",
+        "label": "Área prioritaria de atención clínica",
     }
 
 
@@ -414,54 +427,53 @@ def evaluate_ellis(responses):
     }
 
 
-def evaluate_rueda_creencias(responses):
-    dim_map = {dim["id"]: dim for dim in RUEDA_CREENCIAS_DIMENSIONS}
+def evaluate_rueda_vida(responses):
+    dim_map = {dim["id"]: dim for dim in RUEDA_VIDA_DIMENSIONS}
     dimensions = []
 
     for dim_id, dim in dim_map.items():
-        raw = responses.get(str(dim_id)) or responses.get(dim_id) or {}
+        raw = responses.get(str(dim_id)) or responses.get(dim_id) or 1
         if isinstance(raw, dict):
-            actual = int(raw.get("actual", raw.get("now", 1)))
-            deseado = int(raw.get("deseado", raw.get("meta", raw.get("future", 1))))
+            score = int(raw.get("score", raw.get("actual", raw.get("now", 1))))
         else:
-            actual = int(responses.get(f"{dim_id}_actual", responses.get(f"{dim_id}_now", 1)))
-            deseado = int(responses.get(f"{dim_id}_deseado", responses.get(f"{dim_id}_future", 1)))
+            score = int(raw)
 
-        actual = max(1, min(10, actual))
-        deseado = max(1, min(10, deseado))
-        brecha = actual - deseado  # Grado de cambio o tensión terapéutica
-        level_info = get_rueda_level(actual)
+        score = max(1, min(10, score))
+        level_info = get_rueda_level(score)
 
         dimensions.append(
             {
                 "id": dim["id"],
                 "name": dim["name"],
                 "phrase": dim["phrase"],
-                "belief": dim["belief"],
-                "actual": actual,
-                "deseado": deseado,
-                "brecha": brecha,
-                "score": actual,
+                "description": dim.get("description", ""),
+                "score": score,
+                "actual": score,
+                "deseado": score,
+                "brecha": 0,
                 **level_info,
             }
         )
 
-    sorted_by_actual = sorted(dimensions, key=lambda item: (item["actual"], item["brecha"]), reverse=True)
-    sorted_by_brecha = sorted(dimensions, key=lambda item: (item["brecha"], item["actual"]), reverse=True)
+    sorted_by_score_desc = sorted(dimensions, key=lambda item: item["score"], reverse=True)
+    sorted_by_score_asc = sorted(dimensions, key=lambda item: item["score"])
 
-    total_actual = sum(d["actual"] for d in dimensions)
-    total_deseado = sum(d["deseado"] for d in dimensions)
-    promedio_actual = round(total_actual / len(dimensions), 1)
+    total_score = sum(d["score"] for d in dimensions)
+    promedio_actual = round(total_score / len(dimensions), 1)
 
     return {
-        "test_slug": RUEDA_CREENCIAS_SLUG,
-        "test_name": RUEDA_CREENCIAS_TEST["name"],
-        "total_score": total_actual,
+        "test_slug": RUEDA_VIDA_SLUG,
+        "test_name": RUEDA_VIDA_TEST["name"],
+        "total_score": total_score,
         "max_score": 100,
         "promedio_actual": promedio_actual,
-        "total_deseado": total_deseado,
         "dimensions": dimensions,
-        "highest_dimensions": sorted_by_actual[:3],
-        "highest_gaps": sorted_by_brecha[:3],
+        "highest_dimensions": sorted_by_score_desc[:3],
+        "lowest_dimensions": sorted_by_score_asc[:3],
+        "highest_gaps": sorted_by_score_asc[:3],
     }
+
+
+evaluate_rueda_creencias = evaluate_rueda_vida
+
 

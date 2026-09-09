@@ -6,7 +6,8 @@ from pacientes.models import Paciente
 from evaluaciones.catalog import (
     ELLIS_SLUG,
     RUEDA_CREENCIAS_SLUG,
-    evaluate_rueda_creencias,
+    RUEDA_VIDA_SLUG,
+    evaluate_rueda_vida,
     get_test,
     list_tests,
 )
@@ -38,55 +39,54 @@ class EvaluacionesTestCase(TestCase):
     def test_catalog_contains_both_tests(self):
         tests = list_tests()
         slugs = [t["slug"] for t in tests]
-        self.assertIn(RUEDA_CREENCIAS_SLUG, slugs)
+        self.assertIn(RUEDA_VIDA_SLUG, slugs)
         self.assertIn(ELLIS_SLUG, slugs)
 
-        rueda = get_test(RUEDA_CREENCIAS_SLUG)
-        self.assertEqual(rueda["name"], "Rueda de Creencias Limitantes")
+        rueda = get_test(RUEDA_VIDA_SLUG)
+        self.assertEqual(rueda["name"], "Rueda de la Vida")
         self.assertEqual(len(rueda["dimensions"]), 10)
         self.assertEqual(len(rueda["questions"]), 10)
 
-    def test_evaluate_rueda_creencias_logic(self):
+    def test_evaluate_rueda_vida_logic(self):
         sample_responses = {
-            "1": {"actual": 9, "deseado": 2},  # Necesidad de aprobación: ALTO, brecha 7
-            "2": {"actual": 8, "deseado": 3},  # Perfeccionismo: ALTO, brecha 5
-            "3": {"actual": 4, "deseado": 3},  # Etiquetas: BAJO, brecha 1
-            "4": {"actual": 7, "deseado": 2},  # Magnificación: MODERADO, brecha 5
-            "5": {"actual": 3, "deseado": 2},  # Externalización: BAJO, brecha 1
-            "6": {"actual": 9, "deseado": 1},  # Adivinación: ALTO, brecha 8
-            "7": {"actual": 5, "deseado": 2},  # Evitación: MODERADO, brecha 3
-            "8": {"actual": 2, "deseado": 2},  # Grandiosidad: BAJO, brecha 0
-            "9": {"actual": 6, "deseado": 2},  # Sobregeneralización: MODERADO, brecha 4
-            "10": {"actual": 4, "deseado": 2}, # Hedonismo: BAJO, brecha 2
+            "1": 9,  # Salud: ALTO
+            "2": 8,  # Dinero: ALTO
+            "3": 4,  # Trabajo: BAJO
+            "4": 7,  # Amor: MODERADO
+            "5": 3,  # Familia: BAJO
+            "6": 9,  # Amigos: ALTO
+            "7": 5,  # Ocio: MODERADO
+            "8": 2,  # Hogar: BAJO
+            "9": 6,  # Crecimiento personal: MODERADO
+            "10": 4, # Espiritualidad: BAJO
         }
-        result = evaluate_rueda_creencias(sample_responses)
-        self.assertEqual(result["test_slug"], RUEDA_CREENCIAS_SLUG)
+        result = evaluate_rueda_vida(sample_responses)
+        self.assertEqual(result["test_slug"], RUEDA_VIDA_SLUG)
         self.assertEqual(result["total_score"], 57)
         self.assertEqual(result["promedio_actual"], 5.7)
 
         # Highest dimensions should have scores 9, 9, 8
         highest_ids = [dim["id"] for dim in result["highest_dimensions"]]
-        self.assertIn(1, highest_ids)  # Necesidad de aprobación
-        self.assertIn(6, highest_ids)  # Adivinación/Catastrofismo
-        self.assertIn(2, highest_ids)  # Perfeccionismo
+        self.assertIn(1, highest_ids)  # Salud
+        self.assertIn(6, highest_ids)  # Amigos
+        self.assertIn(2, highest_ids)  # Dinero
 
-        # Check gap calculations
         dim_1 = next(d for d in result["dimensions"] if d["id"] == 1)
-        self.assertEqual(dim_1["brecha"], 7)
+        self.assertEqual(dim_1["score"], 9)
         self.assertEqual(dim_1["level"], "ALTO")
 
-    def test_assign_and_submit_rueda_creencias(self):
+    def test_assign_and_submit_rueda_vida(self):
         # 1. Psychologist assigns Rueda test
         res = self.client.post(
             "/api/evaluaciones/asignaciones/",
-            {"paciente": self.paciente.id, "test_slug": RUEDA_CREENCIAS_SLUG},
+            {"paciente": self.paciente.id, "test_slug": RUEDA_VIDA_SLUG},
             format="json",
             secure=True,
         )
         self.assertEqual(res.status_code, 201)
         asignacion_id = res.data["id"]
         asignacion = EvaluacionAsignada.objects.get(id=asignacion_id)
-        self.assertEqual(asignacion.test_slug, RUEDA_CREENCIAS_SLUG)
+        self.assertEqual(asignacion.test_slug, RUEDA_VIDA_SLUG)
 
         # Extract token from public url
         token = asignacion.enlace_generado.split("/")[-1]
@@ -95,12 +95,12 @@ class EvaluacionesTestCase(TestCase):
         public_client = APIClient()
         pub_res = public_client.get(f"/api/evaluaciones/publicas/{token}/", secure=True)
         self.assertEqual(pub_res.status_code, 200)
-        self.assertEqual(pub_res.data["test"]["slug"], RUEDA_CREENCIAS_SLUG)
+        self.assertEqual(pub_res.data["test"]["slug"], RUEDA_VIDA_SLUG)
         self.assertEqual(len(pub_res.data["test"]["questions"]), 10)
 
-        # 3. Patient submits responses
+        # 3. Patient submits responses (single 1-10 scores)
         responses = {
-            str(i): {"actual": 8 if i in [1, 2] else 4, "deseado": 2}
+            str(i): 8 if i in [1, 2] else 4
             for i in range(1, 11)
         }
         submit_res = public_client.post(
@@ -115,8 +115,8 @@ class EvaluacionesTestCase(TestCase):
         asignacion.refresh_from_db()
         self.assertEqual(asignacion.estado, EvaluacionAsignada.Estado.COMPLETADO)
         self.assertIsNotNone(asignacion.sesion)
-        self.assertEqual(asignacion.sesion.documento_nombre_original, "Rueda de Creencias Limitantes")
-        self.assertEqual(asignacion.resultado.puntajes["test_slug"], RUEDA_CREENCIAS_SLUG)
+        self.assertEqual(asignacion.sesion.documento_nombre_original, "Rueda de la Vida")
+        self.assertEqual(asignacion.resultado.puntajes["test_slug"], RUEDA_VIDA_SLUG)
 
     def test_assign_immediate_in_session_without_email(self):
         # Patient without email
@@ -128,7 +128,7 @@ class EvaluacionesTestCase(TestCase):
             "/api/evaluaciones/asignaciones/",
             {
                 "paciente": self.paciente.id,
-                "test_slug": RUEDA_CREENCIAS_SLUG,
+                "test_slug": RUEDA_VIDA_SLUG,
                 "enviar_email": False,
             },
             format="json",
@@ -145,7 +145,7 @@ class EvaluacionesTestCase(TestCase):
         self.assertEqual(pub_res.status_code, 200)
 
         responses = {
-            str(i): {"actual": 7, "deseado": 3}
+            str(i): 7
             for i in range(1, 11)
         }
         submit_res = public_client.post(

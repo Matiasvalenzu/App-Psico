@@ -14,7 +14,8 @@ interface TestQuestion {
 interface TestDimension {
   id: number;
   name: string;
-  belief: string;
+  belief?: string;
+  description?: string;
   phrase?: string;
   questions?: number[];
 }
@@ -151,23 +152,12 @@ export default function TestsCatalogPage() {
                     {selected.tipo_evaluacion === "rueda_polar" ? (
                       <div className="mt-3 space-y-2 text-xs">
                         <div className="flex items-center justify-between text-muted-foreground">
-                          <span className="font-medium text-foreground">1. Presencia actual:</span>
-                          <span className="text-[11px]">(1 = Mínima, 10 = Totalmente)</span>
+                          <span className="font-medium text-foreground">Satisfacción actual en esta área:</span>
+                          <span className="text-[11px]">(1 = Muy insatisfecho, 10 = Pleno)</span>
                         </div>
                         <div className="grid grid-cols-10 gap-1 text-center">
                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
                             <div key={`act-prev-${v}`} className="rounded border bg-background py-1 text-[11px] font-bold text-muted-foreground">
-                              {v}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between text-muted-foreground pt-1">
-                          <span className="font-medium text-foreground">2. Meta deseada:</span>
-                          <span className="text-[11px]">(1 = Reducirla, 10 = Mantener)</span>
-                        </div>
-                        <div className="grid grid-cols-10 gap-1 text-center">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-                            <div key={`des-prev-${v}`} className="rounded border bg-background py-1 text-[11px] font-bold text-muted-foreground">
                               {v}
                             </div>
                           ))}
@@ -202,12 +192,18 @@ export default function TestsCatalogPage() {
                     </p>
                     {dimension.phrase && (
                       <p className="mt-1 text-xs italic text-muted-foreground">
-                        Frase guía: &ldquo;{dimension.phrase}&rdquo;
+                        Pregunta / Frase: &ldquo;{dimension.phrase}&rdquo;
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      <strong className="text-foreground">Núcleo:</strong> {dimension.belief}
-                    </p>
+                    {dimension.description ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        <strong className="text-foreground">Ámbito:</strong> {dimension.description}
+                      </p>
+                    ) : dimension.belief ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        <strong className="text-foreground">Núcleo:</strong> {dimension.belief}
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>

@@ -795,10 +795,11 @@ export default function SesionDetailPage() {
           {/* Test results (si la sesión es origen test) */}
           {isTest && sesion.resultado_test?.secciones?.length ? (
             <div className="space-y-6">
-              {/* Visualización Gráfica para Rueda de Creencias Limitantes */}
-              {sesion.resultado_test.test_slug === "rueda-creencias" && (
+              {/* Visualización Gráfica para Rueda de la Vida */}
+              {(sesion.resultado_test.test_slug === "rueda-vida" ||
+                sesion.resultado_test.test_slug === "rueda-creencias") && (
                 <div className="space-y-5">
-                  {/* Banner de Creencias Predominantes */}
+                  {/* Banner de Áreas de Fortaleza (Mayor Satisfacción) */}
                   {Array.isArray(sesion.resultado_test.puntajes?.highest_dimensions) &&
                     (sesion.resultado_test.puntajes.highest_dimensions as RuedaDimension[]).length > 0 && (
                       <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-5 shadow-card">
@@ -807,47 +808,96 @@ export default function SesionDetailPage() {
                             <Sparkles className="h-4 w-4" />
                           </span>
                           <h3 className="text-base font-bold text-foreground">
-                            Creencias Predominantes en el Paciente
+                            Áreas de Mayor Satisfacción (Fortalezas Vitales)
                           </h3>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Según las respuestas registradas, el paciente se sitúa principalmente en las siguientes creencias:
+                          Dimensiones que el paciente evaluó con mayor bienestar y recursos de plenitud:
                         </p>
                         <div className="mt-3 grid gap-3 sm:grid-cols-3">
                           {(sesion.resultado_test.puntajes.highest_dimensions as RuedaDimension[]).map(
-                            (dim, idx) => (
-                              <div
-                                key={dim.id}
-                                className="rounded-xl border border-border/80 bg-card p-3.5 shadow-xs"
-                              >
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400">
-                                    #{idx + 1} Creencia {dim.id}
-                                  </span>
-                                  <span
-                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                      dim.actual >= 8
-                                        ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
-                                        : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                                    }`}
-                                  >
-                                    {dim.actual >= 8 ? "Alto / Urgente" : "Moderado"}
-                                  </span>
+                            (dim, idx) => {
+                              const scoreVal = dim.score ?? dim.actual ?? 1;
+                              return (
+                                <div
+                                  key={dim.id}
+                                  className="rounded-xl border border-border/80 bg-card p-3.5 shadow-xs"
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400">
+                                      #{idx + 1} Área {dim.id}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                        scoreVal >= 8
+                                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                          : "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                                      }`}
+                                    >
+                                      {scoreVal >= 8 ? "Alta Satisfacción" : "Moderado"}
+                                    </span>
+                                  </div>
+                                  <h4 className="mt-1 text-sm font-bold text-foreground">{dim.name}</h4>
+                                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>
+                                      Satisfacción actual: <strong className="text-cyan-600 dark:text-cyan-400 font-bold">{scoreVal}.00 / 10</strong>
+                                    </span>
+                                  </div>
                                 </div>
-                                <h4 className="mt-1 text-sm font-bold text-foreground">{dim.name}</h4>
-                                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>
-                                    Actual: <strong className="text-foreground">{dim.actual}.00</strong>
-                                  </span>
-                                  <span>
-                                    Meta: <strong className="text-indigo-600 dark:text-indigo-400">{dim.deseado}.00</strong>
-                                  </span>
-                                  <span>
-                                    Brecha: <strong className="text-rose-500">{dim.brecha}</strong>
-                                  </span>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Banner de Áreas Prioritarias (Menor Satisfacción) */}
+                  {Array.isArray(sesion.resultado_test.puntajes?.lowest_dimensions) &&
+                    (sesion.resultado_test.puntajes.lowest_dimensions as RuedaDimension[]).length > 0 && (
+                      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-card">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                            <Clock className="h-4 w-4" />
+                          </span>
+                          <h3 className="text-base font-bold text-foreground">
+                            Áreas Prioritarias de Intervención (Menor Satisfacción)
+                          </h3>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Dimensiones que representan focos de atención o desequilibrio a explorar en terapia:
+                        </p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                          {(sesion.resultado_test.puntajes.lowest_dimensions as RuedaDimension[]).map(
+                            (dim, idx) => {
+                              const scoreVal = dim.score ?? dim.actual ?? 1;
+                              return (
+                                <div
+                                  key={dim.id}
+                                  className="rounded-xl border border-border/80 bg-card p-3.5 shadow-xs"
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                                      #{idx + 1} Área {dim.id}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                        scoreVal <= 4
+                                          ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                                          : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                                      }`}
+                                    >
+                                      {scoreVal <= 4 ? "Prioritario / Crítico" : "Margen de mejora"}
+                                    </span>
+                                  </div>
+                                  <h4 className="mt-1 text-sm font-bold text-foreground">{dim.name}</h4>
+                                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>
+                                      Satisfacción actual: <strong className="text-rose-600 dark:text-rose-400 font-bold">{scoreVal}.00 / 10</strong>
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
-                            )
+                              );
+                            }
                           )}
                         </div>
                       </div>

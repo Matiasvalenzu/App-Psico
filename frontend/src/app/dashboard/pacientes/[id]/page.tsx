@@ -365,14 +365,14 @@ export default function PacienteDetailPage() {
   // Psychological test modal
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testModalMode, setTestModalMode] = useState<"start" | "send">("start");
-  const [selectedTestSlug, setSelectedTestSlug] = useState<string>("rueda-creencias");
+  const [selectedTestSlug, setSelectedTestSlug] = useState<string>("rueda-vida");
   const [catalogTests, setCatalogTests] = useState<CatalogTestItem[]>([
     {
-      slug: "rueda-creencias",
-      name: "Rueda de Creencias",
-      short_name: "Rueda TREC",
-      duration_minutes: 5,
-      description: "10 dimensiones con doble escala (Actual vs Meta) y gráfico de radar.",
+      slug: "rueda-vida",
+      name: "Rueda de la Vida",
+      short_name: "Rueda de la Vida",
+      duration_minutes: 2,
+      description: "10 áreas vitales (Salud, Dinero, Trabajo, Amor...) evaluadas del 1 al 10 con gráfico de radar.",
       tipo_evaluacion: "rueda_polar",
     },
     {
@@ -1505,7 +1505,7 @@ export default function PacienteDetailPage() {
                 <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
                   {catalogTests.map((t) => {
                     const isSelected = selectedTestSlug === t.slug;
-                    const isRueda = t.slug === "rueda-creencias";
+                    const isRueda = t.slug === "rueda-vida" || t.slug === "rueda-creencias";
                     return (
                       <button
                         key={t.slug}

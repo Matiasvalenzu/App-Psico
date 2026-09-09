@@ -20,8 +20,10 @@ from .catalog import (
     ELLIS_SLUG,
     NO_DE_ACUERDO,
     RUEDA_CREENCIAS_SLUG,
+    RUEDA_VIDA_SLUG,
     evaluate_ellis,
     evaluate_rueda_creencias,
+    evaluate_rueda_vida,
     get_test,
 )
 from .models import EvaluacionAsignada, ResultadoEvaluacion
@@ -149,7 +151,7 @@ def normalize_rueda_responses(raw_responses):
     if not isinstance(raw_responses, dict):
         raise ValueError("Las respuestas deben enviarse como objeto.")
 
-    test = get_test(RUEDA_CREENCIAS_SLUG)
+    test = get_test(RUEDA_VIDA_SLUG) or get_test(RUEDA_CREENCIAS_SLUG)
     question_ids = {question["id"] for question in test["questions"]}
     normalized = {}
 
@@ -157,28 +159,25 @@ def normalize_rueda_responses(raw_responses):
         key = str(q_id)
         raw = raw_responses.get(key, raw_responses.get(q_id))
         if isinstance(raw, dict):
-            actual = raw.get("actual", raw.get("now"))
-            deseado = raw.get("deseado", raw.get("meta", raw.get("future")))
+            val = raw.get("score", raw.get("actual", raw.get("now", raw.get("value"))))
         else:
-            actual = raw_responses.get(f"{key}_actual", raw_responses.get(f"{key}_now"))
-            deseado = raw_responses.get(f"{key}_deseado", raw_responses.get(f"{key}_future"))
+            val = raw
 
-        if actual is None or deseado is None:
-            raise ValueError(f"Falta responder la creencia {q_id} (requiere valor actual y meta deseada).")
+        if val is None:
+            val = raw_responses.get(f"{key}_actual", raw_responses.get(f"{key}_score"))
+
+        if val is None:
+            raise ValueError(f"Falta responder el área {q_id}.")
 
         try:
-            actual_int = int(actual)
-            deseado_int = int(deseado)
+            val_int = int(val)
         except (ValueError, TypeError):
-            raise ValueError(f"Los valores para la creencia {q_id} deben ser números del 1 al 10.")
+            raise ValueError(f"El valor para el área {q_id} debe ser un número del 1 al 10.")
 
-        if not (1 <= actual_int <= 10 and 1 <= deseado_int <= 10):
-            raise ValueError(f"Los puntajes de la creencia {q_id} deben estar entre 1 y 10.")
+        if not (1 <= val_int <= 10):
+            raise ValueError(f"El puntaje del área {q_id} debe estar entre 1 y 10.")
 
-        normalized[key] = {
-            "actual": actual_int,
-            "deseado": deseado_int,
-        }
+        normalized[key] = val_int
 
     return normalized
 
@@ -187,20 +186,21 @@ def complete_assignment(asignacion, raw_responses):
     test_slug = asignacion.test_slug
     test = get_test(test_slug) or get_test(ELLIS_SLUG)
 
-    if test_slug == RUEDA_CREENCIAS_SLUG:
+    if test_slug in (RUEDA_VIDA_SLUG, RUEDA_CREENCIAS_SLUG):
         responses = normalize_rueda_responses(raw_responses)
-        scores = evaluate_rueda_creencias(responses)
+        scores = evaluate_rueda_vida(responses)
         interpretation = {
             "criterio": (
-                "Puntajes de presencia actual iguales o superiores a 8 señalan una "
-                "creencia limitante predominante y foco terapéutico prioritario. "
-                "Puntajes de 5 a 7 señalan presencia moderada en situaciones específicas. "
-                "La brecha (Actual - Meta) refleja la discrepancia y el grado de cambio "
-                "deseado por el paciente en esa creencia."
+                "Puntajes de 8 a 10 señalan áreas de alta satisfacción y fortaleza vital. "
+                "Puntajes de 5 a 7 indican un nivel funcional con margen de crecimiento. "
+                "Puntajes de 1 a 4 reflejan insatisfacción o desequilibrio, señalando áreas prioritarias de atención clínica."
             ),
             "promedio_actual": scores.get("promedio_actual", 0),
+            "areas_fortaleza": scores.get("highest_dimensions", []),
+            "areas_prioritarias": scores.get("lowest_dimensions", []),
             "creencias_predominantes": scores.get("highest_dimensions", []),
             "mayores_brechas": scores.get("highest_gaps", []),
+            "dimensiones": scores.get("dimensions", []),
             "dimensiones_elevadas": [
                 dimension
                 for dimension in scores["dimensions"]
@@ -309,7 +309,7 @@ def build_result_sections(resultado, include_observation=True):
     test_slug = resultado.asignacion.test_slug
     test = get_test(test_slug) or get_test(ELLIS_SLUG)
 
-    if test_slug == RUEDA_CREENCIAS_SLUG:
+    if test_slug in (RUEDA_VIDA_SLUG, RUEDA_CREENCIAS_SLUG):
         return build_rueda_result_sections(resultado, test, include_observation)
     return build_ellis_result_sections(resultado, test, include_observation)
 
@@ -319,47 +319,47 @@ def build_rueda_result_sections(resultado, test, include_observation=True):
     interpretation = resultado.interpretacion
     title = f"Resultado - {test['name']}"
 
-    predominantes = interpretation.get("creencias_predominantes", [])
-    brechas = interpretation.get("mayores_brechas", [])
+    fortalezas = interpretation.get("areas_fortaleza") or interpretation.get("creencias_predominantes", [])
+    prioritarias = interpretation.get("areas_prioritarias") or scores.get("lowest_dimensions", [])
 
     summary_lines = [
-        f"Promedio de presencia actual: {scores.get('promedio_actual', 0)} / 10",
-        f"Carga cognitiva acumulada: {scores.get('total_score', 0)} / 100",
+        f"Promedio de satisfacción vital: {scores.get('promedio_actual', 0)} / 10",
+        f"Puntaje total de bienestar: {scores.get('total_score', 0)} / 100",
         "",
-        "CREENCIAS PREDOMINANTES EN EL PACIENTE:",
+        "ÁREAS DE MAYOR SATISFACCIÓN (FORTALEZAS VITALES):",
     ]
-    for i, dim in enumerate(predominantes, 1):
+    for i, dim in enumerate(fortalezas, 1):
         summary_lines.append(
-            f"{i}. {dim['name']}: {dim['actual']}/10 actual (Meta: {dim['deseado']}/10, Brecha: {dim['brecha']}) - {dim['label']}"
+            f"{i}. {dim['name']}: {dim.get('score', dim.get('actual', 0))}/10 - {dim['label']}"
         )
 
     summary_lines.append("")
-    summary_lines.append("MAYOR DISCREPANCIA / DESEO DE TRANSFORMACIÓN:")
-    for i, dim in enumerate(brechas, 1):
+    summary_lines.append("ÁREAS PRIORITARIAS DE ATENCIÓN / MENOR SATISFACCIÓN:")
+    for i, dim in enumerate(prioritarias, 1):
         summary_lines.append(
-            f"{i}. {dim['name']}: Brecha de {dim['brecha']} puntos (Actual: {dim['actual']} -> Meta: {dim['deseado']})"
+            f"{i}. {dim['name']}: {dim.get('score', dim.get('actual', 0))}/10 - {dim['label']}"
         )
 
     table_lines = [
-        "TABLA COMPARATIVA DE LA RUEDA:",
-        "N° | Creencia | Actual (1-10) | Meta (1-10) | Brecha | Nivel",
-        "---|---|---|---|---|---",
+        "EVALUACIÓN POR ÁREAS DE LA VIDA:",
+        "N° | Área de la Vida | Nivel Actual (1-10) | Estado / Clasificación",
+        "---|---|---|---",
     ]
     for dim in scores.get("dimensions", []):
         table_lines.append(
-            f"{dim['id']} | {dim['name']} | {dim['actual']} | {dim['deseado']} | {dim['brecha']} | {dim['level']}"
+            f"{dim['id']} | {dim['name']} | {dim.get('score', dim.get('actual', 0))}/10 | {dim['label']}"
         )
 
     detail_lines = [
         interpretation.get("criterio", ""),
         "",
-        "DETALLE POR CREENCIA Y FRASE GUÍA:",
+        "DETALLE POR ÁREA Y PREGUNTA CLÍNICA:",
     ]
     for dim in scores.get("dimensions", []):
         detail_lines.append(
-            f"{dim['id']}. {dim['name']} (Actual: {dim['actual']}/10, Meta: {dim['deseado']}/10):\n"
-            f"   Frase reflexiva: \"{dim['phrase']}\"\n"
-            f"   Núcleo cognitivo: {dim['belief']}\n"
+            f"{dim['id']}. {dim['name']} ({dim.get('score', dim.get('actual', 0))}/10):\n"
+            f"   Pregunta: \"{dim.get('phrase', '')}\"\n"
+            f"   Ámbito: {dim.get('description', '')}\n"
             f"   Clasificación: {dim['label']}\n"
         )
 
@@ -367,19 +367,19 @@ def build_rueda_result_sections(resultado, test, include_observation=True):
         {
             "key": "resumen_rueda",
             "title": title,
-            "document_title": "Resumen y Creencias Predominantes",
+            "document_title": "Resumen y Áreas Vitales",
             "content": "\n".join(summary_lines),
         },
         {
             "key": "tabla_rueda",
             "title": title,
-            "document_title": "Tabla Comparativa Brecha",
+            "document_title": "Tabla de Puntuaciones por Área",
             "content": "\n".join(table_lines),
         },
         {
             "key": "detalle_creencias",
             "title": title,
-            "document_title": "Detalle Clínico por Creencia",
+            "document_title": "Detalle Clínico por Área",
             "content": "\n".join(detail_lines),
         },
     ]
@@ -504,17 +504,18 @@ def generate_ai_observation(asignacion, resultado):
     test = get_test(asignacion.test_slug)
     test_name = test["name"] if test else "Test Psicológico"
 
-    if asignacion.test_slug == RUEDA_CREENCIAS_SLUG:
+    if asignacion.test_slug in (RUEDA_VIDA_SLUG, RUEDA_CREENCIAS_SLUG):
         user_prompt = (
-            f"Genera una observación clínica breve y estructurada basada en la {test_name} (TREC / Modelo Cognitivo de Ellis).\n\n"
+            f"Genera una observación clínica breve y estructurada basada en la {test_name} (Evaluación sistémica de satisfacción vital en 10 áreas clave).\n\n"
             f"Contexto del paciente:\n{patient_context}\n\n"
-            f"Resultados de la Rueda de Creencias:\n{result_context}\n\n"
+            f"Resultados de la Rueda de la Vida:\n{result_context}\n\n"
             f"Extractos DSM-5 de apoyo disponibles:\n{dsm_context or 'No se encontró contexto DSM-5 disponible.'}\n\n"
             "Estructura la respuesta con los siguientes apartados:\n"
-            "SÍNTESIS DEL PERFIL DE CREENCIAS (Señala en cuáles de las 10 creencias se encuentra principalmente situado el paciente y su nivel de carga cognitiva);\n"
-            "DISCREPANCIA Y METAS TERAPÉUTICAS (Analiza dónde el paciente manifiesta mayor deseo de transformación o brecha);\n"
-            "HIPÓTESIS CLÍNICAS Y DISTORSIONES ASOCIADAS (Relaciona el perfil con el motivo de consulta);\n"
-            "SUGERENCIAS DE INTERVENCIÓN EN SESIÓN (Preguntas de debate socrático y estrategias cognitivas recomendadas);\n"
+            "SÍNTESIS DEL EQUILIBRIO VITAL (Analiza el nivel promedio y el balance global de satisfacción en las 10 áreas);\n"
+            "ÁREAS DE FORTALEZA Y RECURSOS (Identifica las dimensiones con mayor puntaje que sirven como anclaje resiliente);\n"
+            "ÁREAS DE VULNERABILIDAD O PRIORITARIAS (Focos de insatisfacción o desequilibrio que demandan intervención inmediata);\n"
+            "RELACIÓN CON EL MOTIVO DE CONSULTA (Cómo se articulan estas áreas con la sintomatología o demandas del paciente);\n"
+            "RECOMENDACIONES PARA EL TRABAJO TERAPÉUTICO (Estrategias y metas concretas para las próximas sesiones);\n"
             "LÍMITES DE LA OBSERVACIÓN.\n"
             "No uses Markdown ni asteriscos. Si necesitas títulos, escríbelos en mayúsculas."
         )
