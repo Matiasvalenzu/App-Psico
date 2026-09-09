@@ -9,6 +9,7 @@ from .models import EvaluacionAsignada, ResultadoEvaluacion
 class CrearEvaluacionAsignadaSerializer(serializers.Serializer):
     paciente = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.all())
     test_slug = serializers.CharField(default=ELLIS_SLUG)
+    enviar_email = serializers.BooleanField(default=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -24,12 +25,14 @@ class CrearEvaluacionAsignadaSerializer(serializers.Serializer):
             raise serializers.ValidationError("Test no disponible.")
         return value
 
-    def validate_paciente(self, paciente):
-        if not paciente.email_contacto:
+    def validate(self, attrs):
+        paciente = attrs.get("paciente")
+        enviar_email = attrs.get("enviar_email", True)
+        if enviar_email and (not paciente or not paciente.email_contacto):
             raise serializers.ValidationError(
-                "El paciente no tiene correo de contacto registrado."
+                {"paciente": "El paciente no tiene correo de contacto registrado para enviar el test por correo."}
             )
-        return paciente
+        return attrs
 
 
 class ResultadoEvaluacionSerializer(serializers.ModelSerializer):
@@ -87,7 +90,7 @@ class EvaluacionAsignadaSerializer(serializers.ModelSerializer):
 
 
 class PublicSubmitSerializer(serializers.Serializer):
-    respuestas = serializers.DictField(child=serializers.CharField())
+    respuestas = serializers.DictField()
 
 
 def public_test_payload(asignacion):

@@ -21,6 +21,7 @@ import {
   Copy,
   Clock,
   Download,
+  ExternalLink,
   FileText,
   Loader2,
   MessageCircle,
@@ -138,10 +139,20 @@ const CHAT_SUGGESTED_PROMPTS = [
 interface TestSendResult {
   id: number;
   public_url: string;
+  token?: string;
   email_enviado: boolean;
   email_error: string;
   email_configurado: boolean;
   fecha_expiracion: string;
+}
+
+interface CatalogTestItem {
+  slug: string;
+  name: string;
+  short_name?: string;
+  duration_minutes: number;
+  description: string;
+  tipo_evaluacion?: string;
 }
 
 function getDateTimeInputValue(date = new Date()) {
@@ -353,6 +364,25 @@ export default function PacienteDetailPage() {
 
   // Psychological test modal
   const [testModalOpen, setTestModalOpen] = useState(false);
+  const [testModalMode, setTestModalMode] = useState<"start" | "send">("start");
+  const [selectedTestSlug, setSelectedTestSlug] = useState<string>("rueda-creencias");
+  const [catalogTests, setCatalogTests] = useState<CatalogTestItem[]>([
+    {
+      slug: "rueda-creencias",
+      name: "Rueda de Creencias",
+      short_name: "Rueda TREC",
+      duration_minutes: 5,
+      description: "10 dimensiones con doble escala (Actual vs Meta) y gráfico de radar.",
+      tipo_evaluacion: "rueda_polar",
+    },
+    {
+      slug: "creencias-ellis",
+      name: "Test de Creencias Ellis",
+      short_name: "Ellis 100",
+      duration_minutes: 20,
+      description: "100 preguntas dicotómicas (De acuerdo / No de acuerdo).",
+    },
+  ]);
   const [sendingTest, setSendingTest] = useState(false);
   const [testSendError, setTestSendError] = useState("");
   const [testSendResult, setTestSendResult] = useState<TestSendResult | null>(null);
@@ -407,6 +437,23 @@ export default function PacienteDetailPage() {
   useEffect(() => {
     loadData();
   }, [id]);
+
+  useEffect(() => {
+    async function loadTestCatalog() {
+      try {
+        const res = await apiFetch("/evaluaciones/catalogo/");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setCatalogTests(data);
+          }
+        }
+      } catch {
+        // preserve defaults
+      }
+    }
+    loadTestCatalog();
+  }, []);
 
   useEffect(() => {
     const calc = calcularEdad(editFechaNacimiento);
@@ -816,19 +863,20 @@ export default function PacienteDetailPage() {
     }
   }
 
-  function openTestModal() {
+  function openTestModal(mode: "start" | "send" = "start") {
+    setTestModalMode(mode);
     setTestSendError("");
     setTestSendResult(null);
     setCopySuccess(false);
     setTestModalOpen(true);
   }
 
-  async function handleSendEllisTest() {
+  async function handleExecuteTest(mode: "start" | "send") {
     if (!paciente) return;
     setTestSendError("");
     setTestSendResult(null);
     setCopySuccess(false);
-    if (!paciente.email_contacto) {
+    if (mode === "send" && !paciente.email_contacto) {
       setTestSendError("El paciente no tiene correo registrado. Edita la ficha antes de enviar el test.");
       return;
     }
@@ -836,7 +884,11 @@ export default function PacienteDetailPage() {
     try {
       const res = await apiFetch("/evaluaciones/asignaciones/", {
         method: "POST",
-        body: JSON.stringify({ paciente: paciente.id, test_slug: "creencias-ellis" }),
+        body: JSON.stringify({
+          paciente: paciente.id,
+          test_slug: selectedTestSlug,
+          enviar_email: mode === "send",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -844,6 +896,9 @@ export default function PacienteDetailPage() {
         return;
       }
       setTestSendResult(data);
+      if (mode === "start" && data.public_url) {
+        window.open(data.public_url, "_blank");
+      }
     } catch (err) {
       console.error(err);
       setTestSendError("No se pudo generar el test.");
@@ -1201,8 +1256,17 @@ export default function PacienteDetailPage() {
               </a>
             )}
             <button
-              onClick={openTestModal}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 hover:shadow-subtle"
+              type="button"
+              onClick={() => openTestModal("start")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              <span>Comenzar test</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openTestModal("send")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-2 text-xs font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 hover:shadow-subtle active:scale-95 cursor-pointer"
             >
               <Send className="h-3.5 w-3.5" />
               <span>Enviar test</span>
@@ -1353,74 +1417,222 @@ export default function PacienteDetailPage() {
         </div>
       )}
 
-      {/* Send test modal */}
+      {/* Test modal: Comenzar test en sesión o Enviar por correo */}
       {testModalOpen && (
         <ClientPortal>
           <div className="w-full max-w-xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated">
+            {/* Modal Header */}
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold">
-                  <ClipboardList className="h-5 w-5 text-emerald-600" />
-                  Enviar Test de Creencias Ellis
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="flex items-center gap-2 text-lg font-semibold">
+                    {testModalMode === "start" ? (
+                      <Play className="h-5 w-5 text-primary fill-primary/20" />
+                    ) : (
+                      <Send className="h-5 w-5 text-emerald-600" />
+                    )}
+                    <span>
+                      {testModalMode === "start"
+                        ? "Comenzar Test en Sesión"
+                        : "Enviar Test al Paciente"}
+                    </span>
+                  </h3>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      testModalMode === "start"
+                        ? "bg-primary/10 text-primary border border-primary/20"
+                        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                    }`}
+                  >
+                    {testModalMode === "start" ? "En vivo (Box / Remoto)" : "Por correo"}
+                  </span>
+                </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Se generará un enlace personal para {paciente.nombre_completo} con vencimiento de 7 días y uso único.
+                  {testModalMode === "start"
+                    ? `Aplica el test en tiempo real junto a ${paciente.nombre_completo}. Al completarlo, los gráficos y análisis se guardarán de inmediato en su ficha.`
+                    : `Se generará un enlace personal para ${paciente.nombre_completo} con vencimiento de 7 días y uso único.`}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setTestModalOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-5 space-y-4">
-              <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                <p className="font-medium">Correo destino</p>
-                <p className="mt-1 text-muted-foreground">
-                  {paciente.email_contacto || "Sin correo registrado"}
-                </p>
+            {/* Modal Mode Selector Tabs */}
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-muted/60 p-1 border border-border/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setTestModalMode("start");
+                  setTestSendError("");
+                }}
+                className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
+                  testModalMode === "start"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Play className="h-3.5 w-3.5 fill-current" />
+                <span>Comenzar en sesión</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTestModalMode("send");
+                  setTestSendError("");
+                }}
+                className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
+                  testModalMode === "send"
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Send className="h-3.5 w-3.5" />
+                <span>Enviar por correo</span>
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              {/* Instrument Selection */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Selecciona el instrumento
+                </label>
+                <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+                  {catalogTests.map((t) => {
+                    const isSelected = selectedTestSlug === t.slug;
+                    const isRueda = t.slug === "rueda-creencias";
+                    return (
+                      <button
+                        key={t.slug}
+                        type="button"
+                        onClick={() => setSelectedTestSlug(t.slug)}
+                        className={`rounded-xl border p-3.5 text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? isRueda
+                              ? "border-cyan-500 bg-cyan-500/10 text-foreground ring-2 ring-cyan-500/20"
+                              : "border-primary bg-primary/10 text-foreground ring-2 ring-primary/20"
+                            : "border-border/70 bg-card hover:border-primary/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold">{t.name}</span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              isRueda
+                                ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {isRueda ? "Nuevo · 3-5 min" : t.duration_minutes ? `${t.duration_minutes} min` : "Estándar"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                          {t.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                <p className="font-medium">Mensaje estándar</p>
-                <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                  Hola {paciente.nombre}, tu psicólogo/a te solicita completar el Test de Creencias Ellis como parte de tu proceso. El enlace es personal, vence en 7 días y no requiere iniciar sesión.
-                </p>
-              </div>
-              {!paciente.email_contacto && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
-                  Para enviar el test debes registrar un correo de contacto en la ficha del paciente.
+
+              {/* Mode Start description */}
+              {testModalMode === "start" && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">💡 ¿Cómo funciona en sesión?</span>
+                  <p className="mt-1">
+                    Al pulsar <span className="font-medium text-foreground">Comenzar test ahora</span> se generará la sesión y se abrirá el instrumento en una nueva pestaña (o en esta ventana). Podrás proyectarlo en el box presencial o compartir solo esa pestaña en Google Meet / Zoom con el paciente sin exponer sus notas clínicas privadas.
+                  </p>
                 </div>
               )}
+
+              {/* Mode Send description */}
+              {testModalMode === "send" && (
+                <>
+                  <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                    <p className="font-medium">Correo destino</p>
+                    <p className="mt-1 text-muted-foreground">
+                      {paciente.email_contacto || "Sin correo registrado"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                    <p className="font-medium">Mensaje estándar</p>
+                    <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                      Hola {paciente.nombre}, tu psicólogo/a te solicita completar el {selectedTestSlug === "rueda-creencias" ? "instrumento Rueda de Creencias Limitantes" : "Test de Creencias Ellis"} como parte de tu proceso. El enlace es personal, vence en 7 días y no requiere iniciar sesión.
+                    </p>
+                  </div>
+                  {!paciente.email_contacto && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                      Para enviar el test por correo debes registrar un correo de contacto en la ficha del paciente.
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Result display */}
               {testSendResult && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
                   <p className="font-semibold">
-                    {testSendResult.email_enviado
+                    {testModalMode === "start"
+                      ? "¡Evaluación lista para comenzar!"
+                      : testSendResult.email_enviado
                       ? "Correo enviado correctamente."
                       : "Enlace generado. El correo queda pendiente hasta configurar SMTP."}
                   </p>
-                  {testSendResult.email_error && (
+                  {testSendResult.email_error && testModalMode === "send" && (
                     <p className="mt-1 text-xs">{testSendResult.email_error}</p>
                   )}
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <input
-                      readOnly
-                      value={testSendResult.public_url}
-                      className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-background dark:text-emerald-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={copyGeneratedTestLink}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-                    >
-                      <Copy className="h-4 w-4" />
-                      {copySuccess ? "Copiado" : "Copiar"}
-                    </button>
-                  </div>
+
+                  {testModalMode === "start" ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => window.open(testSendResult.public_url, "_blank")}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 cursor-pointer"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>Abrir en nueva pestaña</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(testSendResult.public_url)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-accent cursor-pointer"
+                      >
+                        <span>Abrir en esta ventana</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={copyGeneratedTestLink}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent cursor-pointer"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>{copySuccess ? "Copiado" : "Copiar enlace"}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        readOnly
+                        value={testSendResult.public_url}
+                        className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-background dark:text-emerald-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyGeneratedTestLink}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 cursor-pointer"
+                      >
+                        <Copy className="h-4 w-4" />
+                        {copySuccess ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
+
               {testSendError && (
                 <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                   {testSendError}
@@ -1428,22 +1640,31 @@ export default function PacienteDetailPage() {
               )}
             </div>
 
+            {/* Modal Footer */}
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setTestModalOpen(false)}
-                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent cursor-pointer"
               >
                 Cerrar
               </button>
               <button
                 type="button"
-                onClick={handleSendEllisTest}
-                disabled={sendingTest || !paciente.email_contacto}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-subtle transition-all hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => handleExecuteTest(testModalMode)}
+                disabled={sendingTest || (testModalMode === "send" && !paciente.email_contacto)}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-subtle transition-all disabled:opacity-50 cursor-pointer ${
+                  testModalMode === "start"
+                    ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
               >
                 {sendingTest && <Loader2 className="h-4 w-4 animate-spin" />}
-                {sendingTest ? "Generando..." : "Generar y enviar"}
+                {sendingTest
+                  ? "Iniciando..."
+                  : testModalMode === "start"
+                  ? "Comenzar test ahora"
+                  : "Generar y enviar"}
               </button>
             </div>
           </div>

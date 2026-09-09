@@ -7,6 +7,16 @@ import { ClipboardList, Eye, Loader2 } from "lucide-react";
 interface TestQuestion {
   id: number;
   text: string;
+  name?: string;
+  phrase?: string;
+}
+
+interface TestDimension {
+  id: number;
+  name: string;
+  belief: string;
+  phrase?: string;
+  questions?: number[];
 }
 
 interface TestDefinition {
@@ -15,11 +25,12 @@ interface TestDefinition {
   short_name: string;
   version: string;
   duration_minutes: number;
+  tipo_evaluacion?: string;
   description: string;
   instructions: string;
   response_options: Array<{ value: string; label: string }>;
   questions: TestQuestion[];
-  dimensions: Array<{ id: number; name: string; belief: string; questions: number[] }>;
+  dimensions: TestDimension[];
 }
 
 export default function TestsCatalogPage() {
@@ -127,23 +138,55 @@ export default function TestsCatalogPage() {
               <h3 className="mt-2 text-xl font-bold">{selected.name}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{selected.instructions}</p>
               <div className="mt-4 grid gap-3">
-                {selected.questions.slice(0, 8).map((question) => (
+                {selected.questions.slice(0, 6).map((question) => (
                   <div key={question.id} className="rounded-lg border border-border/60 bg-muted/30 p-4">
-                    <p className="text-sm font-medium">
-                      {question.id}. {question.text}
+                    <p className="text-sm font-semibold text-foreground">
+                      {question.id}. {question.name || question.text}
                     </p>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {selected.response_options.map((option) => (
-                        <div key={option.value} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
-                          {option.label}
+                    {question.phrase && (
+                      <p className="mt-1 text-xs italic text-muted-foreground bg-background/60 p-2 rounded">
+                        &ldquo;{question.phrase}&rdquo;
+                      </p>
+                    )}
+                    {selected.tipo_evaluacion === "rueda_polar" ? (
+                      <div className="mt-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                          <span className="font-medium text-foreground">1. Presencia actual:</span>
+                          <span className="text-[11px]">(1 = Mínima, 10 = Totalmente)</span>
                         </div>
-                      ))}
-                    </div>
+                        <div className="grid grid-cols-10 gap-1 text-center">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+                            <div key={`act-prev-${v}`} className="rounded border bg-background py-1 text-[11px] font-bold text-muted-foreground">
+                              {v}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between text-muted-foreground pt-1">
+                          <span className="font-medium text-foreground">2. Meta deseada:</span>
+                          <span className="text-[11px]">(1 = Reducirla, 10 = Mantener)</span>
+                        </div>
+                        <div className="grid grid-cols-10 gap-1 text-center">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+                            <div key={`des-prev-${v}`} className="rounded border bg-background py-1 text-[11px] font-bold text-muted-foreground">
+                              {v}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {selected.response_options.map((option) => (
+                          <div key={option.value} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                            {option.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Vista previa parcial: el paciente verá las {selected.questions.length} preguntas en la página pública del enlace.
+                Vista previa parcial: el paciente responderá las {selected.questions.length} preguntas en el enlace personal.
               </p>
             </section>
 
@@ -157,7 +200,14 @@ export default function TestsCatalogPage() {
                     <p className="text-sm font-semibold">
                       {dimension.id}. {dimension.name}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">{dimension.belief}</p>
+                    {dimension.phrase && (
+                      <p className="mt-1 text-xs italic text-muted-foreground">
+                        Frase guía: &ldquo;{dimension.phrase}&rdquo;
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      <strong className="text-foreground">Núcleo:</strong> {dimension.belief}
+                    </p>
                   </div>
                 ))}
               </div>

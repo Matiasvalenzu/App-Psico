@@ -25,3 +25,4 @@ __pycache__/
 data/
 backups/
 *.sqlite3
+.playwright-cli/

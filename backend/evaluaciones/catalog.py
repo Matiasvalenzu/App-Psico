@@ -196,7 +196,120 @@ ELLIS_TEST = {
 }
 
 
-TESTS = {ELLIS_SLUG: ELLIS_TEST}
+RUEDA_CREENCIAS_SLUG = "rueda-creencias"
+
+RUEDA_CREENCIAS_DIMENSIONS = [
+    {
+        "id": 1,
+        "name": "Necesidad de aprobación",
+        "phrase": "Siento una constante necesidad de ser aprobado y querido por los demás para validar mi propio valor.",
+        "belief": "Para ser feliz y sentirme valioso necesito absolutamente la aprobación y el afecto de las personas que me rodean.",
+    },
+    {
+        "id": 2,
+        "name": "Perfeccionismo",
+        "phrase": "Me exijo ser completamente impecable y competente en todo lo que hago; equivocarme me resulta inaceptable.",
+        "belief": "Debo ser indefectiblemente competente y perfecto en todo lo que emprendo; los errores son signo de debilidad o fracaso.",
+    },
+    {
+        "id": 3,
+        "name": "Etiquetas/Justiciero",
+        "phrase": "Tiendo a juzgar con dureza a quienes cometen errores o actúan mal, creyendo que merecen castigo severo.",
+        "belief": "Ciertas personas son malas, viles o injustas y deben ser severamente juzgadas y castigadas por sus acciones.",
+    },
+    {
+        "id": 4,
+        "name": "Magnificación",
+        "phrase": "Cuando algo no resulta como esperaba o se frustran mis planes, lo siento como una catástrofe insoportable.",
+        "belief": "Es una desgracia terrible e insoportable cuando las cosas no salen exactamente como a mí me gustaría que fueran.",
+    },
+    {
+        "id": 5,
+        "name": "Externalización/Racionalización",
+        "phrase": "Siento que mi malestar o infelicidad son causados solo por factores externos sobre los que no tengo control.",
+        "belief": "La causa de mi malestar y sufrimiento proviene del exterior y de otras personas, por lo que tengo poco o ningún poder para cambiarlo.",
+    },
+    {
+        "id": 6,
+        "name": "Adivinación/Catastrofismo",
+        "phrase": "Pienso frecuentemente en peligros futuros o escenarios negativos, anticipándome constantemente a lo peor.",
+        "belief": "Si algo malo o peligroso puede ocurrir, debo preocuparme continuamente y obsesionarme con esa posibilidad.",
+    },
+    {
+        "id": 7,
+        "name": "Evitación",
+        "phrase": "Prefiero postergar o eludir los problemas y decisiones difíciles porque enfrentarlos me genera incomodidad.",
+        "belief": "Es más fácil eludir o posponer las dificultades y responsabilidades de la vida que hacerles frente.",
+    },
+    {
+        "id": 8,
+        "name": "Grandiosidad",
+        "phrase": "Siento que merezco un trato especial, que las cosas deberían ser más fáciles para mí o que necesito a alguien superior que me respalde.",
+        "belief": "Tengo derecho a un trato preferencial o necesito apoyarme en personas más fuertes y con mayor autoridad que yo.",
+    },
+    {
+        "id": 9,
+        "name": "Sobregeneralización/Influencia del pasado",
+        "phrase": "Creo que los errores y vivencias de mi pasado me condenan y determinan que las cosas seguirán saliendo igual.",
+        "belief": "El pasado determina irreversiblemente mi presente; si algo afectó fuertemente mi vida antes, lo seguirá haciendo siempre.",
+    },
+    {
+        "id": 10,
+        "name": "Hedonismo",
+        "phrase": "Busco la satisfacción o comodidad inmediata por encima de mis metas a largo plazo, rehuyendo del esfuerzo.",
+        "belief": "La verdadera comodidad y bienestar se logran evitando el esfuerzo y eligiendo el placer pasivo o inmediato.",
+    },
+]
+
+RUEDA_CREENCIAS_QUESTIONS = [
+    {
+        "id": dim["id"],
+        "dimension_id": dim["id"],
+        "name": dim["name"],
+        "phrase": dim["phrase"],
+        "text": f"{dim['name']}: {dim['phrase']}",
+        "belief": dim["belief"],
+    }
+    for dim in RUEDA_CREENCIAS_DIMENSIONS
+]
+
+RUEDA_CREENCIAS_TEST = {
+    "slug": RUEDA_CREENCIAS_SLUG,
+    "name": "Rueda de Creencias Limitantes",
+    "short_name": "Rueda de Creencias",
+    "version": "1.0",
+    "duration_minutes": 5,
+    "tipo_evaluacion": "rueda_polar",
+    "description": (
+        "Instrumento reflexivo interactivo basado en las 10 creencias limitantes "
+        "y distorsiones cognitivas centrales (TREC / Beck). Evalúa la presencia actual "
+        "y la meta de transformación deseada de cada creencia en escala del 1 al 10."
+    ),
+    "instructions": (
+        "Para cada una de las 10 creencias, reflexiona y responde con dos valores del 1 al 10:\n"
+        "1. Presencia actual: ¿Qué tan presente o influyente está esta creencia en tu vida hoy? (1 = Nada presente, 10 = Totalmente presente).\n"
+        "2. Meta deseada: ¿A qué nivel desearías reducirla o transformarla como objetivo personal? (1 = Eliminar su influencia, 10 = Mantenerla igual)."
+    ),
+    "response_options": [
+        {"value": str(i), "label": str(i)} for i in range(1, 11)
+    ],
+    "scale_info": {
+        "min": 1,
+        "max": 10,
+        "labels": {
+            "actual": "Presencia actual en mi vida",
+            "deseado": "Meta terapéutica de transformación",
+        },
+    },
+    "questions": RUEDA_CREENCIAS_QUESTIONS,
+    "dimensions": RUEDA_CREENCIAS_DIMENSIONS,
+}
+
+
+TESTS = {
+    RUEDA_CREENCIAS_SLUG: RUEDA_CREENCIAS_TEST,
+    ELLIS_SLUG: ELLIS_TEST,
+}
 
 
 def list_tests():
@@ -208,10 +321,23 @@ def get_test(slug):
 
 
 def without_scoring(test):
-    public_questions = [
-        {"id": question["id"], "text": question["text"]}
-        for question in test["questions"]
-    ]
+    if test.get("tipo_evaluacion") == "rueda_polar":
+        public_questions = [
+            {
+                "id": question["id"],
+                "dimension_id": question["dimension_id"],
+                "name": question["name"],
+                "phrase": question["phrase"],
+                "text": question["text"],
+                "belief": question["belief"],
+            }
+            for question in test["questions"]
+        ]
+    else:
+        public_questions = [
+            {"id": question["id"], "text": question["text"]}
+            for question in test["questions"]
+        ]
     return {
         **test,
         "questions": public_questions,
@@ -232,6 +358,23 @@ def get_level(score):
     return {
         "level": "BAJO",
         "label": "Sin elevación clínicamente destacada según el criterio del instrumento",
+    }
+
+
+def get_rueda_level(actual_score):
+    if actual_score >= 8:
+        return {
+            "level": "ALTO",
+            "label": "Creencia predominante / Foco terapéutico prioritario",
+        }
+    if actual_score >= 5:
+        return {
+            "level": "MODERADO",
+            "label": "Presencia moderada en situaciones específicas",
+        }
+    return {
+        "level": "BAJO",
+        "label": "Sin impacto limitante significativo",
     }
 
 
@@ -269,3 +412,56 @@ def evaluate_ellis(responses):
         "highest_dimensions": sorted_dimensions[:3],
         "scores_by_question": scores_by_question,
     }
+
+
+def evaluate_rueda_creencias(responses):
+    dim_map = {dim["id"]: dim for dim in RUEDA_CREENCIAS_DIMENSIONS}
+    dimensions = []
+
+    for dim_id, dim in dim_map.items():
+        raw = responses.get(str(dim_id)) or responses.get(dim_id) or {}
+        if isinstance(raw, dict):
+            actual = int(raw.get("actual", raw.get("now", 1)))
+            deseado = int(raw.get("deseado", raw.get("meta", raw.get("future", 1))))
+        else:
+            actual = int(responses.get(f"{dim_id}_actual", responses.get(f"{dim_id}_now", 1)))
+            deseado = int(responses.get(f"{dim_id}_deseado", responses.get(f"{dim_id}_future", 1)))
+
+        actual = max(1, min(10, actual))
+        deseado = max(1, min(10, deseado))
+        brecha = actual - deseado  # Grado de cambio o tensión terapéutica
+        level_info = get_rueda_level(actual)
+
+        dimensions.append(
+            {
+                "id": dim["id"],
+                "name": dim["name"],
+                "phrase": dim["phrase"],
+                "belief": dim["belief"],
+                "actual": actual,
+                "deseado": deseado,
+                "brecha": brecha,
+                "score": actual,
+                **level_info,
+            }
+        )
+
+    sorted_by_actual = sorted(dimensions, key=lambda item: (item["actual"], item["brecha"]), reverse=True)
+    sorted_by_brecha = sorted(dimensions, key=lambda item: (item["brecha"], item["actual"]), reverse=True)
+
+    total_actual = sum(d["actual"] for d in dimensions)
+    total_deseado = sum(d["deseado"] for d in dimensions)
+    promedio_actual = round(total_actual / len(dimensions), 1)
+
+    return {
+        "test_slug": RUEDA_CREENCIAS_SLUG,
+        "test_name": RUEDA_CREENCIAS_TEST["name"],
+        "total_score": total_actual,
+        "max_score": 100,
+        "promedio_actual": promedio_actual,
+        "total_deseado": total_deseado,
+        "dimensions": dimensions,
+        "highest_dimensions": sorted_by_actual[:3],
+        "highest_gaps": sorted_by_brecha[:3],
+    }
+

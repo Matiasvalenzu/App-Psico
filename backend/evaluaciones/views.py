@@ -66,6 +66,7 @@ class EvaluacionAsignadaListCreateView(generics.ListCreateAPIView):
         input_serializer.is_valid(raise_exception=True)
         paciente = input_serializer.validated_data["paciente"]
         test_slug = input_serializer.validated_data.get("test_slug") or ELLIS_SLUG
+        enviar_email = input_serializer.validated_data.get("enviar_email", True)
         token = generate_token()
         public_url = build_public_test_url(token)
         expires_at = timezone.now() + timedelta(
@@ -78,30 +79,34 @@ class EvaluacionAsignadaListCreateView(generics.ListCreateAPIView):
             test_slug=test_slug,
             token_hash=hash_token(token),
             enlace_generado=public_url,
-            email_destino=paciente.email_contacto,
-            mensaje_email=fixed_email_message(request.user, paciente, public_url),
+            email_destino=paciente.email_contacto or "",
+            mensaje_email=fixed_email_message(request.user, paciente, public_url, test_slug=test_slug) if enviar_email else "",
             fecha_expiracion=expires_at,
+            estado=EvaluacionAsignada.Estado.PENDIENTE,
         )
-        email_sent, email_error = send_assignment_email(asignacion)
-        asignacion.email_enviado = email_sent
-        asignacion.email_error = email_error
-        if email_sent:
-            asignacion.estado = EvaluacionAsignada.Estado.ENVIADO
-            asignacion.fecha_envio = timezone.now()
-        elif getattr(settings, "EMAIL_HOST", ""):
-            asignacion.estado = EvaluacionAsignada.Estado.ERROR_ENVIO
-        asignacion.save(
-            update_fields=[
-                "email_enviado",
-                "email_error",
-                "estado",
-                "fecha_envio",
-                "updated_at",
-            ]
-        )
+
+        if enviar_email:
+            email_sent, email_error = send_assignment_email(asignacion)
+            asignacion.email_enviado = email_sent
+            asignacion.email_error = email_error
+            if email_sent:
+                asignacion.estado = EvaluacionAsignada.Estado.ENVIADO
+                asignacion.fecha_envio = timezone.now()
+            elif getattr(settings, "EMAIL_HOST", ""):
+                asignacion.estado = EvaluacionAsignada.Estado.ERROR_ENVIO
+            asignacion.save(
+                update_fields=[
+                    "email_enviado",
+                    "email_error",
+                    "estado",
+                    "fecha_envio",
+                    "updated_at",
+                ]
+            )
 
         data = EvaluacionAsignadaSerializer(asignacion).data
         data["public_url"] = public_url
+        data["token"] = token
         data["email_configurado"] = bool(getattr(settings, "EMAIL_HOST", ""))
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -164,5 +169,7 @@ class EvaluacionPublicaResponderView(APIView):
             {
                 "estado": "COMPLETADO",
                 "message": "Gracias. Tus respuestas fueron guardadas y serán revisadas por tu psicólogo/a.",
+                "paciente_id": asignacion.paciente_id,
+                "sesion_id": asignacion.sesion_id if asignacion.sesion else None,
             }
         )
