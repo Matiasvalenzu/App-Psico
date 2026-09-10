@@ -51,15 +51,25 @@ export default function DashboardLayout({
       }
 
       try {
-        const user = await getCurrentUser();
-        setIsAdmin(user.username === "Admin" || user.is_admin === true);
-        setIsSuperuser(user.is_superuser === true);
+        const isAdm = user.username === "Admin" || user.is_admin === true;
+        const isSuper = user.is_superuser === true;
+        setIsAdmin(isAdm);
+        setIsSuperuser(isSuper);
         setSuscripcionEstado(user.suscripcion_estado || null);
         setDiasRestantes(
           typeof user.dias_restantes_prueba === "number"
             ? user.dias_restantes_prueba
             : null
         );
+
+        // Si la suscripción expiró y no es admin, forzar navegación a /dashboard/suscripcion
+        if (!isAdm && !isSuper && user.suscripcion_activa === false) {
+          if (pathname !== "/dashboard/suscripcion") {
+            router.replace("/dashboard/suscripcion");
+            return;
+          }
+        }
+
         setReady(true);
       } catch {
         localStorage.clear();

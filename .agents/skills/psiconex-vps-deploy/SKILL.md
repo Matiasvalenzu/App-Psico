@@ -14,6 +14,7 @@ description: Deploy Psiconex to the production VPS. Use ONLY when the user expli
 - Compose file: `docker-compose.prod.yml`
 - Production environment file: `/srv/psiconex-docker/shared/.env`, linked as `current/.env`
 - Local production environment source: `.env.production`
+- Local Hostinger credentials: `.env.hostinger` (`HOSTINGER_API_TOKEN`, `HOSTINGER_VM_ID`)
 
 Never print, commit, copy into source files, or expose values from either
 environment file. Never delete Docker volumes or databases.
@@ -29,6 +30,10 @@ or use destructive Git commands to clean the worktree.
 
 ## Required Workflow
 
+0. Verify SSH connectivity and sync dynamic IP if needed:
+   Run `python scripts/sync_vps_ip.py`. If the public IP has changed or SSH times out,
+   it automatically adds the new IP to the Hostinger Cloud Firewall via API
+   and syncs the rule for port 22 before attempting any SSH or Git operations.
 1. Run the relevant local tests or build checks. Report blockers before
    deploying if they are caused by the requested change.
 2. Commit the intended files, push the commit to `origin/main`, then push the

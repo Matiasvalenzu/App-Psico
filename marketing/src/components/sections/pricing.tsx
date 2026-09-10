@@ -50,7 +50,7 @@ const PLANS: Plan[] = [
     features: [
       "Todo lo de Estándar, más:",
       "Múltiples perfiles de voz",
-      "Búsqueda semántica (RAG) en histórico",
+      "Búsqueda inteligente en historial clínico",
       "Plantillas de informe personalizadas",
       "Exportación masiva de datos",
       "Integraciones avanzadas",
@@ -220,6 +220,11 @@ export function PricingSection() {
                     <Link href={ROUTES.register}>{plan.cta}</Link>
                   </Button>
                 )}
+                {plan.featured && (
+                  <p className="mt-2.5 text-center text-[11px] text-muted-foreground leading-snug">
+                    14 días gratis sin tarjeta. Después de la prueba: $4.990/mes. Sin permanencia. Cancela cuando quieras.
+                  </p>
+                )}
               </div>
             </motion.div>
           ))}
@@ -232,7 +237,7 @@ export function PricingSection() {
           transition={{ delay: 0.6 }}
           className="mt-12 text-center text-xs text-muted-foreground"
         >
-          Precio real · Sin permanencia
+          Precio real · Sin permanencia · Boleta/factura chilena
         </motion.p>
       </div>
     </section>

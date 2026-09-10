@@ -76,3 +76,11 @@ public/logo-icon.jpg            — ícono DatnexiA (1455×1600)
 - La primera sesión del día paga el costo de carga de modelos (~1-2 min)
 - Los logos JPG tienen fondo blanco — se muestran en contenedor `bg-white rounded-lg`
 - Usuario Admin se detecta por `username === "Admin"` o `is_admin === true`
+
+## Browser automation
+- Para automatizar una sesión autenticada en Chrome, usa la extensión oficial
+  de Playwright en el perfil Windows del usuario. No abras un navegador
+  aislado con `playwright-cli open`.
+- Adjunta con el `playwright-cli.ps1` de Windows y
+  `attach --extension=chrome`; toma un snapshot antes de cada interacción y
+  al terminar usa `detach`, nunca `close`, salvo instrucción explícita.

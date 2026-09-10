@@ -26,3 +26,5 @@ data/
 backups/
 *.sqlite3
 .playwright-cli/
+.next/
+backend/celerybeat-schedule

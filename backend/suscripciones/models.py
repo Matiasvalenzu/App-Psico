@@ -16,10 +16,15 @@ class Suscripcion(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='suscripcion')
     estado = models.CharField(max_length=20, choices=ESTADOS, default='trial')
     fin_prueba = models.DateTimeField(null=True, blank=True)
-
+    
     mp_preapproval_id = models.CharField(max_length=100, null=True, blank=True)
     mp_payer_id = models.CharField(max_length=100, null=True, blank=True)
-
+    
+    card_last_four = models.CharField(max_length=4, null=True, blank=True)
+    card_brand = models.CharField(max_length=20, null=True, blank=True)
+    proximo_cobro = models.DateTimeField(null=True, blank=True)
+    cancelada_en = models.DateTimeField(null=True, blank=True)
+    
     creada_en = models.DateTimeField(auto_now_add=True)
     actualizada_en = models.DateTimeField(auto_now=True)
 
