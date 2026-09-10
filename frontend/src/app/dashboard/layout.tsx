@@ -51,6 +51,7 @@ export default function DashboardLayout({
       }
 
       try {
+        const user = await getCurrentUser();
         const isAdm = user.username === "Admin" || user.is_admin === true;
         const isSuper = user.is_superuser === true;
         setIsAdmin(isAdm);
