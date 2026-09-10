@@ -261,13 +261,13 @@ export default function CardCheckoutModal({
               <div className="h-20 w-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xl shadow-emerald-500/10">
                 <CheckCircle2 className="h-10 w-10 animate-in zoom-in-75 duration-300" />
               </div>
-              <div className="absolute -bottom-1 -right-1 rounded-full bg-card p-1 shadow-md border border-border">
+              <div className="absolute -bottom-1 -right-1 rounded-full bg-card p-0.5 shadow-md border border-border">
                 <Image
-                  src="/logo-psiconex-512.png"
+                  src="/logo-psiconex-icon.png"
                   alt="Psiconex"
-                  width={22}
-                  height={22}
-                  className="rounded-full object-contain"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 rounded-full object-contain"
                 />
               </div>
             </div>
@@ -296,22 +296,22 @@ export default function CardCheckoutModal({
           </div>
         ) : (
           <div className="overflow-y-auto px-6 py-6 sm:px-8 sm:py-7 space-y-5">
-            {/* Encabezado con Logo Oficial de Psiconex */}
+            {/* Encabezado con Logo Oficial Redondo de Psiconex */}
             <div className="flex items-center justify-between gap-4 pb-1">
               <div className="flex items-center gap-3">
-                <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/10 via-primary/10 to-violet-500/10 border border-primary/20 p-2 shadow-sm">
+                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center">
                   <Image
-                    src="/logo-psiconex-512.png"
+                    src="/logo-psiconex-icon.png"
                     alt="Psiconex"
-                    width={48}
-                    height={48}
-                    className="h-full w-full object-contain"
+                    width={56}
+                    height={56}
+                    className="h-12 w-12 object-contain drop-shadow-md transition-transform hover:scale-105"
                     priority
                   />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-bold tracking-tight text-foreground">Psiconex</span>
+                    <span className="text-lg font-bold tracking-tight text-foreground">Psiconex</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
                       <Sparkles className="h-3 w-3" />
                       Plan Pro
@@ -408,7 +408,7 @@ export default function CardCheckoutModal({
               {/* Marca de agua sutil de Psiconex */}
               <div className="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 pointer-events-none">
                 <Image
-                  src="/logo-psiconex-512.png"
+                  src="/logo-psiconex-icon.png"
                   alt=""
                   width={144}
                   height={144}
