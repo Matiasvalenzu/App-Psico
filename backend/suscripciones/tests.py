@@ -25,14 +25,14 @@ class SuscripcionesApiTests(APITestCase):
         self.assertIsNotNone(suscripcion.fin_prueba)
 
     def test_estado_endpoint(self):
-        response = self.client.get("/api/suscripciones/estado/")
+        response = self.client.get("/api/suscripciones/estado/", secure=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["estado"], "trial")
         self.assertTrue(response.data["is_active_or_trial"])
         self.assertIn("dias_restantes_prueba", response.data)
         self.assertIn("public_key", response.data)
 
-    @patch("backend.suscripciones.views._get_mp_sdk")
+    @patch("suscripciones.views._get_mp_sdk")
     def test_contratar_card_defiere_cobro_en_trial(self, mock_sdk_fn):
         mock_sdk = MagicMock()
         mock_sdk_fn.return_value = mock_sdk
@@ -50,7 +50,7 @@ class SuscripcionesApiTests(APITestCase):
             "payment_method_id": "visa",
             "card_last_four": "4242",
         }
-        response = self.client.post("/api/suscripciones/contratar/", payload, format="json")
+        response = self.client.post("/api/suscripciones/contratar/", payload, format="json", secure=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "ok")
         self.assertEqual(response.data["card_brand"], "visa")
@@ -67,7 +67,7 @@ class SuscripcionesApiTests(APITestCase):
         self.assertEqual(self.user.suscripcion.mp_preapproval_id, "preapproval_123456")
         self.assertEqual(self.user.suscripcion.card_last_four, "4242")
 
-    @patch("backend.suscripciones.views._get_mp_sdk")
+    @patch("suscripciones.views._get_mp_sdk")
     def test_cancelar_suscripcion(self, mock_sdk_fn):
         mock_sdk = MagicMock()
         mock_sdk_fn.return_value = mock_sdk
@@ -78,7 +78,7 @@ class SuscripcionesApiTests(APITestCase):
         suscripcion.mp_preapproval_id = "preapproval_123456"
         suscripcion.save()
 
-        response = self.client.post("/api/suscripciones/cancelar/")
+        response = self.client.post("/api/suscripciones/cancelar/", secure=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "ok")
 
