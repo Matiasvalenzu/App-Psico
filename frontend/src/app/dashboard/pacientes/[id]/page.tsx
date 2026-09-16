@@ -36,7 +36,9 @@ import {
   Upload,
   Video,
   X,
+  PlayCircle,
 } from "lucide-react";
+import { useTutorial } from "@/context/TutorialContext";
 
 interface Paciente {
   id: number;
@@ -316,6 +318,7 @@ export default function PacienteDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params.id as string;
+  const { openTutorial } = useTutorial();
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [sesiones, setSesiones] = useState<Sesion[]>([]);
@@ -1191,6 +1194,16 @@ export default function PacienteDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openTutorial(3)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs"
+            title="Ver video tutorial sobre Ficha Clínica y Asistente IA (Módulo 3 y 5)"
+          >
+            <PlayCircle className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">Tutorial de Ficha y Sesiones IA</span>
+            <span className="md:hidden">Tutorial</span>
+          </button>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>

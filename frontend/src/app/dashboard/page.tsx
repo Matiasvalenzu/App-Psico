@@ -20,8 +20,10 @@ import {
   Sparkles,
   Phone,
   Calendar,
+  PlayCircle,
 } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useTutorial } from "@/context/TutorialContext";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,6 +173,7 @@ function getPatientStatus(value?: string) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { openTutorial } = useTutorial();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -357,17 +360,31 @@ export default function DashboardPage() {
             Gestión de expedientes clínicos, seguimiento terapéutico y estados de tratamiento.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setError("");
-            setSuccess("");
-            setShowForm(!showForm);
-          }}
-          className="gap-2.5 rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 bg-primary text-primary-foreground font-semibold !px-6 !h-11 text-sm shrink-0"
-        >
-          <UserPlus className="h-4.5 w-4.5" />
-          <span>Nuevo paciente</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => openTutorial(2)}
+            className="gap-2 rounded-xl !h-11 text-xs sm:text-sm font-semibold border-primary/30 text-primary hover:bg-primary/10 transition-all hover:-translate-y-0.5"
+            title="Ver video tutorial sobre creación y gestión de pacientes"
+          >
+            <PlayCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">Ver tutorial de Pacientes</span>
+            <span className="sm:hidden">Tutorial</span>
+          </Button>
+
+          <Button
+            onClick={() => {
+              setError("");
+              setSuccess("");
+              setShowForm(!showForm);
+            }}
+            className="gap-2.5 rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 bg-primary text-primary-foreground font-semibold !px-6 !h-11 text-sm shrink-0"
+          >
+            <UserPlus className="h-4.5 w-4.5" />
+            <span>Nuevo paciente</span>
+          </Button>
+        </div>
       </div>
 
       {/* ── Clinical Cockpit: Tarjetas de Métricas ── */}

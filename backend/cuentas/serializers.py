@@ -24,6 +24,7 @@ class PerfilPsicologoSerializer(serializers.Serializer):
     )
     comuna = serializers.CharField(max_length=100, allow_blank=True, required=False)
     direccion_consulta = serializers.CharField(max_length=255, allow_blank=True, required=False)
+    tutorial_visto = serializers.BooleanField(required=False)
 
     def to_representation(self, instance):
         return {
@@ -44,6 +45,7 @@ class PerfilPsicologoSerializer(serializers.Serializer):
             "modalidad_atencion": instance.modalidad_atencion,
             "comuna": instance.comuna,
             "direccion_consulta": instance.direccion_consulta,
+            "tutorial_visto": instance.tutorial_visto,
         }
 
     def validate_rut_profesional(self, value):

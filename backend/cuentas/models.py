@@ -30,6 +30,7 @@ class PerfilPsicologo(models.Model):
     )
     comuna = models.CharField(max_length=100, blank=True, default="")
     direccion_consulta = models.CharField(max_length=255, blank=True, default="")
+    tutorial_visto = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

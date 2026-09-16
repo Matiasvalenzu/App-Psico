@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, ShieldCheck, UserRound, PlayCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useTutorial } from "@/context/TutorialContext";
 
 interface Profile {
   login_email: string;
@@ -49,6 +50,7 @@ function getError(data: unknown, fallback: string) {
 }
 
 export default function ProfessionalProfilePage() {
+  const { openTutorial } = useTutorial();
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [notificationEmail, setNotificationEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -139,9 +141,25 @@ export default function ProfessionalProfilePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"><UserRound className="h-6 w-6" /></div>
-        <div><h1 className="text-2xl font-bold tracking-tight">Mi perfil profesional</h1><p className="text-sm text-muted-foreground">Datos de tu práctica y canales de contacto de Psiconex.</p></div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <UserRound className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Mi perfil profesional</h1>
+            <p className="text-sm text-muted-foreground">Datos de tu práctica y canales de contacto de Psiconex.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => openTutorial(1)}
+          className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs sm:text-sm font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs shrink-0 self-start sm:self-auto"
+          title="Ver tutorial de Configuración de Perfil (Módulo 1)"
+        >
+          <PlayCircle className="h-4 w-4" />
+          <span>Tutorial de Configuración</span>
+        </button>
       </div>
 
       {(error || message) && <div className={`rounded-xl border p-4 text-sm ${error ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"}`}>{error || message}</div>}

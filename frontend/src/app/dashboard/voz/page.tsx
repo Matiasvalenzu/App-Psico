@@ -16,8 +16,10 @@ import {
   ShieldCheck,
   X,
   Info,
+  PlayCircle,
 } from "lucide-react";
 import { ClientPortal } from "@/components/ui/ClientPortal";
+import { useTutorial } from "@/context/TutorialContext";
 
 function getAudioMimeType() {
   const types = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
@@ -66,6 +68,7 @@ const SAMPLE_TEXTS = [
 ];
 
 export default function VoiceEnrollmentPage() {
+  const { openTutorial } = useTutorial();
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [samples, setSamples] = useState<Blob[]>([]);
@@ -236,13 +239,24 @@ export default function VoiceEnrollmentPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Perfil de voz del psicólogo
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Entrena la IA (ECAPA-TDNN) con tu voz para separar automáticamente tus intervenciones de las del paciente en sesiones clínicas y videollamadas.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Perfil de voz del psicólogo
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Entrena la IA (ECAPA-TDNN) con tu voz para separar automáticamente tus intervenciones de las del paciente en sesiones clínicas y videollamadas.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => openTutorial(4)}
+          className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs shrink-0 self-start sm:self-auto"
+          title="Ver tutorial de Enrolamiento de Voz (Módulo 4)"
+        >
+          <PlayCircle className="h-4 w-4" />
+          <span>Tutorial de Enrolamiento de Voz</span>
+        </button>
       </div>
 
       {/* Estado del perfil actual */}

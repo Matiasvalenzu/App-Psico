@@ -155,10 +155,27 @@ class RegistrationFlowTests(TestCase):
         self.assertEqual(res_login.status_code, 200)
         self.assertIn("access", res_login.data)
 
-        # 4. Check current_user endpoint has trial days
+        # 4. Check current_user endpoint has trial days and tutorial_visto
         token = res_login.data["access"]
         client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
         res_me = client.get("/api/auth/me/")
         self.assertEqual(res_me.status_code, 200)
         self.assertEqual(res_me.data["suscripcion_estado"], "trial")
         self.assertEqual(res_me.data["dias_restantes_prueba"], 14)
+        self.assertIn("tutorial_visto", res_me.data)
+        self.assertFalse(res_me.data["tutorial_visto"])
+
+        # 5. Update tutorial_visto via PATCH /api/cuenta/perfil/
+        res_patch = client.patch(
+            "/api/cuenta/perfil/",
+            {"tutorial_visto": True},
+            format="json",
+        )
+        self.assertEqual(res_patch.status_code, 200)
+        self.assertTrue(res_patch.data["tutorial_visto"])
+
+        # 6. Verify current_user endpoint reflects tutorial_visto = True
+        res_me_updated = client.get("/api/auth/me/")
+        self.assertEqual(res_me_updated.status_code, 200)
+        self.assertTrue(res_me_updated.data["tutorial_visto"])
+

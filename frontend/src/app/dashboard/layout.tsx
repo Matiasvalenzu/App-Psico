@@ -16,6 +16,8 @@ import {
   Settings,
   CreditCard,
   MessageSquarePlus,
+  PlayCircle,
+  Video,
 } from "lucide-react";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -26,14 +28,32 @@ import FloatingFeedbackButton from "@/components/feedback/FloatingFeedbackButton
 import { useIsMobile } from "@/hooks/use-media-query";
 import { AudioRecordingProvider } from "@/context/AudioRecordingContext";
 import PersistentRecordingBar from "@/components/recording/PersistentRecordingBar";
+import { TutorialProvider, useTutorial } from "@/context/TutorialContext";
+import TutorialModal from "@/components/tutorial/TutorialModal";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <TutorialProvider>
+      <AudioRecordingProvider>
+        <DashboardInner>{children}</DashboardInner>
+        <TutorialModal />
+      </AudioRecordingProvider>
+    </TutorialProvider>
+  );
+}
+
+function DashboardInner({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
+  const { openTutorial } = useTutorial();
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -200,6 +220,17 @@ export default function DashboardLayout({
           />
           <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" />
           <NavItem href="/dashboard/feedback" icon={MessageSquarePlus} label="Feedback y Ayuda" />
+          <button
+            type="button"
+            onClick={() => openTutorial(0)}
+            title={isCollapsed ? "Video Tutorial Maestro" : undefined}
+            className={`group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-accent/80 hover:text-foreground ${
+              isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
+            }`}
+          >
+            <Video className="h-4.5 w-4.5 shrink-0 text-primary transition-transform duration-200 group-hover:scale-110" />
+            {!isCollapsed && <span className="tracking-tight">Video Tutorial</span>}
+          </button>
           {showAdminSection && (
             <div className="mt-8">
               {!isCollapsed && (
@@ -254,9 +285,18 @@ export default function DashboardLayout({
                 <span>{diasRestantes}d prueba</span>
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => openTutorial(0)}
+              className="flex md:hidden items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+              title="Ver tutorial guiado"
+            >
+              <PlayCircle className="h-3.5 w-3.5" />
+              <span>Tutorial</span>
+            </button>
           </div>
 
-          {/* Desktop: trial badge + theme toggle + logout */}
+          {/* Desktop: trial badge + tutorial + theme toggle + logout */}
           <div className="hidden md:flex items-center gap-3.5">
             {suscripcionEstado === "trial" && diasRestantes !== null && (
               <Link
@@ -274,6 +314,15 @@ export default function DashboardLayout({
                 </span>
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => openTutorial(0)}
+              className="group inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:border-primary/40 active:scale-95 cursor-pointer"
+              title="Ver video tutorial de Psiconex (11 min)"
+            >
+              <PlayCircle className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />
+              <span>Tutorial</span>
+            </button>
             <div className="h-4 w-px bg-border/80" />
             <ThemeToggle />
             <div className="h-4 w-px bg-border/80" />

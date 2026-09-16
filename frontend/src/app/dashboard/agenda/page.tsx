@@ -32,9 +32,11 @@ import {
   Trash2,
   UserPlus,
   X,
+  PlayCircle,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ClientPortal } from "@/components/ui/ClientPortal";
+import { useTutorial } from "@/context/TutorialContext";
 
 type AgendaEstado =
   | "PROGRAMADA"
@@ -143,6 +145,7 @@ function parseApiPathFromNext(nextUrl: string | null) {
 }
 
 export default function AgendaPage() {
+  const { openTutorial } = useTutorial();
   const calendarRef = useRef<FullCalendar | null>(null);
   const [citas, setCitas] = useState<AgendaCita[]>([]);
   const [pacientes, setPacientes] = useState<PacienteOption[]>([]);
@@ -831,6 +834,15 @@ export default function AgendaPage() {
               {googleStatus?.requires_reauthorization ? "Reconectar Google" : "Conectar Google"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => openTutorial(7)}
+            className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary shadow-subtle transition-all hover:bg-primary/20"
+            title="Ver video tutorial sobre Calendar y Agenda"
+          >
+            <PlayCircle className="h-4 w-4" />
+            <span>Ver tutorial de Agenda</span>
+          </button>
           <button
             type="button"
             onClick={() => openCreateModal(defaultStartForDate(new Date()))}

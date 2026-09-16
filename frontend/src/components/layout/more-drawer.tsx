@@ -12,8 +12,10 @@ import {
   CreditCard,
   X,
   MessageSquarePlus,
+  PlayCircle,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { useTutorial } from "@/context/TutorialContext";
 
 interface MoreDrawerProps {
   open: boolean;
@@ -30,6 +32,7 @@ export default function MoreDrawer({
 }: MoreDrawerProps) {
   const router = useRouter();
   const { theme, toggle } = useTheme();
+  const { openTutorial } = useTutorial();
   const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -183,6 +186,14 @@ export default function MoreDrawer({
             )}
 
             <div className="my-2 h-px bg-border mx-2" />
+
+            <MenuItem
+              icon={PlayCircle}
+              label="Video Tutorial Maestro"
+              onClick={() => {
+                openTutorial(0);
+              }}
+            />
 
             <MenuItem
               href="/dashboard/feedback"

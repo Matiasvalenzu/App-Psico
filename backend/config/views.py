@@ -35,6 +35,10 @@ def current_user(request):
             delta = fin_prueba - timezone.now()
             dias_restantes_prueba = max(0, delta.days + (1 if delta.seconds > 0 else 0))
 
+    tutorial_visto = False
+    if hasattr(request.user, "perfil_psicologo"):
+        tutorial_visto = request.user.perfil_psicologo.tutorial_visto
+
     return Response(
         {
             "username": request.user.username,
@@ -47,6 +51,7 @@ def current_user(request):
             "suscripcion_estado": suscripcion_estado,
             "fin_prueba": fin_prueba,
             "dias_restantes_prueba": dias_restantes_prueba,
+            "tutorial_visto": tutorial_visto,
         }
     )
 
