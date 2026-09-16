@@ -128,23 +128,19 @@ def sync_firewall_ip(force=False):
         hostinger_request(f"/firewall/{fw_id}/rules", token, method="POST", data=rule_payload)
         print("      [OK] Regla añadida exitosamente en Hostinger.")
 
-    print(f"      Sincronizando firewall con el servidor...")
-    hostinger_request(f"/firewall/{fw_id}/sync", token, method="POST")
-    print("      [OK] Solicitud de sincronización aceptada por Hostinger.")
+    print(f"      Sincronizando firewall con el servidor (VM {vm_id})...")
+    sync_res = hostinger_request(f"/firewall/{fw_id}/sync/{vm_id}", token, method="POST")
+    action_id = sync_res.get("id") if isinstance(sync_res, dict) else None
+    print(f"      [OK] Solicitud de sincronización aceptada por Hostinger (Action ID: {action_id}).")
 
-    print("[4/4] Esperando propagación de reglas (6 segundos)...")
-    time.sleep(6)
-
-    print("      Verificando conexión SSH...")
-    for attempt in range(1, 4):
-        if test_ssh(timeout=5):
+    print("[4/4] Esperando propagación de reglas en el hipervisor (hasta 35 segundos)...")
+    for _ in range(7):
+        time.sleep(5)
+        if test_ssh(timeout=4):
             print(f"[EXITO] Conexión SSH establecida correctamente con la IP {current_ip}.")
             return True
-        print(f"      Intento {attempt}/3 esperando respuesta de SSH...")
-        time.sleep(3)
 
-    print("[AVISO] Hostinger ya tiene autorizada tu IP, pero el firewall interno (ufw) del VPS aún no la permite.")
-    print("        Asegúrate de ejecutar una sola vez en la consola web de KVM 2: sudo ufw allow 22/tcp")
+    print("[AVISO] Hostinger aún no termina de aplicar la regla o el puerto sigue bloqueado.")
     return False
 
 if __name__ == "__main__":
