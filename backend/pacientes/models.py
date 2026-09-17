@@ -89,3 +89,59 @@ class Paciente(models.Model):
     @property
     def nombre_completo(self):
         return f"{self.nombre} {self.apellido}"
+
+
+class ConsentimientoInformado(models.Model):
+    class Estado(models.TextChoices):
+        BORRADOR = "BORRADOR", "Borrador"
+        ENVIADO = "ENVIADO", "Enviado / Pendiente de firma"
+        FIRMADO = "FIRMADO", "Firmado digitalmente"
+        RECHAZADO = "RECHAZADO", "Rechazado"
+
+    paciente = models.ForeignKey(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name="consentimientos",
+    )
+    psicologo = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="consentimientos_emitidos",
+    )
+    titulo = models.CharField(
+        max_length=255,
+        default="Consentimiento Informado para Atención Psicológica",
+    )
+    contenido = models.TextField(help_text="Texto completo del consentimiento redactado.")
+    estado = models.CharField(
+        max_length=20,
+        choices=Estado.choices,
+        default=Estado.BORRADOR,
+        db_index=True,
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    enlace_firma = models.URLField(max_length=500, blank=True, default="")
+    email_destino = models.EmailField(blank=True, default="")
+    email_enviado = models.BooleanField(default=False)
+    email_error = models.TextField(blank=True, default="")
+    fecha_envio = models.DateTimeField(null=True, blank=True)
+    fecha_firma = models.DateTimeField(null=True, blank=True)
+
+    # Datos de firma digital
+    firma_nombre = models.CharField(max_length=200, blank=True, default="")
+    firma_rut = models.CharField(max_length=30, blank=True, default="")
+    firma_imagen = models.TextField(blank=True, default="", help_text="Data URL base64 de la firma gráfica")
+    firma_ip = models.CharField(max_length=60, blank=True, default="")
+    firma_user_agent = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Consentimiento Informado"
+        verbose_name_plural = "Consentimientos Informados"
+
+    def __str__(self):
+        return f"Consentimiento {self.paciente.nombre_completo} ({self.estado})"
+

@@ -15,6 +15,7 @@ import {
   ArrowUp,
   Brain,
   Calendar,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
@@ -76,6 +77,9 @@ interface Paciente {
   notas_privadas: string;
   estado: string;
   activo: boolean;
+  consentimiento_estado?: string | null;
+  consentimiento_id?: number | null;
+  consentimiento_fecha_firma?: string | null;
   created_at: string;
 }
 
@@ -259,15 +263,15 @@ function DetailItem({
 }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-muted/20 p-3.5 transition-colors hover:bg-muted/40">
-      <div className="flex items-center justify-between gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-3.5 transition-colors hover:bg-muted/40 min-w-0">
+      <div className="flex items-center justify-between gap-1 min-w-0">
+        <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
           {label}
         </span>
-        {Icon && <Icon className="h-3.5 w-3.5 text-primary/60" />}
+        {Icon && <Icon className="h-3.5 w-3.5 text-primary/60 shrink-0" />}
       </div>
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground tracking-tight break-words">{value}</p>
+      <div className="mt-1.5 flex items-center justify-between gap-2 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-foreground tracking-tight break-words min-w-0">{value}</p>
         {action && <div className="shrink-0">{action}</div>}
       </div>
     </div>
@@ -348,7 +352,7 @@ export default function PacienteDetailPage() {
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
   const [chatToDelete, setChatToDelete] = useState<ChatConversacion | null>(null);
   const [deletingChat, setDeletingChat] = useState(false);
-  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(true);
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
   const [editingConversationId, setEditingConversationId] = useState<number | null>(null);
   const [editingConversationTitle, setEditingConversationTitle] = useState("");
 
@@ -442,6 +446,9 @@ export default function PacienteDetailPage() {
 
   useEffect(() => {
     loadData();
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setIsChatSidebarOpen(true);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -1179,52 +1186,53 @@ export default function PacienteDetailPage() {
   return (
     <div className="space-y-6">
       {/* Back navigation & Status bar */}
-      <div className="sticky top-14 md:top-16 z-10 -mx-4 -mt-4 mb-6 px-4 py-3 bg-background/85 backdrop-blur-md border-b border-border/60 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="sticky top-14 md:top-16 z-10 -mx-4 -mt-4 mb-5 sm:mb-6 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-background/85 backdrop-blur-md border-b border-border/60 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => router.push("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:border-primary/40 active:scale-95"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border/80 bg-card px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:border-primary/40 active:scale-95 shrink-0"
           >
-            <ArrowLeft className="h-3.5 w-3.5 text-primary" />
-            <span>Volver a Pacientes</span>
+            <ArrowLeft className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="hidden sm:inline">Volver a Pacientes</span>
+            <span className="sm:hidden">Volver</span>
           </button>
-          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground min-w-0">
             <span>/</span>
-            <span className="font-semibold text-foreground tracking-tight truncate max-w-[240px]">
+            <span className="font-semibold text-foreground tracking-tight truncate max-w-[200px] lg:max-w-[260px]">
               {paciente.nombre_completo}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={() => openTutorial(3)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs"
+            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs"
             title="Ver video tutorial sobre Ficha Clínica y Asistente IA (Módulo 3 y 5)"
           >
             <PlayCircle className="h-3.5 w-3.5" />
             <span className="hidden md:inline">Tutorial de Ficha y Sesiones IA</span>
-            <span className="md:hidden">Tutorial</span>
+            <span className="hidden xs:inline md:hidden">Tutorial</span>
           </button>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="truncate max-w-[90px] sm:max-w-none">{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>
           </span>
         </div>
       </div>
 
       {/* Bloque 1: Tarjeta Principal de Identidad & Acciones Rápidas */}
-      <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-7 shadow-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-          <div className="flex items-center gap-4 sm:gap-5">
-            <div className="flex h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl sm:text-2xl font-bold text-primary border border-primary/20 shadow-xs">
+      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 md:p-7 shadow-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-5">
+          <div className="flex items-start sm:items-center gap-3.5 sm:gap-5 min-w-0">
+            <div className="flex h-13 w-13 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg sm:text-xl md:text-2xl font-bold text-primary border border-primary/20 shadow-xs">
               {paciente.nombre.charAt(0).toUpperCase()}
               {paciente.apellido.charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-foreground break-words">
                   {paciente.nombre_completo}
                 </h1>
                 {paciente.activo === false && (
@@ -1233,24 +1241,24 @@ export default function PacienteDetailPage() {
                   </span>
                 )}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-muted-foreground">
                 {paciente.rut && (
-                  <span className="inline-flex items-center font-mono font-medium text-foreground/80 bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70">
+                  <span className="inline-flex items-center font-mono font-medium text-foreground/80 bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-[11px] sm:text-xs">
                     {paciente.rut}
                   </span>
                 )}
                 {paciente.edad && (
-                  <span className="bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70 text-foreground/80 font-medium">
+                  <span className="bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-foreground/80 font-medium text-[11px] sm:text-xs">
                     {paciente.edad} años
                   </span>
                 )}
                 {paciente.sexo && paciente.sexo !== "N" && (
-                  <span className="bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70 text-foreground/80 font-medium">
+                  <span className="bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-foreground/80 font-medium text-[11px] sm:text-xs">
                     {getSexoLabel(paciente.sexo)}
                   </span>
                 )}
                 {paciente.ocupacion_laboral && (
-                  <span className="bg-muted/60 px-2.5 py-1 rounded-lg border border-border/70 text-foreground/80 font-medium">
+                  <span className="bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-foreground/80 font-medium text-[11px] sm:text-xs truncate max-w-[180px] sm:max-w-none">
                     {paciente.ocupacion_laboral}
                   </span>
                 )}
@@ -1258,63 +1266,155 @@ export default function PacienteDetailPage() {
             </div>
           </div>
 
-          {/* Botones de Acción Rápida */}
-          <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
+          {/* Botones de Acción Rápida: Grid 2 cols en teléfono móvil, flex wrap en desktop */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto self-stretch sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
             {paciente.telefono_whatsapp && (
               <a
                 href={`https://wa.me/${paciente.telefono_whatsapp.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50/70 px-3.5 py-2 text-xs font-semibold text-emerald-700 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-subtle dark:bg-emerald-950/40 dark:text-emerald-300"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50/70 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-subtle dark:bg-emerald-950/40 dark:text-emerald-300 w-full sm:w-auto"
               >
-                <MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>WhatsApp</span>
               </a>
             )}
             <button
               type="button"
               onClick={() => openTestModal("start")}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer w-full sm:w-auto"
             >
-              <Play className="h-3.5 w-3.5 fill-current" />
+              <Play className="h-3.5 w-3.5 fill-current shrink-0" />
               <span>Comenzar test</span>
             </button>
             <button
               type="button"
               onClick={() => openTestModal("send")}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-2 text-xs font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 hover:shadow-subtle active:scale-95 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 hover:shadow-subtle active:scale-95 cursor-pointer w-full sm:w-auto"
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-3.5 w-3.5 shrink-0" />
               <span>Enviar test</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setConsentModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/80 px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-violet-950/40 dark:text-violet-300"
-              title="Generar Consentimiento Informado editable (Ley 19.628)"
-            >
-              <FileSignature className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-              <span>Consentimiento</span>
-            </button>
+            {paciente.consentimiento_estado === "FIRMADO" ? (
+              <button
+                type="button"
+                onClick={() => setConsentModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-emerald-950/40 dark:text-emerald-300 w-full sm:w-auto"
+                title="Consentimiento firmado digitalmente por el paciente"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>Consentimiento firmado ✓</span>
+              </button>
+            ) : paciente.consentimiento_estado === "ENVIADO" ? (
+              <button
+                type="button"
+                onClick={() => setConsentModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-800 shadow-xs transition-all hover:bg-amber-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-amber-950/40 dark:text-amber-300 w-full sm:w-auto"
+                title="Consentimiento enviado por correo, pendiente de firma"
+              >
+                <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Consentimiento pendiente ⏳</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConsentModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/80 px-3 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-violet-950/40 dark:text-violet-300 w-full sm:w-auto"
+                title="Generar Consentimiento Informado editable con datos del paciente (Ley 19.628)"
+              >
+                <FileSignature className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+                <span>Consentimiento</span>
+              </button>
+            )}
             <button
               onClick={openEditModal}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:shadow-subtle"
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:shadow-subtle w-full sm:w-auto ${
+                paciente.telefono_whatsapp ? "col-span-1" : "col-span-2 sm:col-span-1"
+              }`}
             >
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               <span>Editar</span>
             </button>
           </div>
         </div>
       </div>
 
+      {/* Banner / Resumen de Consentimiento Informado */}
+      <div
+        className={`rounded-2xl border p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 ${
+          paciente.consentimiento_estado === "FIRMADO"
+            ? "border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-900/40"
+            : paciente.consentimiento_estado === "ENVIADO"
+            ? "border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-900/40"
+            : "border-border/80 bg-card"
+        }`}
+      >
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              paciente.consentimiento_estado === "FIRMADO"
+                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+                : paciente.consentimiento_estado === "ENVIADO"
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                : "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+            }`}
+          >
+            <FileSignature className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-foreground">Consentimiento Informado (Ley 19.628)</h3>
+              {paciente.consentimiento_estado === "FIRMADO" ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold px-2 py-0.5 border border-emerald-300 dark:border-emerald-800">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  Firmado digitalmente
+                </span>
+              ) : paciente.consentimiento_estado === "ENVIADO" ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-[10px] font-bold px-2 py-0.5 border border-amber-300 dark:border-amber-800">
+                  <Clock className="h-3 w-3 text-amber-600" />
+                  Enviado por correo (Pendiente)
+                </span>
+              ) : (
+                <span className="rounded-full bg-muted text-muted-foreground text-[10px] font-medium px-2 py-0.5 border border-border">
+                  No generado
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {paciente.consentimiento_estado === "FIRMADO"
+                ? `El paciente completó la firma electrónica de consentimiento${
+                    paciente.consentimiento_fecha_firma
+                      ? ` el ${new Date(paciente.consentimiento_fecha_firma).toLocaleDateString("es-CL")}`
+                      : ""
+                  }. El documento se encuentra debidamente custodiado.`
+                : paciente.consentimiento_estado === "ENVIADO"
+                ? "Documento enviado por correo electrónico; esperando que el paciente acceda al enlace y firme."
+                : "Planilla redactada con los datos del paciente lista para revisión, envío por correo y firma digital."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <button
+            type="button"
+            onClick={() => setConsentModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent cursor-pointer"
+          >
+            <FileSignature className="h-3.5 w-3.5 text-primary" />
+            <span>
+              {paciente.consentimiento_estado === "FIRMADO" ? "Ver consentimiento firmado" : "Gestionar consentimiento"}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Bloque 2: Expediente y Datos Demográficos */}
-      <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm">
+        <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-border/60 pb-2.5 sm:pb-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Expediente y Datos Personales
           </h2>
         </div>
-        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-4">
           <DetailItem label="RUT" value={paciente.rut} />
           <DetailItem label="Edad" value={paciente.edad ? `${paciente.edad} años` : null} />
           <DetailItem label="Sexo" value={paciente.sexo !== "N" ? getSexoLabel(paciente.sexo) : null} />
@@ -1328,28 +1428,28 @@ export default function PacienteDetailPage() {
 
       {/* Bloque 3: Motivo de consulta y Objetivos Terapéuticos */}
       {(paciente.motivo_consulta || paciente.objetivos_intervencion) && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3.5 sm:gap-4 md:grid-cols-2">
           {paciente.motivo_consulta && (
-            <div className="rounded-2xl border border-primary/25 bg-primary/[0.02] p-6 shadow-sm flex flex-col justify-between">
+            <div className="rounded-2xl border border-primary/25 bg-primary/[0.02] p-4 sm:p-6 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="mb-3 flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
+                <div className="mb-2.5 sm:mb-3 flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
                   <ClipboardList className="h-4 w-4" />
                   <span>Motivo de consulta</span>
                 </div>
-                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                <p className="text-xs sm:text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
                   {paciente.motivo_consulta}
                 </p>
               </div>
             </div>
           )}
           {paciente.objetivos_intervencion && (
-            <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm flex flex-col justify-between">
+            <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="mb-3 flex items-center gap-2 text-muted-foreground font-semibold text-xs uppercase tracking-wider">
+                <div className="mb-2.5 sm:mb-3 flex items-center gap-2 text-muted-foreground font-semibold text-xs uppercase tracking-wider">
                   <Brain className="h-4 w-4 text-primary/70" />
                   <span>Objetivos de intervención</span>
                 </div>
-                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                <p className="text-xs sm:text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
                   {paciente.objetivos_intervencion}
                 </p>
               </div>
@@ -1360,13 +1460,13 @@ export default function PacienteDetailPage() {
 
       {/* Bloque 4: Contacto y Ubicación */}
       {hasContactData && (
-        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm">
+          <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-border/60 pb-2.5 sm:pb-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Contacto y Ubicación
             </h2>
           </div>
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2.5 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem
               label="WhatsApp"
               value={paciente.telefono_whatsapp}
@@ -1405,13 +1505,13 @@ export default function PacienteDetailPage() {
 
       {/* Bloque 5: Información Clínica Ampliada */}
       {hasClinicalData && (
-        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm">
+          <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-border/60 pb-2.5 sm:pb-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Información Clínica Complementaria
             </h2>
           </div>
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2.5 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <DetailItem label="Frecuencia de atención" value={paciente.frecuencia_atencion} />
             <DetailItem label="Origen de consulta" value={paciente.origen_consulta} />
             <DetailItem label="Diagnóstico sospechado" value={paciente.diagnostico_sospechado} />
@@ -1423,14 +1523,14 @@ export default function PacienteDetailPage() {
 
       {/* Bloque 6: Alertas Clínicas, Riesgo y Tutor */}
       {hasRiskData && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-50/30 p-6 shadow-sm dark:bg-amber-950/20 dark:border-amber-900/50">
-          <div className="mb-4 flex items-center gap-2 border-b border-amber-500/20 pb-3 text-amber-800 dark:text-amber-300">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-50/30 p-4 sm:p-6 shadow-sm dark:bg-amber-950/20 dark:border-amber-900/50">
+          <div className="mb-3 sm:mb-4 flex items-center gap-2 border-b border-amber-500/20 pb-2.5 sm:pb-3 text-amber-800 dark:text-amber-300">
             <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
             <h2 className="text-xs font-semibold uppercase tracking-wider">
               Alertas Clínicas, Red de Emergencia y Tutor
             </h2>
           </div>
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2.5 sm:gap-3.5 grid-cols-2 lg:grid-cols-4">
             <DetailItem label="Riesgo suicida" value={paciente.riesgo_suicida ? "Sí" : ""} />
             <DetailItem label="Ideación suicida" value={paciente.ideacion_suicida_nivel} />
             <DetailItem label="Contacto emergencia" value={paciente.contacto_emergencia_nombre} />
@@ -1445,7 +1545,7 @@ export default function PacienteDetailPage() {
       {/* Test modal: Comenzar test en sesión o Enviar por correo */}
       {testModalOpen && (
         <ClientPortal>
-          <div className="w-full max-w-xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated">
+          <div className="w-full max-w-xl rounded-xl border border-border/60 bg-card p-4 sm:p-6 shadow-elevated max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1701,7 +1801,7 @@ export default function PacienteDetailPage() {
         <ClientPortal>
           <form
             onSubmit={handleEdit}
-            className="w-full max-w-3xl rounded-xl border border-border/60 bg-card p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl rounded-xl border border-border/60 bg-card p-4 sm:p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2046,7 +2146,7 @@ export default function PacienteDetailPage() {
           onClose={() => setConsentModalOpen(false)}
           paciente={paciente}
           onSavedToFicha={() => {
-            loadInformes();
+            loadData();
           }}
         />
       )}
@@ -2239,24 +2339,24 @@ export default function PacienteDetailPage() {
       )}
 
       {/* Sessions header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-base sm:text-lg font-semibold tracking-tight">
           Sesiones ({sesionesClinicas.length})
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <button
             onClick={openVirtualModal}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-50 px-3.5 py-2 text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3 py-2 text-xs sm:text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50 w-full sm:w-auto"
           >
-            <Video className="h-4 w-4" />
-            Sesión remota
+            <Video className="h-4 w-4 shrink-0" />
+            <span>Sesión remota</span>
           </button>
           <button
             onClick={handleNewSession}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs sm:text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card w-full sm:w-auto"
           >
-            <Play className="h-4 w-4" />
-            Sesión presencial
+            <Play className="h-4 w-4 shrink-0" />
+            <span>Sesión presencial</span>
           </button>
         </div>
       </div>
@@ -2303,7 +2403,7 @@ export default function PacienteDetailPage() {
         <ClientPortal>
           <form
             onSubmit={handleDocumentUpload}
-            className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-6 shadow-elevated"
+            className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-4 sm:p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2700,29 +2800,41 @@ export default function PacienteDetailPage() {
 
           {/* ── Chat Sidebar (Historial) ── */}
           <div
-            className={`relative flex flex-col border-r border-border/60 bg-muted/20 transition-all duration-300 overflow-hidden ${
-              isChatSidebarOpen ? "w-72 min-w-[288px]" : "w-0 min-w-0 border-r-0"
+            className={`transition-all duration-300 overflow-hidden ${
+              isChatSidebarOpen
+                ? "absolute inset-0 z-30 bg-card flex flex-col md:relative md:inset-auto md:z-auto md:w-72 md:min-w-[288px] md:border-r md:border-border/60 md:bg-muted/20"
+                : "hidden md:flex md:w-0 md:min-w-0 md:border-r-0"
             }`}
           >
             {/* Sidebar Header */}
-            <div className="flex items-center justify-between gap-2 px-4 py-4 border-b border-border/40">
+            <div className="flex items-center justify-between gap-2 px-4 py-3.5 border-b border-border/40">
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-sm font-semibold truncate">Conversaciones</span>
               </div>
-              <button
-                type="button"
-                onClick={createChatConversation}
-                disabled={creatingChat}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
-                title="Nueva conversación"
-              >
-                {creatingChat ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={createChatConversation}
+                  disabled={creatingChat}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
+                  title="Nueva conversación"
+                >
+                  {creatingChat ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsChatSidebarOpen(false)}
+                  className="flex md:hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  title="Cerrar historial"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Conversation List */}
@@ -2747,7 +2859,12 @@ export default function PacienteDetailPage() {
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       }`}
                       onClick={() => {
-                        if (!isEditing) loadChatConversation(conv.id);
+                        if (!isEditing) {
+                          loadChatConversation(conv.id);
+                          if (typeof window !== "undefined" && window.innerWidth < 768) {
+                            setIsChatSidebarOpen(false);
+                          }
+                        }
                       }}
                     >
                       <MessageCircle className={`h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
@@ -2820,9 +2937,9 @@ export default function PacienteDetailPage() {
             </div>
           </div>
 
-          {/* ── Toggle Button (Chat Sidebar) ── */}
+          {/* ── Toggle Button (Chat Sidebar - solo desktop) ── */}
           <div
-            className={`relative flex items-start pt-3 z-10 transition-all duration-300 ${
+            className={`hidden md:flex relative items-start pt-3 z-10 transition-all duration-300 ${
               isChatSidebarOpen ? "-mx-3.5" : "ml-4 -mr-3.5"
             }`}
           >
@@ -2843,22 +2960,22 @@ export default function PacienteDetailPage() {
           {/* ── Main Chat Area ── */}
           <div className="flex flex-1 flex-col min-w-0">
             {/* Chat Header */}
-            <div className="flex items-center justify-between gap-3 border-b border-border/40 px-5 py-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 shadow-glow shrink-0">
-                  <Sparkles className="h-4 w-4 text-primary" />
+            <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-primary/10 shadow-glow shrink-0">
+                  <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-semibold tracking-tight truncate">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <h2 className="text-sm sm:text-base font-semibold tracking-tight truncate">
                       Chat IA del paciente
                     </h2>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium text-primary shrink-0">
                       <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-soft" />
                       IA
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                     {chatId
                       ? chatConversations.find((c) => c.id === chatId)?.titulo || "Nueva conversación"
                       : "Analiza sesiones y documentos con IA"}
@@ -2866,16 +2983,27 @@ export default function PacienteDetailPage() {
                 </div>
               </div>
 
-              {chatId && (
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowChatControls(!showChatControls)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium shadow-subtle transition-all hover:bg-accent shrink-0"
+                  onClick={() => setIsChatSidebarOpen(true)}
+                  className="md:hidden inline-flex items-center gap-1 rounded-lg border border-border/80 bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground shadow-2xs hover:bg-accent active:scale-95"
+                  title="Ver conversaciones"
                 >
-                  {showChatControls ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  Controles
+                  <MessageCircle className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>Historial</span>
                 </button>
-              )}
+                {chatId && (
+                  <button
+                    type="button"
+                    onClick={() => setShowChatControls(!showChatControls)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 sm:px-2.5 py-1 text-xs font-medium shadow-subtle transition-all hover:bg-accent shrink-0"
+                  >
+                    {showChatControls ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    <span className="hidden sm:inline">Controles</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Collapsible Controls */}
@@ -3076,18 +3204,18 @@ export default function PacienteDetailPage() {
             </div>
 
             {/* Suggested Prompts */}
-            <div className="border-t border-border/40 px-5 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="border-t border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
+              <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Preguntas sugeridas
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
                 {CHAT_SUGGESTED_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => selectSuggestedChatPrompt(prompt)}
                     disabled={sendingChat || creatingChat}
-                    className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50"
+                    className="rounded-full border border-border/80 bg-card px-2.5 py-1 text-[11px] sm:text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50 text-left max-w-full truncate"
                   >
                     {prompt}
                   </button>
@@ -3096,7 +3224,7 @@ export default function PacienteDetailPage() {
             </div>
 
             {/* Chat Input */}
-            <div className="border-t border-border/40 px-5 py-3">
+            <div className="border-t border-border/40 px-3 sm:px-5 py-2.5 sm:py-3">
               <form onSubmit={sendChatMessage} className="flex items-end gap-2">
                 <textarea
                   ref={textareaRef}
@@ -3105,7 +3233,7 @@ export default function PacienteDetailPage() {
                   onKeyDown={handleKeyDown}
                   rows={1}
                   disabled={sendingChat || creatingChat}
-                  className="flex-1 resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
+                  className="flex-1 min-w-0 resize-none rounded-xl border border-input bg-background px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
                   placeholder={
                     chatId
                       ? `Pregunta sobre las sesiones de ${paciente.nombre}...`
@@ -3115,12 +3243,12 @@ export default function PacienteDetailPage() {
                 <button
                   type="submit"
                   disabled={sendingChat || creatingChat || !chatInput.trim()}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {sendingChat ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <ArrowUp className="h-5 w-5" />
+                    <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
                   )}
                 </button>
               </form>

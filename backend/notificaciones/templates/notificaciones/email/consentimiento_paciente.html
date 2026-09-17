@@ -1,0 +1,13 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Consentimiento Informado - Psiconex{% endblock %}
+{% block preheader %}{{ psychologist_name }} te ha enviado el consentimiento informado para tu atención psicológica.{% endblock %}
+{% block eyebrow %}Atención Psicológica{% endblock %}
+{% block heading %}Firma de Consentimiento Informado{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ patient_name }}, tu profesional tratante <strong>{{ psychologist_name }}</strong> ha generado tu documento de <strong>Consentimiento Informado</strong> para tu proceso de atención psicológica.</p>
+<p style="margin:0 0 22px;color:#475569;font-size:14px;line-height:1.7;">Por favor accede al siguiente enlace para revisar las condiciones del encuadre clínico, confidencialidad y asistencia digital, y otorgar tu consentimiento mediante firma digital. No necesitas ingresar contraseñas; puedes firmarlo cómodamente desde tu teléfono móvil o computador.</p>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Este documento formaliza el resguardo ético y legal de tu información de conformidad con la Ley N° 19.628 sobre Protección de la Vida Privada y la Ley N° 20.584 de Derechos y Deberes en Salud.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#7c3aed;"><a href="{{ public_url }}" style="display:inline-block;padding:13px 24px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Revisar y Firmar Consentimiento</a></td></tr></table>
+{% endblock %}

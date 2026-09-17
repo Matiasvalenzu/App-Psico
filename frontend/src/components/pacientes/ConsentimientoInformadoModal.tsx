@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   FileSignature,
@@ -17,6 +17,11 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  Send,
+  ExternalLink,
+  Mail,
+  Clock,
+  UserCheck,
 } from "lucide-react";
 import { apiFetch, getCurrentUser } from "@/lib/api";
 
@@ -34,6 +39,22 @@ interface PacienteData {
   es_menor_edad?: boolean;
   nombre_tutor?: string;
   telefono_tutor?: string;
+}
+
+interface ConsentRecord {
+  id: number;
+  estado: "BORRADOR" | "ENVIADO" | "FIRMADO" | "RECHAZADO";
+  enlace_firma: string;
+  email_destino: string;
+  email_enviado: boolean;
+  email_error: string;
+  fecha_envio: string | null;
+  fecha_firma: string | null;
+  firma_nombre: string;
+  firma_rut: string;
+  firma_imagen: string;
+  firma_ip: string;
+  contenido: string;
 }
 
 interface ConsentimientoModalProps {
@@ -78,12 +99,22 @@ export default function ConsentimientoInformadoModal({
   onSavedToFicha,
 }: ConsentimientoModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"preview" | "edit" | "params">("preview");
+  const [activeTab, setActiveTab] = useState<"digital_sign" | "preview" | "params" | "edit">("digital_sign");
   const [loadingUser, setLoadingUser] = useState(false);
+  const [loadingConsent, setLoadingConsent] = useState(false);
   const [savingInforme, setSavingInforme] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+
   const [copySuccess, setCopySuccess] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Backend persisted consent record
+  const [consentRecord, setConsentRecord] = useState<ConsentRecord | null>(null);
+  const [emailDestino, setEmailDestino] = useState(paciente.email_contacto || "");
 
   // Editable parameters
   const [ciudad, setCiudad] = useState("Santiago");
@@ -122,42 +153,71 @@ export default function ConsentimientoInformadoModal({
     setMounted(true);
   }, []);
 
-  // Fetch current psychologist profile
+  // Fetch backend consent record & psychologist profile
   useEffect(() => {
     if (!isOpen) return;
     let isCancelled = false;
-    async function loadPsicologo() {
+
+    async function loadData() {
       setLoadingUser(true);
+      setLoadingConsent(true);
       try {
-        const profile: PsychologistProfile = await getCurrentUser();
+        const [profile, consentRes] = await Promise.all([
+          getCurrentUser().catch(() => ({} as PsychologistProfile)),
+          apiFetch(`/pacientes/${paciente.id}/consentimiento/`).catch(() => null),
+        ]);
+
         if (isCancelled) return;
-        const nombre =
-          profile.full_name ||
-          [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
-          "";
-        if (nombre) setPsicologoNombre(nombre);
-        if (profile.rut_profesional) setPsicologoRut(profile.rut_profesional);
-        if (profile.registro_profesional) setPsicologoRegistro(profile.registro_profesional);
-        if (profile.especialidad_clinica) setPsicologoEspecialidad(profile.especialidad_clinica);
-        if (profile.direccion_consulta || profile.comuna) {
-          setPsicologoLugar(
-            [profile.direccion_consulta, profile.comuna].filter(Boolean).join(", ")
-          );
+
+        // Populate psychologist
+        if (profile) {
+          const nombre =
+            profile.full_name ||
+            [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+            "";
+          if (nombre) setPsicologoNombre(nombre);
+          if (profile.rut_profesional) setPsicologoRut(profile.rut_profesional);
+          if (profile.registro_profesional) setPsicologoRegistro(profile.registro_profesional);
+          if (profile.especialidad_clinica) setPsicologoEspecialidad(profile.especialidad_clinica);
+          if (profile.direccion_consulta || profile.comuna) {
+            setPsicologoLugar(
+              [profile.direccion_consulta, profile.comuna].filter(Boolean).join(", ")
+            );
+          }
+          if (profile.comuna) {
+            setCiudad(profile.comuna);
+          }
         }
-        if (profile.comuna) {
-          setCiudad(profile.comuna);
+
+        // Populate consent if exists
+        if (consentRes && consentRes.ok) {
+          const data = await consentRes.json();
+          if (data.consentimiento) {
+            setConsentRecord(data.consentimiento);
+            if (data.consentimiento.email_destino) {
+              setEmailDestino(data.consentimiento.email_destino);
+            }
+            if (data.consentimiento.contenido) {
+              setDocumentContent(data.consentimiento.contenido);
+              setHasManuallyEdited(true);
+            }
+          }
         }
       } catch (err) {
-        console.warn("No se pudo cargar el perfil del psicólogo automáticamente:", err);
+        console.warn("Error al cargar datos del consentimiento:", err);
       } finally {
-        if (!isCancelled) setLoadingUser(false);
+        if (!isCancelled) {
+          setLoadingUser(false);
+          setLoadingConsent(false);
+        }
       }
     }
-    loadPsicologo();
+
+    loadData();
     return () => {
       isCancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, paciente.id]);
 
   // Function to build template text
   const buildTemplate = useMemo(() => {
@@ -237,7 +297,7 @@ Toda la información revelada en el contexto de las sesiones se encuentra ampara
 Dicha confidencialidad solo podrá ser excepcionada en las situaciones legal y éticamente previstas:
 a) Ante riesgo inminente, grave y manifiesto para la integridad física o vida del/de la paciente o de terceros.
 b) Por requerimiento fundado y formal emanado de los Tribunales de Justicia competentes.
-c) Al tomar conocimiento verídico de situaciones constitutivas de vulneración grave o abuso hacia niños, niñas, adolescentes o adultos en condición de dependencia o incapacidad, según lo mandata la ley penal chilena.${grabacionSection}
+c) Al tomar conocimiento verídico de situaciones constitutivas de vulneración grave o abuso hacia niños, niñas, adolescentes o adultos en condición de dependencia o incapacidad, según lo mandata la ley penal chilena.${grabacionSection}${acuerdosSection}
 
 ${numDerechos}. DERECHOS DEL/DE LA PACIENTE (LEY N° 20.584 Y LEY N° 19.628)
 El/la paciente (o su tutor legal) tiene derecho a:
@@ -289,7 +349,109 @@ Fecha: ${fecha}                                       RUT: ${pRut}
     setHasManuallyEdited(false);
     setDocumentContent(buildTemplate());
     setSaveSuccess(false);
+    setEmailSuccessMsg("");
     setErrorMessage("");
+  }
+
+  // SEND BY EMAIL
+  async function handleSendEmail() {
+    if (!emailDestino.trim()) {
+      setErrorMessage("Por favor ingresa o verifica el correo electrónico del paciente.");
+      return;
+    }
+    setSendingEmail(true);
+    setErrorMessage("");
+    setEmailSuccessMsg("");
+    try {
+      const res = await apiFetch(`/pacientes/${paciente.id}/consentimiento/`, {
+        method: "POST",
+        body: JSON.stringify({
+          contenido: documentContent,
+          email_destino: emailDestino.trim(),
+          enviar_email: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.detail || "No se pudo enviar el correo de consentimiento.");
+      }
+      setConsentRecord(data);
+      setEmailSuccessMsg(`¡Consentimiento enviado con éxito a ${emailDestino}! El paciente podrá firmarlo desde su correo.`);
+      if (onSavedToFicha) onSavedToFicha();
+    } catch (err: unknown) {
+      const errObj = err as { message?: string };
+      setErrorMessage(errObj?.message || "Error al enviar el correo.");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  // RESEND EMAIL
+  async function handleResendEmail() {
+    if (!consentRecord?.id) return;
+    setSendingEmail(true);
+    setErrorMessage("");
+    setEmailSuccessMsg("");
+    try {
+      const res = await apiFetch(`/pacientes/consentimiento/${consentRecord.id}/enviar/`, {
+        method: "POST",
+        body: JSON.stringify({
+          email_destino: emailDestino.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "No se pudo reenviar el correo.");
+      }
+      setConsentRecord(data.consentimiento);
+      setEmailSuccessMsg(`Correo reenviado exitosamente a ${emailDestino}.`);
+      if (onSavedToFicha) onSavedToFicha();
+    } catch (err: unknown) {
+      const errObj = err as { message?: string };
+      setErrorMessage(errObj?.message || "Error al reenviar el correo.");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  // GENERATE PUBLIC LINK
+  async function handleGenerateLink() {
+    setGeneratingLink(true);
+    setErrorMessage("");
+    setEmailSuccessMsg("");
+    try {
+      const res = await apiFetch(`/pacientes/${paciente.id}/consentimiento/`, {
+        method: "POST",
+        body: JSON.stringify({
+          contenido: documentContent,
+          email_destino: emailDestino.trim(),
+          enviar_email: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.detail || "No se pudo generar el enlace de firma.");
+      }
+      setConsentRecord(data);
+      if (data.enlace_firma || data.public_url) {
+        navigator.clipboard.writeText(data.enlace_firma || data.public_url);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 3000);
+      }
+      if (onSavedToFicha) onSavedToFicha();
+    } catch (err: unknown) {
+      const errObj = err as { message?: string };
+      setErrorMessage(errObj?.message || "Error al generar el enlace.");
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
+
+  function handleCopyExistingLink() {
+    if (!consentRecord?.enlace_firma) return;
+    navigator.clipboard.writeText(consentRecord.enlace_firma);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 3000);
   }
 
   function handleCopyText() {
@@ -305,7 +467,6 @@ Fecha: ${fecha}                                       RUT: ${pRut}
       return;
     }
 
-    // Convert newlines to formatted paragraphs / lines
     const paragraphs = documentContent
       .split("\n\n")
       .map((block) => {
@@ -333,6 +494,19 @@ Fecha: ${fecha}                                       RUT: ${pRut}
       })
       .join("");
 
+    let firmaDigitalBox = "";
+    if (consentRecord?.estado === "FIRMADO") {
+      firmaDigitalBox = `
+        <div style="margin-top:25px;padding:12px;border:1px solid #10b981;border-radius:8px;background:#ecfdf5;font-size:9pt;">
+          <strong>✓ CERTIFICADO DE FIRMA DIGITAL ELECTRÓNICA (LEY 19.628)</strong><br>
+          Firmante: ${consentRecord.firma_nombre || paciente.nombre_completo}<br>
+          RUT: ${consentRecord.firma_rut || paciente.rut || "No especificado"}<br>
+          Fecha: ${consentRecord.fecha_firma ? new Date(consentRecord.fecha_firma).toLocaleString("es-CL") : "Registrada"}<br>
+          ${consentRecord.firma_imagen ? `<img src="${consentRecord.firma_imagen}" style="max-height:60px;margin-top:5px;display:block;">` : ""}
+        </div>
+      `;
+    }
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html lang="es">
@@ -348,14 +522,13 @@ Fecha: ${fecha}                                       RUT: ${pRut}
             margin: 0;
             padding: 10px;
           }
-          @media print {
-            body { padding: 0; }
-          }
+          @media print { body { padding: 0; } }
         </style>
       </head>
       <body>
         <div style="max-width:760px;margin:0 auto;">
           ${paragraphs}
+          ${firmaDigitalBox}
         </div>
       </body>
       </html>
@@ -463,6 +636,9 @@ Fecha: ${fecha}                                       RUT: ${pRut}
 
   if (!isOpen || !mounted) return null;
 
+  const isSigned = consentRecord?.estado === "FIRMADO";
+  const isSent = consentRecord?.estado === "ENVIADO";
+
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-3 sm:p-5 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div className="flex max-h-[94vh] w-full max-w-4xl flex-col rounded-2xl border border-border/70 bg-card shadow-2xl overflow-hidden my-auto">
@@ -475,18 +651,27 @@ Fecha: ${fecha}                                       RUT: ${pRut}
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-lg font-bold tracking-tight text-foreground">
-                  Plantilla de Consentimiento Informado
+                  Consentimiento Informado del Paciente
                 </h3>
-                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                  <ShieldCheck className="h-3 w-3" />
-                  Ley 19.628 Chile
-                </span>
-                <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary border border-primary/20">
-                  Colegio de Psicólogos
-                </span>
+                {isSigned ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Firmado Digitalmente
+                  </span>
+                ) : isSent ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                    <Clock className="h-3 w-3" />
+                    Pendiente de Firma
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300 border border-violet-500/20">
+                    <ShieldCheck className="h-3 w-3" />
+                    Ley 19.628 Chile
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Documento legal editable estructurado con los datos de{" "}
+                Documento legal generado automáticamente para{" "}
                 <span className="font-semibold text-foreground">{paciente.nombre_completo}</span>
               </p>
             </div>
@@ -502,8 +687,23 @@ Fecha: ${fecha}                                       RUT: ${pRut}
         </div>
 
         {/* Tab switcher */}
-        <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-6 py-2">
+        <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-6 py-2 overflow-x-auto">
           <div className="flex items-center gap-1.5 rounded-xl bg-muted/80 p-1 border border-border/60">
+            <button
+              type="button"
+              onClick={() => setActiveTab("digital_sign")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "digital_sign"
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Send className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              <span>Enviar y Firma Digital</span>
+              {isSigned && (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              )}
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab("preview")}
@@ -518,21 +718,6 @@ Fecha: ${fecha}                                       RUT: ${pRut}
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("edit")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "edit"
-                  ? "bg-card text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FileSignature className="h-3.5 w-3.5" />
-              <span>Editor de texto libre</span>
-              {hasManuallyEdited && (
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title="Editado a mano" />
-              )}
-            </button>
-            <button
-              type="button"
               onClick={() => setActiveTab("params")}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "params"
@@ -541,313 +726,458 @@ Fecha: ${fecha}                                       RUT: ${pRut}
               }`}
             >
               <Sliders className="h-3.5 w-3.5" />
-              <span>Datos y Parámetros</span>
+              <span>Datos del documento</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("edit")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "edit"
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>Editar redacción completa</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleResetTemplate}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              title="Restablecer documento a los datos originales de la ficha"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Restablecer plantilla</span>
-            </button>
+          <div className="hidden sm:flex items-center gap-2">
+            {hasManuallyEdited && (
+              <button
+                type="button"
+                onClick={handleResetTemplate}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title="Restablecer texto desde los parámetros actuales"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Restablecer</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 bg-muted/10">
-          {activeTab === "preview" && (
-            <div className="mx-auto max-w-2xl rounded-xl border border-border/80 bg-card p-7 sm:p-9 shadow-subtle text-foreground text-xs leading-relaxed">
-              <div className="border-b border-border/60 pb-4 text-center">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
-                  República de Chile · Marco Clínico y Legal
-                </p>
-                <h4 className="mt-1 text-sm sm:text-base font-extrabold uppercase tracking-tight text-foreground">
-                  Consentimiento Informado para Atención Psicológica y Asistencia Digital de Sesiones
-                </h4>
-                <p className="mt-1 text-[11px] italic text-muted-foreground">
-                  En cumplimiento de la Ley N° 19.628 (Protección de la Vida Privada), Ley N° 20.584 (Derechos y Deberes en Salud) y el Código de Ética del Colegio de Psicólogos de Chile
-                </p>
-              </div>
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* TAB: DIGITAL SIGN & EMAIL */}
+          {activeTab === "digital_sign" && (
+            <div className="space-y-6 max-w-3xl mx-auto">
+              {/* Signed Status Banner */}
+              {isSigned ? (
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-50/50 p-6 dark:bg-emerald-950/20">
+                  <div className="flex items-start gap-3.5">
+                    <div className="rounded-full bg-emerald-500/20 p-2 text-emerald-700 dark:text-emerald-300 shrink-0">
+                      <CheckCircle2 className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-base font-bold text-emerald-900 dark:text-emerald-200">
+                          Consentimiento Informado Firmado Digitalmente
+                        </h4>
+                        <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                          Válido y Custodiado
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-emerald-800/90 dark:text-emerald-300/80 leading-relaxed">
+                        El paciente ha otorgado voluntariamente su consentimiento informado electrónico de acuerdo
+                        con la Ley N° 19.628 y la Ley N° 20.584.
+                      </p>
 
-              <div className="mt-5 space-y-4 whitespace-pre-wrap font-sans text-xs sm:text-[13px] leading-relaxed text-foreground/90">
-                {documentContent}
-              </div>
-            </div>
-          )}
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-card/80 p-3.5 rounded-xl border border-emerald-500/20">
+                        <div>
+                          <span className="text-muted-foreground font-medium">Firmante:</span>{" "}
+                          <strong className="text-foreground">{consentRecord.firma_nombre || paciente.nombre_completo}</strong>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground font-medium">RUT:</span>{" "}
+                          <strong className="font-mono text-foreground">{consentRecord.firma_rut || paciente.rut || "No registrado"}</strong>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground font-medium">Fecha y Hora:</span>{" "}
+                          <strong className="text-foreground">
+                            {consentRecord.fecha_firma ? new Date(consentRecord.fecha_firma).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" }) : "N/A"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground font-medium">Dirección IP:</span>{" "}
+                          <span className="font-mono text-muted-foreground">{consentRecord.firma_ip || "Auditada"}</span>
+                        </div>
+                      </div>
 
-          {activeTab === "edit" && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Modifica cualquier palabra o cláusula libremente. El texto actualizado se mantendrá para imprimir, descargar y guardar.
-                </p>
-                {hasManuallyEdited && (
-                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                    (Cambios manuales aplicados)
-                  </span>
-                )}
-              </div>
-              <textarea
-                value={documentContent}
-                onChange={(e) => {
-                  setDocumentContent(e.target.value);
-                  setHasManuallyEdited(true);
-                }}
-                rows={20}
-                className="w-full rounded-xl border border-input bg-card p-4 font-mono text-xs sm:text-sm leading-relaxed text-foreground shadow-inner focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none resize-y"
-                placeholder="Escribe o ajusta el consentimiento aquí..."
-              />
-            </div>
-          )}
+                      {consentRecord.firma_imagen && (
+                        <div className="mt-3.5 bg-card p-3 rounded-xl border border-border/80 inline-block">
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                            Firma digital registrada:
+                          </span>
+                          <img
+                            src={consentRecord.firma_imagen}
+                            alt="Trazo de firma digital"
+                            className="h-16 max-w-full object-contain bg-white rounded p-1 border border-border/40"
+                          />
+                        </div>
+                      )}
 
-          {activeTab === "params" && (
-            <div className="space-y-6">
-              {loadingUser && (
-                <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-primary">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Cargando datos profesionales del psicólogo desde tu perfil...</span>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {consentRecord.enlace_firma && (
+                          <a
+                            href={consentRecord.enlace_firma}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                            <span>Ver documento firmado</span>
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handlePrintDocument}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 cursor-pointer"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          <span>Imprimir / Descargar PDF</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ) : null}
 
-              {/* Psicologo params */}
-              <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
-                  <span>1. Datos del Profesional Psicólogo/a</span>
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">Nombre y Apellido</span>
-                    <input
-                      type="text"
-                      value={psicologoNombre}
-                      onChange={(e) => {
-                        setPsicologoNombre(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                      placeholder="Ej: Lic. Valentina Pérez"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">RUT Profesional</span>
-                    <input
-                      type="text"
-                      value={psicologoRut}
-                      onChange={(e) => {
-                        setPsicologoRut(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                      placeholder="Ej: 15.432.890-K"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">Registro SIS / Colegio de Psicólogos</span>
-                    <input
-                      type="text"
-                      value={psicologoRegistro}
-                      onChange={(e) => {
-                        setPsicologoRegistro(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                      placeholder="Ej: Registro SIS N° 458921"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">Especialidad / Enfoque</span>
-                    <input
-                      type="text"
-                      value={psicologoEspecialidad}
-                      onChange={(e) => {
-                        setPsicologoEspecialidad(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                      placeholder="Ej: Psicología Clínica Cognitivo-Conductual"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs sm:col-span-2">
-                    <span className="font-semibold text-muted-foreground">Lugar de Consulta o Modalidad</span>
-                    <input
-                      type="text"
-                      value={psicologoLugar}
-                      onChange={(e) => {
-                        setPsicologoLugar(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                      placeholder="Ej: Av. Providencia 1234 Of. 502 / Modalidad Online"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Paciente params */}
-              <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>2. Datos del/de la Paciente (Pre-cargados)</span>
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">Nombre Completo</span>
-                    <input
-                      type="text"
-                      value={pacienteNombre}
-                      onChange={(e) => {
-                        setPacienteNombre(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">RUT</span>
-                    <input
-                      type="text"
-                      value={pacienteRut}
-                      onChange={(e) => {
-                        setPacienteRut(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">Edad</span>
-                    <input
-                      type="text"
-                      value={pacienteEdad}
-                      onChange={(e) => {
-                        setPacienteEdad(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs sm:col-span-2">
-                    <span className="font-semibold text-muted-foreground">Domicilio / Comuna</span>
-                    <input
-                      type="text"
-                      value={pacienteDomicilio}
-                      onChange={(e) => {
-                        setPacienteDomicilio(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs">
-                    <span className="font-semibold text-muted-foreground">Teléfono / Email</span>
-                    <input
-                      type="text"
-                      value={pacienteContacto}
-                      onChange={(e) => {
-                        setPacienteContacto(e.target.value);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                    />
-                  </label>
+              {/* Action 1: Enviar por Correo */}
+              <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="p-2 rounded-xl bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">
+                      Enviar por Correo Electrónico al Paciente
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      El paciente recibirá un correo con formato institucional y un botón directo para firmar desde su móvil o computador.
+                    </p>
+                  </div>
                 </div>
 
-                {/* Tutor checkbox */}
-                <div className="pt-2 border-t border-border/50">
-                  <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={esMenor}
-                      onChange={(e) => {
-                        setEsMenor(e.target.checked);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="rounded border-input text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="font-semibold text-foreground">
-                      Paciente menor de edad o con tutor legal requerido
-                    </span>
-                  </label>
-                  {esMenor && (
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 rounded-lg bg-muted/40 p-3 border border-border/60">
-                      <label className="space-y-1 text-xs">
-                        <span className="font-semibold text-muted-foreground">Nombre Tutor/a</span>
-                        <input
-                          type="text"
-                          value={tutorNombre}
-                          onChange={(e) => {
-                            setTutorNombre(e.target.value);
-                            setHasManuallyEdited(false);
-                          }}
-                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                          placeholder="Nombre del padre, madre o apoderado"
-                        />
-                      </label>
-                      <label className="space-y-1 text-xs">
-                        <span className="font-semibold text-muted-foreground">Teléfono Tutor/a</span>
-                        <input
-                          type="text"
-                          value={tutorTelefono}
-                          onChange={(e) => {
-                            setTutorTelefono(e.target.value);
-                            setHasManuallyEdited(false);
-                          }}
-                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                          placeholder="+56 9 ..."
-                        />
-                      </label>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1.5">
+                      Correo Electrónico de Destino
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <input
+                        type="email"
+                        value={emailDestino}
+                        onChange={(e) => setEmailDestino(e.target.value)}
+                        placeholder="correo@ejemplo.cl"
+                        className="flex-1 rounded-xl border border-border/80 bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      {consentRecord?.id ? (
+                        <button
+                          type="button"
+                          onClick={handleResendEmail}
+                          disabled={sendingEmail || !emailDestino.trim()}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                        >
+                          {sendingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          <span>Reenviar correo</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSendEmail}
+                          disabled={sendingEmail || !emailDestino.trim()}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                        >
+                          {sendingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          <span>Enviar por correo</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isSent && !isSigned && (
+                    <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20">
+                      <Clock className="h-4 w-4 shrink-0 text-amber-600" />
+                      <span>
+                        Enviado el{" "}
+                        <strong>
+                          {consentRecord.fecha_envio ? new Date(consentRecord.fecha_envio).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" }) : "recientemente"}
+                        </strong>
+                        . Esperando que el paciente abra el enlace y complete su firma.
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Cláusula Ley 19.628 y adicionales */}
-              <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  3. Cláusulas y Condiciones del Documento
-                </h4>
-                <div className="space-y-2">
-                  <label className="flex items-start gap-2.5 text-xs cursor-pointer p-2 rounded-lg hover:bg-muted/30 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={incluirGrabacion}
-                      onChange={(e) => {
-                        setIncluirGrabacion(e.target.checked);
-                        setHasManuallyEdited(false);
-                      }}
-                      className="rounded border-input text-primary focus:ring-primary h-4 w-4 mt-0.5"
-                    />
-                    <div>
-                      <span className="font-semibold text-foreground block">
-                        Incluir cláusula explícita de Registro Digital y Asistencia IA en Psiconex (Ley 19.628)
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        Estipula el consentimiento del paciente para la toma de notas asistida por audio, cifrado de extremo a extremo, no cesión de datos y el derecho a revocar la grabación en cualquier momento.
-                      </span>
-                    </div>
-                  </label>
-
-                  <div className="pt-2">
-                    <label className="space-y-1 text-xs">
-                      <span className="font-semibold text-muted-foreground">
-                        Acuerdos adicionales o notas particulares (opcional)
-                      </span>
-                      <textarea
-                        value={acuerdosAdicionales}
-                        onChange={(e) => {
-                          setAcuerdosAdicionales(e.target.value);
-                          setHasManuallyEdited(false);
-                        }}
-                        rows={2}
-                        className="w-full rounded-lg border border-input bg-background p-2.5 text-xs"
-                        placeholder="Ej: Políticas de cancelación de sesión con 24 hrs de anticipación, arancel acordado por sesión, etc."
-                      />
-                    </label>
+              {/* Action 2: Enlace de Firma Digital */}
+              <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <ExternalLink className="h-5 w-5" />
                   </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">
+                      Enlace Directo para Firma Digital
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Puedes copiar el enlace para enviarlo por WhatsApp, Telegram o abrirlo tú mismo si el paciente está presente.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  {consentRecord?.enlace_firma ? (
+                    <div className="space-y-2.5">
+                      <div className="flex flex-col sm:flex-row items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={consentRecord.enlace_firma}
+                          className="w-full rounded-xl border border-border/80 bg-muted/40 px-3.5 py-2 text-xs text-foreground font-mono select-all focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCopyExistingLink}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-card px-4 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent cursor-pointer shrink-0"
+                        >
+                          {linkCopied ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-emerald-600">¡Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5" />
+                              <span>Copiar enlace</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-3 pt-1">
+                        <a
+                          href={consentRecord.enlace_firma}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          <span>Abrir página de firma en nueva pestaña</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleGenerateLink}
+                        disabled={generatingLink}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/60 px-4 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-300 cursor-pointer"
+                      >
+                        {generatingLink ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <FileSignature className="h-3.5 w-3.5" />
+                        )}
+                        <span>Generar enlace de firma digital</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PREVIEW */}
+          {activeTab === "preview" && (
+            <div className="rounded-xl border border-border/80 bg-card p-6 shadow-xs font-serif text-foreground/90 text-sm leading-relaxed max-w-3xl mx-auto space-y-4 whitespace-pre-wrap select-text">
+              {documentContent}
+            </div>
+          )}
+
+          {/* TAB: EDIT FULL TEXT */}
+          {activeTab === "edit" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Redacción Completa del Documento (Editable)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleResetTemplate}
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Restablecer a plantilla estándar
+                </button>
+              </div>
+              <textarea
+                rows={22}
+                value={documentContent}
+                onChange={(e) => {
+                  setDocumentContent(e.target.value);
+                  setHasManuallyEdited(true);
+                }}
+                className="w-full rounded-xl border border-border/80 bg-background p-4 text-xs sm:text-sm font-mono leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          )}
+
+          {/* TAB: PARAMS */}
+          {activeTab === "params" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              {/* Psychologist info */}
+              <div className="rounded-2xl border border-border/80 bg-card p-5 space-y-3.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary border-b border-border/60 pb-2">
+                  Datos del / de la Profesional
+                </h4>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Nombre completo
+                  </label>
+                  <input
+                    type="text"
+                    value={psicologoNombre}
+                    onChange={(e) => setPsicologoNombre(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Cédula de Identidad (RUT)
+                  </label>
+                  <input
+                    type="text"
+                    value={psicologoRut}
+                    onChange={(e) => setPsicologoRut(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    N° Registro SIS / Profesional
+                  </label>
+                  <input
+                    type="text"
+                    value={psicologoRegistro}
+                    onChange={(e) => setPsicologoRegistro(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Especialidad o Enfoque
+                  </label>
+                  <input
+                    type="text"
+                    value={psicologoEspecialidad}
+                    onChange={(e) => setPsicologoEspecialidad(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Lugar de atención / Consulta
+                  </label>
+                  <input
+                    type="text"
+                    value={psicologoLugar}
+                    onChange={(e) => setPsicologoLugar(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Patient info */}
+              <div className="rounded-2xl border border-border/80 bg-card p-5 space-y-3.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary border-b border-border/60 pb-2">
+                  Datos del Paciente
+                </h4>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Nombre completo
+                  </label>
+                  <input
+                    type="text"
+                    value={pacienteNombre}
+                    onChange={(e) => setPacienteNombre(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    RUT del Paciente
+                  </label>
+                  <input
+                    type="text"
+                    value={pacienteRut}
+                    onChange={(e) => setPacienteRut(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Edad
+                  </label>
+                  <input
+                    type="text"
+                    value={pacienteEdad}
+                    onChange={(e) => setPacienteEdad(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Domicilio y Comuna
+                  </label>
+                  <input
+                    type="text"
+                    value={pacienteDomicilio}
+                    onChange={(e) => setPacienteDomicilio(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Contacto (WhatsApp / Correo)
+                  </label>
+                  <input
+                    type="text"
+                    value={pacienteContacto}
+                    onChange={(e) => setPacienteContacto(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Options */}
+              <div className="md:col-span-2 rounded-2xl border border-border/80 bg-card p-5 space-y-3.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary border-b border-border/60 pb-2">
+                  Cláusulas y Condiciones Específicas
+                </h4>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="grabacion"
+                    checked={incluirGrabacion}
+                    onChange={(e) => setIncluirGrabacion(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <label htmlFor="grabacion" className="text-xs font-medium text-foreground cursor-pointer">
+                    Incluir cláusula de Asistencia Digital Clínica y Registro de Audio de Sesiones (Ley 19.628)
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    Acuerdos y condiciones adicionales (opcional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={acuerdosAdicionales}
+                    onChange={(e) => setAcuerdosAdicionales(e.target.value)}
+                    placeholder="Ej: Las cancelaciones deben realizarse con al menos 24 horas de anticipación..."
+                    className="w-full rounded-xl border border-border/80 bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
                 </div>
               </div>
             </div>
@@ -855,12 +1185,17 @@ Fecha: ${fecha}                                       RUT: ${pRut}
         </div>
 
         {/* Feedback Messages */}
+        {emailSuccessMsg && (
+          <div className="mx-6 mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{emailSuccessMsg}</span>
+          </div>
+        )}
+
         {saveSuccess && (
           <div className="mx-6 mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>
-              Consentimiento informado guardado exitosamente en la ficha del paciente (disponible en la sección de Informes).
-            </span>
+            <span>Consentimiento informado guardado exitosamente en la ficha del paciente (sección Informes).</span>
           </div>
         )}
 
@@ -926,14 +1261,14 @@ Fecha: ${fecha}                                       RUT: ${pRut}
               onClick={handleSaveToFicha}
               disabled={savingInforme}
               className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-xs font-semibold text-violet-700 dark:text-violet-300 shadow-xs transition-all hover:bg-violet-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
-              title="Guarda una copia de este consentimiento en la ficha clínica del paciente"
+              title="Guarda una copia de este consentimiento en la sección de Informes de la ficha"
             >
               {savingInforme ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Save className="h-3.5 w-3.5" />
               )}
-              <span>{savingInforme ? "Guardando..." : "Guardar en Ficha"}</span>
+              <span>{savingInforme ? "Guardando..." : "Guardar en Informes"}</span>
             </button>
 
             <button

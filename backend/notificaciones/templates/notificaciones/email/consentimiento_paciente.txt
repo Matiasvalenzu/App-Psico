@@ -1,0 +1,11 @@
+Hola {{ patient_name }},
+
+Tu profesional tratante {{ psychologist_name }} te ha enviado el documento de Consentimiento Informado para tu proceso de atención psicológica.
+
+Puedes revisarlo y firmarlo de forma digital en el siguiente enlace:
+{{ public_url }}
+
+Este documento formaliza el resguardo ético y legal de tu información de conformidad con la Ley N° 19.628 sobre Protección de la Vida Privada y la Ley N° 20.584 de Derechos y Deberes en Salud.
+
+Saludos,
+Equipo Psiconex

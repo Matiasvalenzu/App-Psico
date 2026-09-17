@@ -1,10 +1,26 @@
 from rest_framework import serializers
 
 from .documentos import TIPO_RUT, formatear_documento, normalizar_documento
-from .models import Paciente
+from .models import Paciente, ConsentimientoInformado
 
 
 class PacienteSerializer(serializers.ModelSerializer):
+    consentimiento_estado = serializers.SerializerMethodField()
+    consentimiento_id = serializers.SerializerMethodField()
+    consentimiento_fecha_firma = serializers.SerializerMethodField()
+
+    def get_consentimiento_estado(self, obj):
+        latest = obj.consentimientos.first()
+        return latest.estado if latest else None
+
+    def get_consentimiento_id(self, obj):
+        latest = obj.consentimientos.first()
+        return latest.id if latest else None
+
+    def get_consentimiento_fecha_firma(self, obj):
+        latest = obj.consentimientos.first()
+        return latest.fecha_firma if latest else None
+
     class Meta:
         model = Paciente
         fields = [
@@ -44,10 +60,22 @@ class PacienteSerializer(serializers.ModelSerializer):
             "notas_privadas",
             "estado",
             "activo",
+            "consentimiento_estado",
+            "consentimiento_id",
+            "consentimiento_fecha_firma",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "psicologo", "nombre_completo", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "psicologo",
+            "nombre_completo",
+            "consentimiento_estado",
+            "consentimiento_id",
+            "consentimiento_fecha_firma",
+            "created_at",
+            "updated_at",
+        ]
 
     def validate(self, attrs):
         tipo = attrs.get("tipo_documento", getattr(self.instance, "tipo_documento", TIPO_RUT))
@@ -97,3 +125,98 @@ class PacienteListSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "psicologo", "nombre_completo", "updated_at"]
+
+
+class ConsentimientoInformadoSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source="paciente.nombre_completo", read_only=True)
+    psicologo_nombre = serializers.SerializerMethodField()
+
+    def get_psicologo_nombre(self, obj):
+        return obj.psicologo.get_full_name() or obj.psicologo.username
+
+    class Meta:
+        model = ConsentimientoInformado
+        fields = [
+            "id",
+            "paciente",
+            "paciente_nombre",
+            "psicologo",
+            "psicologo_nombre",
+            "titulo",
+            "contenido",
+            "estado",
+            "enlace_firma",
+            "email_destino",
+            "email_enviado",
+            "email_error",
+            "fecha_envio",
+            "fecha_firma",
+            "firma_nombre",
+            "firma_rut",
+            "firma_imagen",
+            "firma_ip",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "psicologo",
+            "enlace_firma",
+            "fecha_firma",
+            "firma_ip",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class CrearConsentimientoSerializer(serializers.Serializer):
+    contenido = serializers.CharField(required=True)
+    titulo = serializers.CharField(required=False, default="Consentimiento Informado para Atención Psicológica")
+    email_destino = serializers.EmailField(required=False, allow_blank=True)
+    enviar_email = serializers.BooleanField(default=False)
+
+
+class PublicConsentimientoSerializer(serializers.ModelSerializer):
+    paciente_nombre = serializers.CharField(source="paciente.nombre_completo", read_only=True)
+    paciente_rut = serializers.CharField(source="paciente.rut", read_only=True)
+    paciente_email = serializers.CharField(source="paciente.email_contacto", read_only=True)
+    psicologo_nombre = serializers.SerializerMethodField()
+    psicologo_especialidad = serializers.SerializerMethodField()
+
+    def get_psicologo_nombre(self, obj):
+        return obj.psicologo.get_full_name() or obj.psicologo.username
+
+    def get_psicologo_especialidad(self, obj):
+        return getattr(obj.psicologo, "especialidad_clinica", "Psicología Clínica")
+
+    class Meta:
+        model = ConsentimientoInformado
+        fields = [
+            "id",
+            "titulo",
+            "contenido",
+            "estado",
+            "paciente_nombre",
+            "paciente_rut",
+            "paciente_email",
+            "psicologo_nombre",
+            "psicologo_especialidad",
+            "fecha_envio",
+            "fecha_firma",
+            "firma_nombre",
+            "firma_rut",
+            "firma_imagen",
+        ]
+
+
+class FirmarConsentimientoSerializer(serializers.Serializer):
+    firma_nombre = serializers.CharField(required=True, max_length=200)
+    firma_rut = serializers.CharField(required=True, max_length=30)
+    firma_imagen = serializers.CharField(required=False, allow_blank=True)
+    acepta_terminos = serializers.BooleanField(required=True)
+
+    def validate_acepta_terminos(self, value):
+        if not value:
+            raise serializers.ValidationError("Debe aceptar los términos del consentimiento informado.")
+        return value
+
