@@ -1,5 +1,7 @@
 import logging
 import mimetypes
+import os
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -565,7 +567,13 @@ def _merge_dual_track_segments(segments):
 
 
 @shared_task(bind=True, max_retries=1)
-def procesar_audio_dual_track(self, sesion_id, audio_path_psicologo, audio_path_paciente):
+def procesar_audio_dual_track(
+    self,
+    sesion_id,
+    audio_path_psicologo=None,
+    audio_path_paciente=None,
+    audio_path_stereo=None,
+):
     """Transcribe una videollamada Psiconex: cada pista es un hablante, sin diarización."""
     logger.info("Iniciando procesamiento dual-track de sesión %s", sesion_id)
     sesion = None
@@ -579,12 +587,31 @@ def procesar_audio_dual_track(self, sesion_id, audio_path_psicologo, audio_path_
         label_psicologo = (psicologo.get_full_name() or psicologo.username) if psicologo else "Psicólogo"
         label_paciente = sesion.paciente.nombre_completo
 
+        # Si viene audio estéreo unificado, separar canales 0 (Psicólogo) y 1 (Paciente) con ffmpeg
+        if audio_path_stereo and os.path.exists(audio_path_stereo) and os.path.getsize(audio_path_stereo) > 100:
+            base_dir = os.path.dirname(audio_path_stereo)
+            path_psi = os.path.join(base_dir, f"{sesion_id}_split_psicologo.wav")
+            path_pac = os.path.join(base_dir, f"{sesion_id}_split_paciente.wav")
+            cmd = [
+                "ffmpeg", "-y", "-i", audio_path_stereo,
+                "-filter_complex", "[0:a]channelsplit=channel_layout=stereo[left][right]",
+                "-map", "[left]", "-ar", "16000", "-ac", "1", path_psi,
+                "-map", "[right]", "-ar", "16000", "-ac", "1", path_pac,
+            ]
+            logger.info("Dividiendo audio estéreo con ffmpeg: %s", " ".join(cmd))
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if proc.returncode != 0:
+                logger.error("ffmpeg falló al separar canales: %s", proc.stderr)
+                raise RuntimeError(f"ffmpeg split falló: {proc.stderr[:300]}")
+            audio_path_psicologo = path_psi
+            audio_path_paciente = path_pac
+
         segments = []
         for audio_path, hablante, label in (
             (audio_path_psicologo, TranscripcionSegmento.Hablante.PSICOLOGO, label_psicologo),
             (audio_path_paciente, TranscripcionSegmento.Hablante.PACIENTE, label_paciente),
         ):
-            if not os.path.exists(audio_path) or os.path.getsize(audio_path) < 100:
+            if not audio_path or not os.path.exists(audio_path) or os.path.getsize(audio_path) < 100:
                 logger.warning("Pista de audio %s vacía o no encontrada (<100 bytes), omitiendo transcripción.", audio_path)
                 continue
             for segment in _run_whisper(audio_path):
@@ -609,16 +636,17 @@ def procesar_audio_dual_track(self, sesion_id, audio_path_psicologo, audio_path_
             )
 
         update_fields = ["estado", "updated_at"]
-        if not sesion.duracion_segundos:
+        ref_audio = audio_path_stereo or audio_path_psicologo
+        if not sesion.duracion_segundos and ref_audio:
             try:
-                if os.path.exists(audio_path_psicologo) and os.path.getsize(audio_path_psicologo) > 100:
-                    sesion.duracion_segundos = int(get_audio_duration_seconds(audio_path_psicologo))
+                if os.path.exists(ref_audio) and os.path.getsize(ref_audio) > 100:
+                    sesion.duracion_segundos = int(get_audio_duration_seconds(ref_audio))
                     update_fields.append("duracion_segundos")
             except Exception as exc:
                 logger.warning("No se pudo calcular la duración de la sesión %s: %s", sesion_id, exc)
         sesion.estado = Sesion.Estado.COMPLETADO
         sesion.save(update_fields=update_fields)
-        logger.info("Sesión dual-track %s procesada exitosamente", sesion_id)
+        logger.info("Sesión dual-track %s procesada exitosamente (%s segmentos)", sesion_id, len(merged_segments))
         return True
 
     except Sesion.DoesNotExist:

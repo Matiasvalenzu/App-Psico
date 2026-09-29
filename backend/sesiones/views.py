@@ -349,19 +349,31 @@ class SesionViewSet(viewsets.ModelViewSet):
         sesion = self.get_object()
         if not sesion.token_sala:
             return Response({"error": "La sesión no tiene sala Psiconex."}, status=status.HTTP_400_BAD_REQUEST)
+        audio_stereo = request.FILES.get("audio_stereo")
         audio_psicologo = request.FILES.get("audio_psicologo")
         audio_paciente = request.FILES.get("audio_paciente")
-        if not audio_psicologo or not audio_paciente:
-            return Response({"error": "Se requieren ambas pistas de audio."}, status=status.HTTP_400_BAD_REQUEST)
+        if not audio_stereo and (not audio_psicologo or not audio_paciente):
+            return Response({"error": "Se requiere archivo de audio de la sesión."}, status=status.HTTP_400_BAD_REQUEST)
 
         storage_dir = os.path.join(settings.AUDIO_STORAGE_PATH, str(sesion.paciente_id))
         os.makedirs(storage_dir, exist_ok=True)
-        path_psi = os.path.join(storage_dir, f"{sesion.id}_psicologo.webm")
-        path_pac = os.path.join(storage_dir, f"{sesion.id}_paciente.webm")
-        for archivo, path in ((audio_psicologo, path_psi), (audio_paciente, path_pac)):
-            with open(path, "wb+") as destination:
-                for chunk in archivo.chunks():
+        path_stereo = None
+        path_psi = None
+        path_pac = None
+
+        if audio_stereo:
+            path_stereo = os.path.join(storage_dir, f"{sesion.id}_stereo.webm")
+            with open(path_stereo, "wb+") as destination:
+                for chunk in audio_stereo.chunks():
                     destination.write(chunk)
+
+        if audio_psicologo and audio_paciente:
+            path_psi = os.path.join(storage_dir, f"{sesion.id}_psicologo.webm")
+            path_pac = os.path.join(storage_dir, f"{sesion.id}_paciente.webm")
+            for archivo, path in ((audio_psicologo, path_psi), (audio_paciente, path_pac)):
+                with open(path, "wb+") as destination:
+                    for chunk in archivo.chunks():
+                        destination.write(chunk)
 
         update_fields = ["estado_videollamada", "estado", "audio_path", "updated_at"]
         notas = request.data.get("notas_sesion")
@@ -370,7 +382,7 @@ class SesionViewSet(viewsets.ModelViewSet):
             update_fields.append("notas_sesion")
         sesion.estado_videollamada = Sesion.EstadoVideollamada.FINALIZADA
         sesion.estado = Sesion.Estado.PROCESANDO
-        sesion.audio_path = path_psi
+        sesion.audio_path = path_stereo or path_psi
         sesion.save(update_fields=update_fields)
 
         from .tasks import procesar_audio_dual_track
@@ -378,6 +390,7 @@ class SesionViewSet(viewsets.ModelViewSet):
             sesion_id=sesion.id,
             audio_path_psicologo=path_psi,
             audio_path_paciente=path_pac,
+            audio_path_stereo=path_stereo,
         )
         return Response({"ok": True, "mensaje": "Procesando transcripción"})
 

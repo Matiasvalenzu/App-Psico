@@ -209,8 +209,15 @@ export default function SalaPsicologoPage() {
       const ext = result?.mimeType.includes("mp4") ? "m4a" : result?.mimeType.includes("ogg") ? "ogg" : "webm";
       const form = new FormData();
       if (result) {
-        form.append("audio_psicologo", result.audioPsicologo, `psicologo.${ext}`);
-        form.append("audio_paciente", result.audioPaciente, `paciente.${ext}`);
+        if (result.audioStereo) {
+          form.append("audio_stereo", result.audioStereo, `stereo.${ext}`);
+        }
+        if (result.audioPsicologo) {
+          form.append("audio_psicologo", result.audioPsicologo, `psicologo.${ext}`);
+        }
+        if (result.audioPaciente) {
+          form.append("audio_paciente", result.audioPaciente, `paciente.${ext}`);
+        }
       }
       form.append("notas_sesion", notas);
       const res = await apiFetch(`/sesiones/${sesionId}/finalizar_videollamada/`, { method: "POST", body: form });

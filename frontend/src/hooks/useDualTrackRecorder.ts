@@ -4,64 +4,74 @@ import { useCallback, useRef, useState } from "react";
 import { getAudioMimeType } from "@/context/AudioRecordingContext";
 
 export interface DualTrackResult {
-  audioPsicologo: Blob;
-  audioPaciente: Blob;
+  audioStereo: Blob;
+  audioPsicologo?: Blob;
+  audioPaciente?: Blob;
   mimeType: string;
 }
 
-const AUDIO_BITS_PER_SECOND = 32000;
+const AUDIO_BITS_PER_SECOND = 64000;
 
 /**
- * Graba dos pistas de audio alineadas (psicólogo / paciente).
- * Ambas pasan por un AudioContext con destinos independientes: los dos
- * MediaRecorder arrancan en el mismo instante y, si el paciente se reconecta,
- * se conecta la nueva fuente sin cortar la grabación (los huecos quedan como silencio).
- * Nunca se conecta a audioContext.destination para no reproducir eco.
+ * Graba una pista de audio estéreo unificada (Canal 0 = Psicólogo, Canal 1 = Paciente).
+ * Pasan por un AudioContext con ChannelMergerNode(2):
+ * - Canal 0 (L): Micrófono local del psicólogo.
+ * - Canal 1 (R): Audio remoto del paciente (se conecta dinámicamente al llegar).
+ * Si el paciente llega tarde o se desconecta temporalmente, su canal graba silencio nativo
+ * dentro del mismo reloj de audio de 48kHz, garantizando alineación temporal al milisegundo.
  */
 export function useDualTrackRecorder() {
   const [recording, setRecording] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
-  const destLocalRef = useRef<MediaStreamAudioDestinationNode | null>(null);
-  const destRemoteRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const mergerRef = useRef<ChannelMergerNode | null>(null);
+  const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const remoteSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const localSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const recordersRef = useRef<{ local: MediaRecorder; remote: MediaRecorder } | null>(null);
-  const chunksRef = useRef<{ local: Blob[]; remote: Blob[] }>({ local: [], remote: [] });
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const mimeRef = useRef("");
   const pendingRemoteRef = useRef<MediaStream | null>(null);
 
   const connectRemote = useCallback((stream: MediaStream) => {
     const ctx = ctxRef.current;
-    const dest = destRemoteRef.current;
-    if (!ctx || !dest || stream.getAudioTracks().length === 0) return;
+    const merger = mergerRef.current;
+    if (!ctx || !merger || stream.getAudioTracks().length === 0) return;
     try {
       remoteSourceRef.current?.disconnect();
     } catch {}
     const source = ctx.createMediaStreamSource(stream);
-    source.connect(dest);
+    // Conectar el audio remoto del paciente al Canal 1 (Right)
+    source.connect(merger, 0, 1);
     remoteSourceRef.current = source;
   }, []);
 
   const start = useCallback(
     (localStream: MediaStream) => {
-      if (recordersRef.current) return;
+      if (recorderRef.current) return;
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
       const ctx: AudioContext = new Ctx();
       ctxRef.current = ctx;
       void ctx.resume().catch(() => {});
 
-      const destLocal = ctx.createMediaStreamDestination();
-      const destRemote = ctx.createMediaStreamDestination();
-      destLocalRef.current = destLocal;
-      destRemoteRef.current = destRemote;
+      const merger = ctx.createChannelMerger(2);
+      mergerRef.current = merger;
 
+      const dest = ctx.createMediaStreamDestination();
+      dest.channelCount = 2;
+      dest.channelCountMode = "explicit";
+      destRef.current = dest;
+
+      merger.connect(dest);
+
+      // Conectar micrófono local del psicólogo al Canal 0 (Left)
       if (localStream.getAudioTracks().length > 0) {
         const localSource = ctx.createMediaStreamSource(
           new MediaStream(localStream.getAudioTracks())
         );
-        localSource.connect(destLocal);
+        localSource.connect(merger, 0, 0);
         localSourceRef.current = localSource;
       }
+
       if (pendingRemoteRef.current) connectRemote(pendingRemoteRef.current);
 
       const mimeType = getAudioMimeType();
@@ -69,14 +79,13 @@ export function useDualTrackRecorder() {
       const opts: MediaRecorderOptions = { audioBitsPerSecond: AUDIO_BITS_PER_SECOND };
       if (mimeType) opts.mimeType = mimeType;
 
-      chunksRef.current = { local: [], remote: [] };
-      const local = new MediaRecorder(destLocal.stream, opts);
-      const remote = new MediaRecorder(destRemote.stream, opts);
-      local.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.local.push(e.data);
-      remote.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.remote.push(e.data);
-      local.start(1000);
-      remote.start(1000);
-      recordersRef.current = { local, remote };
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(dest.stream, opts);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
       setRecording(true);
     },
     [connectRemote]
@@ -91,16 +100,15 @@ export function useDualTrackRecorder() {
   );
 
   const stop = useCallback(async (): Promise<DualTrackResult | null> => {
-    const recorders = recordersRef.current;
-    if (!recorders) return null;
-    const stopOne = (r: MediaRecorder) =>
-      new Promise<void>((resolve) => {
-        if (r.state === "inactive") return resolve();
-        r.onstop = () => resolve();
-        r.stop();
-      });
-    await Promise.all([stopOne(recorders.local), stopOne(recorders.remote)]);
-    recordersRef.current = null;
+    const recorder = recorderRef.current;
+    if (!recorder) return null;
+
+    await new Promise<void>((resolve) => {
+      if (recorder.state === "inactive") return resolve();
+      recorder.onstop = () => resolve();
+      recorder.stop();
+    });
+    recorderRef.current = null;
     setRecording(false);
 
     try {
@@ -111,9 +119,9 @@ export function useDualTrackRecorder() {
     ctxRef.current = null;
 
     const mimeType = mimeRef.current || "audio/webm";
+    const audioStereo = new Blob(chunksRef.current, { type: mimeType });
     return {
-      audioPsicologo: new Blob(chunksRef.current.local, { type: mimeType }),
-      audioPaciente: new Blob(chunksRef.current.remote, { type: mimeType }),
+      audioStereo,
       mimeType,
     };
   }, []);

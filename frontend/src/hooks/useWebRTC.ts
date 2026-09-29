@@ -34,6 +34,17 @@ function getIceServers(): RTCIceServer[] {
       username: process.env.NEXT_PUBLIC_TURN_USERNAME || "",
       credential: process.env.NEXT_PUBLIC_TURN_PASSWORD || "",
     });
+  } else {
+    servers.push({
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:443?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    });
   }
   return servers;
 }
@@ -133,20 +144,32 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
       // Nuevo objeto para que React y el grabador detecten el cambio
       setRemoteStream(new MediaStream(remote.getTracks()));
     };
+    const handleReconnect = () => {
+      updateStatus("reconnecting");
+      if (role === "psicologo") {
+        pc.createOffer({ iceRestart: true })
+          .then((offer) => pc.setLocalDescription(offer))
+          .then(() => send({ type: "offer", payload: pc.localDescription }))
+          .catch(() => {});
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pcRef.current !== pc) return;
+      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        updateStatus("connected");
+      } else if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+        handleReconnect();
+      }
+    };
+
     pc.onconnectionstatechange = () => {
       if (pcRef.current !== pc) return;
       if (pc.connectionState === "connected") {
         updateStatus("connected");
         sendMediaState();
-      } else if (pc.connectionState === "failed") {
-        updateStatus("reconnecting");
-        // El psicólogo es quien siempre ofrece: reintenta con ICE restart
-        if (role === "psicologo") {
-          pc.createOffer({ iceRestart: true })
-            .then((offer) => pc.setLocalDescription(offer))
-            .then(() => send({ type: "offer", payload: pc.localDescription }))
-            .catch(() => {});
-        }
+      } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        handleReconnect();
       }
     };
     return pc;
@@ -179,6 +202,9 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
           break;
         case "peer-joined":
           setPeerPresent(true);
+          if (role === "psicologo") {
+            await makeOffer();
+          }
           break;
         case "ready":
           if (role === "psicologo") await makeOffer();
