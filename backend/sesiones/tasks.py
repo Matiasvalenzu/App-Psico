@@ -584,6 +584,9 @@ def procesar_audio_dual_track(self, sesion_id, audio_path_psicologo, audio_path_
             (audio_path_psicologo, TranscripcionSegmento.Hablante.PSICOLOGO, label_psicologo),
             (audio_path_paciente, TranscripcionSegmento.Hablante.PACIENTE, label_paciente),
         ):
+            if not os.path.exists(audio_path) or os.path.getsize(audio_path) < 100:
+                logger.warning("Pista de audio %s vacía o no encontrada (<100 bytes), omitiendo transcripción.", audio_path)
+                continue
             for segment in _run_whisper(audio_path):
                 if segment["text"]:
                     segments.append({**segment, "hablante": hablante, "speaker_label": label})
@@ -608,8 +611,9 @@ def procesar_audio_dual_track(self, sesion_id, audio_path_psicologo, audio_path_
         update_fields = ["estado", "updated_at"]
         if not sesion.duracion_segundos:
             try:
-                sesion.duracion_segundos = int(get_audio_duration_seconds(audio_path_psicologo))
-                update_fields.append("duracion_segundos")
+                if os.path.exists(audio_path_psicologo) and os.path.getsize(audio_path_psicologo) > 100:
+                    sesion.duracion_segundos = int(get_audio_duration_seconds(audio_path_psicologo))
+                    update_fields.append("duracion_segundos")
             except Exception as exc:
                 logger.warning("No se pudo calcular la duración de la sesión %s: %s", sesion_id, exc)
         sesion.estado = Sesion.Estado.COMPLETADO
