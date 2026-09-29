@@ -92,6 +92,7 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mediaStateRef = useRef({ mic: true, cam: true });
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
 
   const updateStatus = useCallback((s: SalaStatus) => {
     statusRef.current = s;
@@ -146,20 +147,12 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
     };
     const handleReconnect = () => {
       updateStatus("reconnecting");
-      if (role === "psicologo") {
+      // Solo el psicólogo reintenta, y nunca con una negociación en curso
+      if (role === "psicologo" && pc.signalingState === "stable") {
         pc.createOffer({ iceRestart: true })
           .then((offer) => pc.setLocalDescription(offer))
-          .then(() => send({ type: "offer", payload: pc.localDescription }))
+          .then(() => send({ type: "offer", payload: { ...pc.localDescription!.toJSON(), iceRestart: true } }))
           .catch(() => {});
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      if (pcRef.current !== pc) return;
-      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
-        updateStatus("connected");
-      } else if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-        handleReconnect();
       }
     };
 
@@ -168,7 +161,10 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
       if (pc.connectionState === "connected") {
         updateStatus("connected");
         sendMediaState();
-      } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+      } else if (pc.connectionState === "disconnected") {
+        // Suele ser transitorio: el navegador se recupera solo o pasa a "failed"
+        updateStatus("reconnecting");
+      } else if (pc.connectionState === "failed") {
         handleReconnect();
       }
     };
@@ -202,17 +198,16 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
           break;
         case "peer-joined":
           setPeerPresent(true);
-          if (role === "psicologo") {
-            await makeOffer();
-          }
           break;
         case "ready":
           if (role === "psicologo") await makeOffer();
           break;
         case "offer": {
           if (role !== "paciente") return;
-          const pc = createPeer();
-          await pc.setRemoteDescription(msg.payload);
+          const current = pcRef.current;
+          const pc =
+            msg.payload?.iceRestart && current && current.connectionState !== "closed" ? current : createPeer();
+          await pc.setRemoteDescription({ type: msg.payload.type, sdp: msg.payload.sdp });
           await flushCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -277,7 +272,7 @@ export function useWebRTC({ token, role, ticket }: UseWebRTCOptions) {
       } catch {
         return;
       }
-      void handleMessage(msg).catch(() => {});
+      queueRef.current = queueRef.current.then(() => handleMessage(msg)).catch(() => {});
     };
     ws.onclose = () => {
       if (wsRef.current !== ws) return;
