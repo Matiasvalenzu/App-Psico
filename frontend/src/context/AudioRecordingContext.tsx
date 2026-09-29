@@ -89,7 +89,7 @@ function playAlertChime() {
 
 const AudioRecordingContext = createContext<AudioRecordingContextType | null>(null);
 
-function getAudioMimeType() {
+export function getAudioMimeType() {
   if (typeof window === "undefined" || !window.MediaRecorder) return "";
   const types = [
     "audio/webm;codecs=opus",

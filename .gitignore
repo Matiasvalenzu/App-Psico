@@ -6,6 +6,7 @@ PYANNOTEAPI.TXT
 ps_list.txt
 ps_output.txt
 frontend/node_modules/
+signaling/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
 frontend/.env.local
@@ -28,3 +29,4 @@ backups/
 .playwright-cli/
 .next/
 backend/celerybeat-schedule
+Psiconex-Mailing/

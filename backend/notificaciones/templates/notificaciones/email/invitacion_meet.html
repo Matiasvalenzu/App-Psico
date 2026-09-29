@@ -1,11 +1,11 @@
 {% extends "notificaciones/email/base.html" %}
-{% block title %}Enlace para tu sesión por Google Meet{% endblock %}
+{% block title %}Enlace para tu sesión por {{ platform_name|default:"Google Meet" }}{% endblock %}
 {% block preheader %}Tu enlace para conectarte a la sesión con {{ psychologist_name }}.{% endblock %}
 {% block eyebrow %}Sesión remota{% endblock %}
 {% block heading %}Enlace para tu sesión psicológica{% endblock %}
 {% block content %}
 <p style="margin:0 0 20px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ patient_name }},</p>
-<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.7;"><strong>{{ psychologist_name }}</strong> ha preparado el enlace de Google Meet para tu sesión de atención psicológica.</p>
+<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.7;"><strong>{{ psychologist_name }}</strong> ha preparado el enlace de {{ platform_name|default:"Google Meet" }} para tu sesión de atención psicológica.</p>
 
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
   <tr>
@@ -13,7 +13,7 @@
       <strong style="color:#0f172a;">Profesional:</strong> {{ psychologist_name }}<br>
       {% if session_date %}<strong style="color:#0f172a;">Fecha:</strong> {{ session_date }}<br>{% endif %}
       {% if session_time %}<strong style="color:#0f172a;">Hora:</strong> {{ session_time }} hrs (Chile)<br>{% endif %}
-      <strong style="color:#0f172a;">Plataforma:</strong> Google Meet
+      <strong style="color:#0f172a;">Plataforma:</strong> {{ platform_name|default:"Google Meet" }}
     </td>
   </tr>
 </table>
@@ -22,7 +22,7 @@
   <tr>
     <td style="border-radius:10px;background:#0284c7;">
       <a href="{{ meet_url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;border-radius:10px;">
-        Unirse a la sesión por Google Meet &rarr;
+        Unirse a la sesión por {{ platform_name|default:"Google Meet" }} &rarr;
       </a>
     </td>
   </tr>

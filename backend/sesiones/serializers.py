@@ -66,6 +66,8 @@ class SesionSerializer(serializers.ModelSerializer):
             "origen",
             "plataforma_virtual",
             "url_reunion",
+            "token_sala",
+            "estado_videollamada",
             "documento_nombre_original",
             "documento_mime_type",
             "estado",
@@ -78,6 +80,8 @@ class SesionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "token_sala",
+            "estado_videollamada",
             "psicologo",
             "psicologo_username",
             "numero_sesion",
@@ -136,12 +140,16 @@ class SesionListSerializer(serializers.ModelSerializer):
             "origen",
             "plataforma_virtual",
             "url_reunion",
+            "token_sala",
+            "estado_videollamada",
             "documento_nombre_original",
             "estado",
             "created_at",
         ]
         read_only_fields = [
             "id",
+            "token_sala",
+            "estado_videollamada",
             "psicologo",
             "psicologo_username",
             "numero_sesion",

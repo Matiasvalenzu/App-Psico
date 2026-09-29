@@ -22,6 +22,8 @@ interface Sesion {
   origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
   plataforma_virtual?: string;
   url_reunion?: string;
+  token_sala?: string | null;
+  estado_videollamada?: string;
   documento_nombre_original: string;
   estado: string;
   notas_sesion: string;
@@ -204,6 +206,7 @@ export default function SesionDetailPage() {
   const [downloadingTestSection, setDownloadingTestSection] = useState<string | null>(null);
   const [remoteAssistantOpen, setRemoteAssistantOpen] = useState(false);
   const [transcriptTab, setTranscriptTab] = useState<"dialogue" | "editor">("dialogue");
+  const [mobileTab, setMobileTab] = useState<"dialogo" | "notas">("dialogo");
   const [searchTerm, setSearchTerm] = useState("");
   const [speakerAuditOpen, setSpeakerAuditOpen] = useState(false);
 
@@ -237,6 +240,9 @@ export default function SesionDetailPage() {
       const data = await res.json();
       setSesion(data);
       setNotes(data.notas_sesion || "");
+      if (data && (!data.audio_path || data.estado === "PENDIENTE")) {
+        setMobileTab("notas");
+      }
     } catch (err) {
       console.error(err);
       setError("No se pudo cargar la sesión.");
@@ -422,86 +428,89 @@ export default function SesionDetailPage() {
   return (
     <div className="space-y-6">
       {/* Back navigation & breadcrumb */}
-      <div className="sticky top-14 md:top-16 z-20 -mx-4 -mt-4 mb-4 px-4 py-2.5 bg-background/90 backdrop-blur-md border-b border-border/40 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="sticky top-14 md:top-16 z-20 -mx-4 -mt-4 mb-4 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-background/90 backdrop-blur-md border-b border-border/40 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => router.push(`/dashboard/pacientes/${id}`)}
-            className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-card/80 px-3.5 py-1.5 text-sm font-semibold text-foreground/80 shadow-xs backdrop-blur-sm transition-all hover:bg-muted/60 hover:text-foreground active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border/70 bg-card/80 px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/80 shadow-xs backdrop-blur-sm transition-all hover:bg-muted/60 hover:text-foreground active:scale-95 cursor-pointer shrink-0"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Volver al Paciente</span>
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+            <span className="hidden sm:inline">Volver al Paciente</span>
+            <span className="sm:hidden">Volver</span>
           </button>
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
             <span>Pacientes</span>
             <span>/</span>
-            <span className="font-medium text-foreground">{sesion.paciente_nombre || "Paciente"}</span>
+            <span className="font-medium text-foreground truncate max-w-[140px]">{sesion.paciente_nombre || "Paciente"}</span>
             <span>/</span>
-            <span className="text-primary font-medium">{sessionTitle}</span>
+            <span className="text-primary font-medium truncate max-w-[140px]">{sessionTitle}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
             sesion.estado === "COMPLETADO" ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300" :
             sesion.estado === "PROCESANDO" ? "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300" :
             "bg-muted/60 text-muted-foreground border border-border/60"
           }`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${
+            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
               sesion.estado === "COMPLETADO" ? "bg-emerald-500" :
               sesion.estado === "PROCESANDO" ? "bg-amber-500 animate-ping" : "bg-muted-foreground"
             }`} />
-            {sesion.estado === "COMPLETADO" ? "Completado" : sesion.estado === "PROCESANDO" ? "Procesando audio..." : sesion.estado}
+            <span className="truncate max-w-[100px] sm:max-w-none">
+              {sesion.estado === "COMPLETADO" ? "Completado" : sesion.estado === "PROCESANDO" ? "Procesando..." : sesion.estado}
+            </span>
           </span>
         </div>
       </div>
 
       {/* Session header */}
-      <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-card">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="flex items-start gap-4">
-            <div className={`h-12 w-12 shrink-0 rounded-xl border flex items-center justify-center ${
+      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-card">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+            <div className={`h-11 w-11 sm:h-12 sm:w-12 shrink-0 rounded-xl border flex items-center justify-center ${
               isTest ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" :
               isVirtual ? "border-sky-500/30 bg-sky-500/10 text-sky-600" :
               isExternalDoc ? "border-violet-500/30 bg-violet-500/10 text-violet-600" :
               "border-primary/30 bg-primary/10 text-primary"
             }`}>
               {isTest ? (
-                <ClipboardList className="h-6 w-6" />
+                <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6" />
               ) : isVirtual ? (
-                <Video className="h-6 w-6" />
+                <Video className="h-5 w-5 sm:h-6 sm:w-6" />
               ) : isExternalDoc ? (
-                <FileText className="h-6 w-6" />
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
               ) : (
-                <Mic className="h-6 w-6" />
+                <Mic className="h-5 w-5 sm:h-6 sm:w-6" />
               )}
             </div>
 
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-foreground">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">
                   {sessionTitle}
                 </h1>
-                <span className="text-muted-foreground">—</span>
-                <span className="text-base font-semibold text-foreground/85">
+                <span className="text-muted-foreground hidden xs:inline">—</span>
+                <span className="text-sm sm:text-base font-semibold text-foreground/85">
                   {formatDate(sesion.fecha_hora_inicio)}
                 </span>
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 border border-border/60 px-2.5 py-1 font-medium text-foreground/80">
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 border border-border/60 px-2 py-0.5 font-medium text-foreground/80 text-[11px] sm:text-xs">
                   {isTest ? "Test psicológico" : isVirtual ? "Sesión Remota" : isExternalDoc ? "Documento" : "Sesión Presencial"}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 border border-border/60 px-2.5 py-1 font-medium text-foreground/80">
+                <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 border border-border/60 px-2 py-0.5 font-medium text-foreground/80 text-[11px] sm:text-xs">
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   {formatTime(sesion.fecha_hora_inicio)}
                 </span>
                 {!isExternalDoc && sesion.duracion_segundos && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 border border-border/60 px-2.5 py-1 font-medium text-foreground/80">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-muted/60 border border-border/60 px-2 py-0.5 font-medium text-foreground/80 text-[11px] sm:text-xs">
                     Duración: {formatDuration(sesion.duracion_segundos)}
                   </span>
                 )}
                 {sesion.segmentos && sesion.segmentos.length > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2.5 py-1 font-medium text-primary">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 font-medium text-primary text-[11px] sm:text-xs">
                     <MessageSquare className="h-3 w-3" />
                     {sesion.segmentos.length} intervenciones
                   </span>
@@ -509,27 +518,38 @@ export default function SesionDetailPage() {
               </div>
 
               {isExternalDoc && (
-                <p className="mt-2.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2.5 py-1 rounded-lg border border-border/40">
+                <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2.5 py-1 rounded-lg border border-border/40">
                   <FileText className="h-3.5 w-3.5 text-muted-foreground" /> {sesion.documento_nombre_original || "Documento externo cargado"}
                 </p>
               )}
               {isTest && (
-                <p className="mt-2.5 inline-flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-lg border border-emerald-200/50">
+                <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-lg border border-emerald-200/50">
                   <ClipboardList className="h-3.5 w-3.5" /> Resultado guardado como sesión clínica y disponible para el chat IA.
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {isVirtual && sesion.estado === "PENDIENTE" && (
-              <div className="flex flex-wrap items-center gap-2">
+          {/* Acciones de la sesión adaptadas a móvil y desktop */}
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:shrink-0 w-full lg:w-auto pt-2 lg:pt-0 border-t lg:border-t-0 border-border/40">
+            {isVirtual && sesion.plataforma_virtual === "PSICONEX" && sesion.estado_videollamada !== "FINALIZADA" && (
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/pacientes/${sesion.paciente}/sesiones/${sesion.id}/sala`)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700 transition-colors w-full sm:w-auto"
+              >
+                <Video className="h-3.5 w-3.5" />
+                Entrar a la sala
+              </button>
+            )}
+            {isVirtual && sesion.plataforma_virtual !== "PSICONEX" && sesion.estado === "PENDIENTE" && (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 {sesion.url_reunion && (
                   <a
                     href={sesion.url_reunion}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3.5 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100 transition-colors dark:bg-sky-950/40 dark:text-sky-300"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3.5 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100 transition-colors dark:bg-sky-950/40 dark:text-sky-300 w-full sm:w-auto"
                   >
                     <Video className="h-3.5 w-3.5 text-sky-600" />
                     Abrir Google Meet
@@ -537,7 +557,7 @@ export default function SesionDetailPage() {
                   </a>
                 )}
                 {isCurrentSessionRecording ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto p-2 sm:p-0 rounded-xl bg-sky-500/10 sm:bg-transparent">
                     <span className="text-xs font-mono tabular-nums text-sky-600 animate-pulse flex items-center gap-1.5 font-semibold">
                       <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
@@ -547,19 +567,19 @@ export default function SesionDetailPage() {
                     </span>
                     <button
                       onClick={handleStopRecording}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-destructive px-3.5 py-2 text-xs font-semibold text-destructive-foreground shadow-xs transition-all hover:bg-destructive/90 cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-destructive px-3.5 py-2 text-xs font-semibold text-destructive-foreground shadow-xs transition-all hover:bg-destructive/90 cursor-pointer"
                     >
                       <Square className="h-3.5 w-3.5" /> Detener grabación
                     </button>
                   </div>
                 ) : isCurrentSessionUploading ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo audio...
                   </div>
                 ) : (
                   <button
                     onClick={() => setRemoteAssistantOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-sky-700 cursor-pointer"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-sky-700 cursor-pointer w-full sm:w-auto"
                   >
                     <Mic className="h-3.5 w-3.5" /> Grabar llamada Meet
                   </button>
@@ -567,57 +587,102 @@ export default function SesionDetailPage() {
               </div>
             )}
 
+            {/* Grabación presencial optimizada para teléfono móvil */}
             {!isExternalDoc && !isVirtual && !isTest && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
-              <div className="flex items-center gap-3">
+              <div className="w-full sm:w-auto">
                 {isCurrentSessionUploading ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Subiendo audio...</div>
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-2"><Loader2 className="h-3.5 w-3.5 animate-spin" />Subiendo audio...</div>
                 ) : isCurrentSessionRecording ? (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono tabular-nums text-primary font-semibold animate-pulse">{formatSeconds(globalElapsed)}</span>
-                    <button onClick={handleStopRecording} className="inline-flex items-center gap-1.5 rounded-xl bg-destructive px-3.5 py-2 text-xs font-semibold text-destructive-foreground shadow-xs transition-all hover:bg-destructive/90 cursor-pointer">
-                      <Square className="h-3.5 w-3.5" /> Detener
+                  <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto p-2 sm:p-0 rounded-xl bg-red-500/10 sm:bg-transparent border border-red-500/20 sm:border-0">
+                    <span className="text-sm font-mono tabular-nums text-primary font-bold animate-pulse flex items-center gap-1.5 px-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+                      </span>
+                      {formatSeconds(globalElapsed)}
+                    </span>
+                    <button onClick={handleStopRecording} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-destructive px-4 py-2 text-xs font-bold text-destructive-foreground shadow-xs transition-all hover:bg-destructive/90 active:scale-95 cursor-pointer">
+                      <Square className="h-3.5 w-3.5" /> Detener grabación
                     </button>
                   </div>
                 ) : (
-                  <button onClick={handleStartRecording} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 hover:shadow-md cursor-pointer">
-                    <Mic className="h-3.5 w-3.5" /> Iniciar grabación
+                  <button onClick={handleStartRecording} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 sm:py-2 text-sm sm:text-xs font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-95 cursor-pointer">
+                    <Mic className="h-4 w-4 animate-pulse" />
+                    <span>Iniciar grabación de sesión</span>
                   </button>
                 )}
               </div>
             )}
 
-            <button
-              onClick={exportPdf}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-card px-3.5 py-2 text-xs font-semibold text-foreground/80 shadow-xs transition-all hover:bg-accent hover:text-foreground cursor-pointer"
-            >
-              <Download className="h-3.5 w-3.5" /> Exportar PDF
-            </button>
-            <button
-              onClick={exportDocx}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-card px-3.5 py-2 text-xs font-semibold text-foreground/80 shadow-xs transition-all hover:bg-accent hover:text-foreground cursor-pointer"
-            >
-              <FileText className="h-3.5 w-3.5" /> Exportar Word
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteSessionError("");
-                setDeleteDialogOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive shadow-xs transition-all hover:bg-destructive/15 cursor-pointer"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {isTest ? "Eliminar test" : "Eliminar sesión"}
-            </button>
+            {/* Botones secundarios: Exportar y Eliminar */}
+            <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto pt-1 sm:pt-0">
+              <button
+                onClick={exportPdf}
+                className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl border border-border/70 bg-card px-2 sm:px-3.5 py-2 text-[11px] sm:text-xs font-semibold text-foreground/80 shadow-xs transition-all hover:bg-accent hover:text-foreground cursor-pointer w-full sm:w-auto"
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                <span>PDF</span>
+              </button>
+              <button
+                onClick={exportDocx}
+                className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl border border-border/70 bg-card px-2 sm:px-3.5 py-2 text-[11px] sm:text-xs font-semibold text-foreground/80 shadow-xs transition-all hover:bg-accent hover:text-foreground cursor-pointer w-full sm:w-auto"
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0" />
+                <span>Word</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteSessionError("");
+                  setDeleteDialogOpen(true);
+                }}
+                className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl border border-destructive/25 bg-destructive/5 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold text-destructive shadow-xs transition-all hover:bg-destructive/15 cursor-pointer w-full sm:w-auto"
+              >
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                <span>Eliminar</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {error && <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive font-medium">{error}</div>}
 
+      {/* Selector móvil de vista: Diálogo vs Notas */}
+      <div className="flex lg:hidden rounded-xl bg-muted/60 p-1 border border-border/60 gap-1">
+        <button
+          type="button"
+          onClick={() => setMobileTab("notas")}
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+            mobileTab === "notas"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Edit3 className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span>Notas del psicólogo</span>
+          {notes.length > 0 && (
+            <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("dialogo")}
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+            mobileTab === "dialogo"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+          <span>{isTest ? "Resultados Test" : isExternalDoc ? "Documento" : "Diálogo y Tips"}</span>
+        </button>
+      </div>
+
       {/* Main 2-Column Clinical Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column (7 cols): Diálogo y Transcripción o Resultados de Test */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className={`lg:col-span-7 space-y-6 ${mobileTab === "dialogo" ? "block" : "hidden lg:block"}`}>
           {/* Guía y tips para grabación presencial */}
           {!isExternalDoc && !isVirtual && !isTest && !sesion.audio_path && sesion.estado === "PENDIENTE" && (
             <SessionRecordingTips />
@@ -968,16 +1033,16 @@ export default function SesionDetailPage() {
         </div>
 
         {/* Right Column (5 cols): Panel de Notas Clínicas Sticky & Auditoría de Voz */}
-        <div className="lg:col-span-5 space-y-5 lg:sticky lg:top-20">
+        <div className={`lg:col-span-5 space-y-5 lg:sticky lg:top-20 ${mobileTab === "notas" ? "block" : "hidden lg:block"}`}>
           {/* Notas del psicólogo */}
-          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-card space-y-4">
+          <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-card space-y-3.5 sm:space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold tracking-tight text-foreground flex items-center gap-2">
-                  <Edit3 className="h-4.5 w-4.5 text-primary" />
+                <h2 className="text-sm sm:text-base font-bold tracking-tight text-foreground flex items-center gap-2">
+                  <Edit3 className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-primary" />
                   Notas del psicólogo
                 </h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[11px] sm:text-xs text-muted-foreground">
                   Apuntes privados, impresiones clínicas y acuerdos
                 </p>
               </div>
@@ -985,7 +1050,7 @@ export default function SesionDetailPage() {
               <button
                 onClick={saveNotes}
                 disabled={savingNotes}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
               >
                 <Save className="h-3.5 w-3.5" />
                 {savingNotes ? "Guardando..." : "Guardar notas"}
@@ -1022,8 +1087,8 @@ export default function SesionDetailPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={14}
-              className="w-full rounded-xl border border-input bg-background/60 px-4 py-3 text-xs leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+              rows={8}
+              className="w-full rounded-xl border border-input bg-background/60 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring resize-y sm:rows-14"
               placeholder="Notas privadas sobre la sesión, hipótesis clínicas, evolución del paciente, acuerdos tomados..."
             />
 

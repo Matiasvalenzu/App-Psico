@@ -181,6 +181,7 @@ DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.co
 
 # Public links and psychological tests
 PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "http://localhost:3000")
+SIGNALING_SECRET = os.environ.get("SIGNALING_SECRET", "dev-signaling-secret")
 TEST_LINK_EXPIRATION_DAYS = int(os.environ.get("TEST_LINK_EXPIRATION_DAYS", "7"))
 DSM5_DOCUMENT_PATH = os.environ.get(
     "DSM5_DOCUMENT_PATH",

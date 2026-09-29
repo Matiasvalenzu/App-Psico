@@ -6,6 +6,12 @@
 		file_server
 	}
 
+	@signaling path /ws/signaling /ws/signaling/*
+	handle @signaling {
+		uri strip_prefix /ws/signaling
+		reverse_proxy signaling:8080
+	}
+
 	handle /api/* {
 		reverse_proxy backend:8000 {
 			header_up X-Forwarded-Proto https

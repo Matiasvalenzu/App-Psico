@@ -1,12 +1,20 @@
+import hashlib
+import hmac
 import os
 import re
+import time
+import uuid
 from io import BytesIO
 from django.conf import settings
 from django.db import transaction
 from django.http import FileResponse
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from .documentos import (
     DocumentTextExtractionError,
     UnsupportedDocumentType,
@@ -45,11 +53,15 @@ class SesionViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         audio_path = instance.audio_path
         instance.delete()
-        if audio_path and os.path.exists(audio_path):
-            try:
-                os.remove(audio_path)
-            except OSError:
-                pass
+        paths = [audio_path]
+        if audio_path and audio_path.endswith("_psicologo.webm"):
+            paths.append(audio_path.replace("_psicologo.webm", "_paciente.webm"))
+        for path in paths:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
 
     def perform_create(self, serializer):
         serializer.save(psicologo=self.request.user)
@@ -280,6 +292,94 @@ class SesionViewSet(viewsets.ModelViewSet):
 
         sesion = Sesion.objects.create(**create_kwargs)
         return Response(SesionSerializer(self.get_queryset().get(id=sesion.id)).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="crear_virtual_propia")
+    def crear_virtual_propia(self, request):
+        paciente_id = request.data.get("paciente")
+        if not paciente_id:
+            return Response({"error": "El campo paciente es requerido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from pacientes.models import Paciente
+        try:
+            paciente = Paciente.objects.get(id=paciente_id, psicologo=request.user)
+        except Paciente.DoesNotExist:
+            return Response({"error": "Paciente no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        token = uuid.uuid4().hex
+        create_kwargs = dict(
+            paciente=paciente,
+            psicologo=request.user,
+            origen=Sesion.Origen.VIRTUAL,
+            plataforma_virtual=Sesion.Plataforma.PSICONEX,
+            token_sala=token,
+            url_reunion=f"{settings.PUBLIC_APP_URL.rstrip('/')}/sala/{token}",
+            estado=Sesion.Estado.PENDIENTE,
+        )
+        fecha_hora_inicio = request.data.get("fecha_hora_inicio")
+        if fecha_hora_inicio:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(fecha_hora_inicio)
+            if dt:
+                create_kwargs["fecha_hora_inicio"] = dt
+
+        sesion = Sesion.objects.create(**create_kwargs)
+        return Response(SesionSerializer(self.get_queryset().get(id=sesion.id)).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], url_path="ticket_sala")
+    def ticket_sala(self, request, pk=None):
+        sesion = self.get_object()
+        if not sesion.token_sala:
+            return Response({"error": "La sesión no tiene sala Psiconex."}, status=status.HTTP_400_BAD_REQUEST)
+        if sesion.estado_videollamada == Sesion.EstadoVideollamada.FINALIZADA:
+            return Response({"error": "La videollamada ya finalizó."}, status=status.HTTP_410_GONE)
+
+        exp = int(time.time()) + 2 * 60 * 60
+        firma = hmac.new(
+            settings.SIGNALING_SECRET.encode(),
+            f"{sesion.token_sala}:psicologo:{exp}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if sesion.estado_videollamada != Sesion.EstadoVideollamada.EN_CURSO:
+            sesion.estado_videollamada = Sesion.EstadoVideollamada.EN_CURSO
+            sesion.save(update_fields=["estado_videollamada", "updated_at"])
+        return Response({"token_sala": sesion.token_sala, "ticket": f"{exp}.{firma}"})
+
+    @action(detail=True, methods=["post"], url_path="finalizar_videollamada")
+    def finalizar_videollamada(self, request, pk=None):
+        sesion = self.get_object()
+        if not sesion.token_sala:
+            return Response({"error": "La sesión no tiene sala Psiconex."}, status=status.HTTP_400_BAD_REQUEST)
+        audio_psicologo = request.FILES.get("audio_psicologo")
+        audio_paciente = request.FILES.get("audio_paciente")
+        if not audio_psicologo or not audio_paciente:
+            return Response({"error": "Se requieren ambas pistas de audio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        storage_dir = os.path.join(settings.AUDIO_STORAGE_PATH, str(sesion.paciente_id))
+        os.makedirs(storage_dir, exist_ok=True)
+        path_psi = os.path.join(storage_dir, f"{sesion.id}_psicologo.webm")
+        path_pac = os.path.join(storage_dir, f"{sesion.id}_paciente.webm")
+        for archivo, path in ((audio_psicologo, path_psi), (audio_paciente, path_pac)):
+            with open(path, "wb+") as destination:
+                for chunk in archivo.chunks():
+                    destination.write(chunk)
+
+        update_fields = ["estado_videollamada", "estado", "audio_path", "updated_at"]
+        notas = request.data.get("notas_sesion")
+        if notas is not None:
+            sesion.notas_sesion = notas
+            update_fields.append("notas_sesion")
+        sesion.estado_videollamada = Sesion.EstadoVideollamada.FINALIZADA
+        sesion.estado = Sesion.Estado.PROCESANDO
+        sesion.audio_path = path_psi
+        sesion.save(update_fields=update_fields)
+
+        from .tasks import procesar_audio_dual_track
+        procesar_audio_dual_track.delay(
+            sesion_id=sesion.id,
+            audio_path_psicologo=path_psi,
+            audio_path_paciente=path_pac,
+        )
+        return Response({"ok": True, "mensaje": "Procesando transcripción"})
 
     @action(detail=True, methods=["post"], url_path="caption")
     def caption(self, request, pk=None):
@@ -655,3 +755,30 @@ class SesionViewSet(viewsets.ModelViewSet):
         base = os.path.splitext(base)[0]
         clean = re.sub(r"[^A-Za-z0-9_-]+", "-", base.strip().lower()).strip("-")
         return clean or f"sesion-{sesion.id}"
+
+
+@method_decorator(ratelimit(key="ip", rate="30/m", method="GET", block=True), name="get")
+class SalaPublicaView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, token):
+        sesion = Sesion.objects.select_related("paciente", "psicologo").filter(token_sala=token).first()
+        if not sesion:
+            return Response(
+                {"valida": False, "error": "El enlace de la sesión no es válido."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if sesion.estado_videollamada == Sesion.EstadoVideollamada.FINALIZADA:
+            return Response(
+                {"valida": False, "error": "Esta sesión ha finalizado."},
+                status=status.HTTP_410_GONE,
+            )
+        psicologo = sesion.psicologo
+        return Response({
+            "valida": True,
+            "sesion_id": sesion.id,
+            "paciente_nombre": sesion.paciente.nombre,
+            "psicologo_nombre": (psicologo.get_full_name() if psicologo else "") or "Especialista Psiconex",
+            "estado_videollamada": sesion.estado_videollamada,
+        })

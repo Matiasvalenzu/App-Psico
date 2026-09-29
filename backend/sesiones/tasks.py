@@ -543,3 +543,89 @@ def procesar_audio_sesion(self, sesion_id):
             ).strip()
             sesion.save(update_fields=["estado", "notas_sesion", "updated_at"])
         raise self.retry(exc=exc, countdown=60)
+
+
+DUAL_TRACK_MERGE_GAP_SECONDS = 1.5
+
+
+def _merge_dual_track_segments(segments):
+    merged = []
+    for segment in sorted(segments, key=lambda s: s["start"]):
+        last = merged[-1] if merged else None
+        if (
+            last
+            and last["hablante"] == segment["hablante"]
+            and segment["start"] - last["end"] < DUAL_TRACK_MERGE_GAP_SECONDS
+        ):
+            last["end"] = max(last["end"], segment["end"])
+            last["text"] = f"{last['text']} {segment['text']}".strip()
+        else:
+            merged.append(dict(segment))
+    return merged
+
+
+@shared_task(bind=True, max_retries=1)
+def procesar_audio_dual_track(self, sesion_id, audio_path_psicologo, audio_path_paciente):
+    """Transcribe una videollamada Psiconex: cada pista es un hablante, sin diarización."""
+    logger.info("Iniciando procesamiento dual-track de sesión %s", sesion_id)
+    sesion = None
+
+    try:
+        sesion = Sesion.objects.select_related("psicologo", "paciente").get(id=sesion_id)
+        sesion.estado = Sesion.Estado.PROCESANDO
+        sesion.save(update_fields=["estado", "updated_at"])
+
+        psicologo = sesion.psicologo
+        label_psicologo = (psicologo.get_full_name() or psicologo.username) if psicologo else "Psicólogo"
+        label_paciente = sesion.paciente.nombre_completo
+
+        segments = []
+        for audio_path, hablante, label in (
+            (audio_path_psicologo, TranscripcionSegmento.Hablante.PSICOLOGO, label_psicologo),
+            (audio_path_paciente, TranscripcionSegmento.Hablante.PACIENTE, label_paciente),
+        ):
+            for segment in _run_whisper(audio_path):
+                if segment["text"]:
+                    segments.append({**segment, "hablante": hablante, "speaker_label": label})
+
+        merged_segments = _merge_dual_track_segments(segments)
+
+        TranscripcionSegmento.objects.filter(sesion=sesion).delete()
+        for index, segment in enumerate(merged_segments, start=1):
+            TranscripcionSegmento.objects.create(
+                sesion=sesion,
+                orden=index,
+                inicio_segundo=segment["start"],
+                fin_segundo=segment["end"],
+                hablante=segment["hablante"],
+                speaker_label=segment["speaker_label"],
+                speaker_match_model="dual-track",
+                texto=segment["text"],
+                texto_original=segment["text"],
+                embedding=generate_text_embedding(segment["text"]),
+            )
+
+        update_fields = ["estado", "updated_at"]
+        if not sesion.duracion_segundos:
+            try:
+                sesion.duracion_segundos = int(get_audio_duration_seconds(audio_path_psicologo))
+                update_fields.append("duracion_segundos")
+            except Exception as exc:
+                logger.warning("No se pudo calcular la duración de la sesión %s: %s", sesion_id, exc)
+        sesion.estado = Sesion.Estado.COMPLETADO
+        sesion.save(update_fields=update_fields)
+        logger.info("Sesión dual-track %s procesada exitosamente", sesion_id)
+        return True
+
+    except Sesion.DoesNotExist:
+        logger.error("La sesión %s no existe.", sesion_id)
+        return False
+    except Exception as exc:
+        logger.exception("Error procesando sesión dual-track %s", sesion_id)
+        if sesion is not None:
+            sesion.estado = Sesion.Estado.ERROR
+            sesion.notas_sesion = (
+                f"{sesion.notas_sesion}\n\nError automático de transcripción: {exc}"
+            ).strip()
+            sesion.save(update_fields=["estado", "notas_sesion", "updated_at"])
+        raise self.retry(exc=exc, countdown=60)

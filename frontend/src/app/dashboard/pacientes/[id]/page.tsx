@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { RemoteSessionModal } from "@/components/sesion/RemoteSessionModal";
+import { ModalCrearSesionVirtual } from "@/components/sesion/ModalCrearSesionVirtual";
 import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
 import ConsentimientoInformadoModal from "@/components/pacientes/ConsentimientoInformadoModal";
 import {
@@ -358,6 +359,7 @@ export default function PacienteDetailPage() {
 
   // Remote session modal
   const [remoteModalOpen, setRemoteModalOpen] = useState(false);
+  const [psiconexModalOpen, setPsiconexModalOpen] = useState(false);
   const [assistantModalOpen, setAssistantModalOpen] = useState(false);
   const [activeRemoteSession, setActiveRemoteSession] = useState<{ id: number; url_reunion?: string } | null>(null);
 
@@ -2343,13 +2345,20 @@ export default function PacienteDetailPage() {
         <h2 className="text-base sm:text-lg font-semibold tracking-tight">
           Sesiones ({sesionesClinicas.length})
         </h2>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 w-full sm:w-auto">
           <button
             onClick={openVirtualModal}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3 py-2 text-xs sm:text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50 w-full sm:w-auto"
           >
             <Video className="h-4 w-4 shrink-0" />
             <span>Sesión remota</span>
+          </button>
+          <button
+            onClick={() => setPsiconexModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-600 bg-sky-600 px-3 py-2 text-xs sm:text-sm font-medium text-white shadow-subtle transition-all hover:bg-sky-700 hover:shadow-card w-full sm:w-auto"
+          >
+            <Video className="h-4 w-4 shrink-0" />
+            <span>Sesión Virtual Psiconex</span>
           </button>
           <button
             onClick={handleNewSession}
@@ -2374,6 +2383,15 @@ export default function PacienteDetailPage() {
             onStartAssistant={(sesion, meetUrl) => {
               setActiveRemoteSession({ id: sesion.id, url_reunion: meetUrl });
               setAssistantModalOpen(true);
+              loadData();
+            }}
+          />
+
+          <ModalCrearSesionVirtual
+            open={psiconexModalOpen}
+            onClose={() => setPsiconexModalOpen(false)}
+            paciente={paciente}
+            onSessionCreated={() => {
               loadData();
             }}
           />

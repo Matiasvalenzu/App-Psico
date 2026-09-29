@@ -15,6 +15,7 @@ x-backend-env: &backend-env
   DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
   DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
   PUBLIC_APP_URL: https://app.psiconex.cl
+  SIGNALING_SECRET: ${SIGNALING_SECRET:?SIGNALING_SECRET required}
   TEST_LINK_EXPIRATION_DAYS: ${TEST_LINK_EXPIRATION_DAYS:-7}
   DSM5_DOCUMENT_PATH: ${DSM5_DOCUMENT_PATH:-/app/informes/dsm5-manualdiagnsticoyestadisticodelostrastornosmentales-161006005112.pdf}
   EMAIL_HOST: ${EMAIL_HOST:-}
@@ -172,9 +173,18 @@ services:
         NEXT_PUBLIC_API_URL: https://app.psiconex.cl/api
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY: ${NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY:-}
+        NEXT_PUBLIC_TURN_URL: ${NEXT_PUBLIC_TURN_URL:-}
+        NEXT_PUBLIC_TURN_USERNAME: ${NEXT_PUBLIC_TURN_USERNAME:-}
+        NEXT_PUBLIC_TURN_PASSWORD: ${NEXT_PUBLIC_TURN_PASSWORD:-}
     restart: unless-stopped
     depends_on:
       - backend
+
+  signaling:
+    build: ./signaling
+    restart: unless-stopped
+    environment:
+      SIGNALING_SECRET: ${SIGNALING_SECRET:?SIGNALING_SECRET required}
 
   marketing:
     build:
@@ -198,6 +208,7 @@ services:
     depends_on:
       - backend
       - frontend
+      - signaling
 
 volumes:
   postgres_data:

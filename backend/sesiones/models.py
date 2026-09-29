@@ -16,6 +16,12 @@ class Sesion(models.Model):
     class Plataforma(models.TextChoices):
         GOOGLE_MEET = "GOOGLE_MEET", "Google Meet"
         ZOOM = "ZOOM", "Zoom"
+        PSICONEX = "PSICONEX", "Psiconex Meet"
+
+    class EstadoVideollamada(models.TextChoices):
+        CREADA = "CREADA", "Creada"
+        EN_CURSO = "EN_CURSO", "En curso"
+        FINALIZADA = "FINALIZADA", "Finalizada"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
@@ -50,6 +56,14 @@ class Sesion(models.Model):
         max_length=20, choices=Plataforma.choices, null=True, blank=True
     )
     url_reunion = models.URLField(null=True, blank=True)
+    token_sala = models.CharField(
+        max_length=64, unique=True, null=True, blank=True, db_index=True
+    )
+    estado_videollamada = models.CharField(
+        max_length=20,
+        choices=EstadoVideollamada.choices,
+        default=EstadoVideollamada.CREADA,
+    )
     captions_buffer = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

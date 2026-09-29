@@ -17,6 +17,7 @@ x-backend-env: &backend-env
   MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
   MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY:-}
   PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://192.168.1.151:3000}
+  SIGNALING_SECRET: ${SIGNALING_SECRET:-dev-signaling-secret}
   TEST_LINK_EXPIRATION_DAYS: ${TEST_LINK_EXPIRATION_DAYS:-7}
   DSM5_DOCUMENT_PATH: ${DSM5_DOCUMENT_PATH:-/app/informes/dsm5-manualdiagnsticoyestadisticodelostrastornosmentales-161006005112.pdf}
   EMAIL_HOST: ${EMAIL_HOST:-}
@@ -174,6 +175,15 @@ services:
       redis:
         condition: service_healthy
 
+  signaling:
+    build: ./signaling
+    container_name: psicologo-signaling-dev
+    environment:
+      SIGNALING_SECRET: ${SIGNALING_SECRET:-dev-signaling-secret}
+    ports:
+      - "${SIGNALING_PORT:-8090}:8080"
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -191,6 +201,10 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:8000/api}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY: ${NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY:-}
+      NEXT_PUBLIC_SIGNALING_URL: ${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8090}
+      NEXT_PUBLIC_TURN_URL: ${NEXT_PUBLIC_TURN_URL:-}
+      NEXT_PUBLIC_TURN_USERNAME: ${NEXT_PUBLIC_TURN_USERNAME:-}
+      NEXT_PUBLIC_TURN_PASSWORD: ${NEXT_PUBLIC_TURN_PASSWORD:-}
     depends_on:
       - backend
 

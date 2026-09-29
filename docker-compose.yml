@@ -10,6 +10,17 @@ services:
       timeout: 5s
       retries: 5
 
+  sii_libredte:
+    image: php:7.4-apache
+    container_name: psicologo-sii-libredte
+    volumes:
+      - ./docker/libredte:/var/www/html
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    networks:
+      default:
+
   backend:
     build:
       context: ./backend
@@ -38,6 +49,7 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:3000}
+      - SIGNALING_SECRET=${SIGNALING_SECRET:-dev-signaling-secret}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,app.psico.datnexia.com,psico.datnexia.com}
       - TEST_LINK_EXPIRATION_DAYS=${TEST_LINK_EXPIRATION_DAYS:-7}
@@ -48,7 +60,11 @@ services:
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
       - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
       - EMAIL_USE_SSL=${EMAIL_USE_SSL:-False}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-15}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-no-reply@datnexia.com}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-Psiconex}
+      - EMAIL_SUPPORT_ADDRESS=${EMAIL_SUPPORT_ADDRESS:-psiconex@datnexia.com}
+      - EMAIL_LOGO_URL=${EMAIL_LOGO_URL:-http://localhost:3000/logo-psiconex.png}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_CALENDAR_REDIRECT_URI=${GOOGLE_CALENDAR_REDIRECT_URI:-http://localhost:8000/api/agenda/google/callback/}
@@ -79,7 +95,7 @@ services:
       redis:
         condition: service_healthy
 
-  celery:
+  celery: &celery-service
     image: app-psico-backend
     container_name: psicologo-celery
     command: celery -A config.celery_app worker --loglevel=info --concurrency=1
@@ -103,6 +119,7 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:3000}
+      - SIGNALING_SECRET=${SIGNALING_SECRET:-dev-signaling-secret}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,app.psico.datnexia.com,psico.datnexia.com}
       - TEST_LINK_EXPIRATION_DAYS=${TEST_LINK_EXPIRATION_DAYS:-7}
       - DSM5_DOCUMENT_PATH=${DSM5_DOCUMENT_PATH:-/app/informes/dsm5-manualdiagnsticoyestadisticodelostrastornosmentales-161006005112.pdf}
@@ -112,7 +129,11 @@ services:
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
       - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
       - EMAIL_USE_SSL=${EMAIL_USE_SSL:-False}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-15}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-no-reply@datnexia.com}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-Psiconex}
+      - EMAIL_SUPPORT_ADDRESS=${EMAIL_SUPPORT_ADDRESS:-psiconex@datnexia.com}
+      - EMAIL_LOGO_URL=${EMAIL_LOGO_URL:-http://localhost:3000/logo-psiconex.png}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_CALENDAR_REDIRECT_URI=${GOOGLE_CALENDAR_REDIRECT_URI:-http://localhost:8000/api/agenda/google/callback/}
@@ -143,11 +164,31 @@ services:
       redis:
         condition: service_healthy
 
+  celery-email:
+    <<: *celery-service
+    container_name: psicologo-celery-email
+    command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --queues=email
+
+  celery-beat:
+    <<: *celery-service
+    container_name: psicologo-celery-beat
+    command: celery -A config.celery_app beat --loglevel=info
+
+  signaling:
+    build: ./signaling
+    container_name: psicologo-signaling
+    environment:
+      - SIGNALING_SECRET=${SIGNALING_SECRET:-dev-signaling-secret}
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.psico.datnexia.com/api}
+        NEXT_PUBLIC_TURN_URL: ${NEXT_PUBLIC_TURN_URL:-}
+        NEXT_PUBLIC_TURN_USERNAME: ${NEXT_PUBLIC_TURN_USERNAME:-}
+        NEXT_PUBLIC_TURN_PASSWORD: ${NEXT_PUBLIC_TURN_PASSWORD:-}
     container_name: psicologo-frontend
     ports:
       - "3000:3000"

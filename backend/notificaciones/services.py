@@ -330,6 +330,7 @@ def send_meet_invitation_to_patient(*, sesion, recipient_email=None):
         "patient_name": paciente.nombre or "Estimado/a",
         "psychologist_name": psychologist_name,
         "meet_url": sesion.url_reunion,
+        "platform_name": sesion.get_plataforma_virtual_display() if sesion.plataforma_virtual else "Google Meet",
         "session_date": fecha_str,
         "session_time": hora_str,
     }
