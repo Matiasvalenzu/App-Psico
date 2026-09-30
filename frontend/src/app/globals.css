@@ -441,6 +441,45 @@
   contain-intrinsic-size: 1px 900px;
 }
 
+/* Paleta violeta de la landing (marketing/), acotada a pantallas públicas como el login */
+.theme-landing {
+  --background: 255 10% 93%;
+  --foreground: 250 25% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 250 25% 14%;
+  --primary: 255 80% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 255 20% 90%;
+  --secondary-foreground: 255 30% 22%;
+  --muted: 255 12% 88%;
+  --muted-foreground: 255 6% 42%;
+  --accent: 255 15% 90%;
+  --accent-foreground: 255 30% 22%;
+  --destructive: 0 84% 60%;
+  --border: 255 12% 85%;
+  --input: 255 12% 85%;
+  --ring: 255 80% 56%;
+}
+
+.dark .theme-landing {
+  --background: 248 20% 5%;
+  --foreground: 250 18% 93%;
+  --card: 248 18% 9%;
+  --card-foreground: 250 18% 93%;
+  --primary: 255 75% 64%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 250 18% 15%;
+  --secondary-foreground: 250 18% 85%;
+  --muted: 250 18% 14%;
+  --muted-foreground: 250 12% 56%;
+  --accent: 250 18% 17%;
+  --accent-foreground: 250 18% 85%;
+  --destructive: 0 70% 52%;
+  --border: 250 18% 18%;
+  --input: 250 18% 18%;
+  --ring: 255 75% 64%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float-slow {
     animation: none !important;

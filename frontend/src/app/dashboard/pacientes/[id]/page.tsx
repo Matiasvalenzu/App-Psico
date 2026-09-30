@@ -44,6 +44,11 @@ import {
 } from "lucide-react";
 import { useTutorial } from "@/context/TutorialContext";
 
+// Elementos ocultos por ahora; se conservan por si se vuelven a habilitar
+const MOSTRAR_ESTADO_PACIENTE = false;
+const MOSTRAR_PLANTILLA_CONSENTIMIENTO = false;
+const MOSTRAR_SESION_REMOTA = false;
+
 interface Paciente {
   id: number;
   nombre: string;
@@ -1217,10 +1222,12 @@ export default function PacienteDetailPage() {
             <span className="hidden md:inline">Tutorial de Ficha y Sesiones IA</span>
             <span className="hidden xs:inline md:hidden">Tutorial</span>
           </button>
-          <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span className="truncate max-w-[90px] sm:max-w-none">{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>
-          </span>
+          {MOSTRAR_ESTADO_PACIENTE && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="truncate max-w-[90px] sm:max-w-none">{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -2168,14 +2175,16 @@ export default function PacienteDetailPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setConsentModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/60 px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 hover:border-violet-400 dark:bg-violet-950/30 dark:text-violet-300 cursor-pointer"
-              title="Generar Consentimiento Informado editable conforme a la Ley 19.628"
-            >
-              <FileSignature className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-              <span>Plantilla Consentimiento</span>
-            </button>
+            {MOSTRAR_PLANTILLA_CONSENTIMIENTO && (
+              <button
+                onClick={() => setConsentModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/60 px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 hover:border-violet-400 dark:bg-violet-950/30 dark:text-violet-300 cursor-pointer"
+                title="Generar Consentimiento Informado editable conforme a la Ley 19.628"
+              >
+                <FileSignature className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                <span>Plantilla Consentimiento</span>
+              </button>
+            )}
             <button
               onClick={openDocumentModal}
               className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-4 py-2 text-xs font-semibold shadow-xs transition-all hover:bg-accent hover:border-primary/40"
@@ -2346,19 +2355,30 @@ export default function PacienteDetailPage() {
           Sesiones ({sesionesClinicas.length})
         </h2>
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={openVirtualModal}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3 py-2 text-xs sm:text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50 w-full sm:w-auto"
-          >
-            <Video className="h-4 w-4 shrink-0" />
-            <span>Sesión remota</span>
-          </button>
+          {MOSTRAR_SESION_REMOTA && (
+            <button
+              onClick={openVirtualModal}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3 py-2 text-xs sm:text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50 w-full sm:w-auto"
+            >
+              <Video className="h-4 w-4 shrink-0" />
+              <span>Sesión remota</span>
+            </button>
+          )}
           <button
             onClick={() => setPsiconexModalOpen(true)}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-600 bg-sky-600 px-3 py-2 text-xs sm:text-sm font-medium text-white shadow-subtle transition-all hover:bg-sky-700 hover:shadow-card w-full sm:w-auto"
           >
             <Video className="h-4 w-4 shrink-0" />
             <span>Sesión Virtual Psiconex</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openTutorial(5)}
+            className="order-last sm:order-none col-span-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs sm:text-sm font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 w-full sm:w-auto"
+            title="Ver video tutorial de Registro de Sesión Presencial (Módulo 5)"
+          >
+            <PlayCircle className="h-4 w-4 shrink-0" />
+            <span>Tutorial sesión presencial</span>
           </button>
           <button
             onClick={handleNewSession}
@@ -2518,7 +2538,7 @@ export default function PacienteDetailPage() {
           <Calendar className="mb-3 h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm font-medium">Sin sesiones clínicas registradas</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Presiona &ldquo;Sesión presencial&rdquo; o crea una sesión remota
+            Presiona &ldquo;Sesión presencial&rdquo; o &ldquo;Sesión Virtual Psiconex&rdquo; para registrar la primera
           </p>
         </div>
       ) : (

@@ -39,7 +39,6 @@ export default function TutorialModal() {
     closeTutorial,
     setContinuousPlay,
     setActiveModulo,
-    dismissForNow,
     markAsSeen,
   } = useTutorial();
 
@@ -365,21 +364,16 @@ export default function TutorialModal() {
               <p className="text-xs sm:text-sm text-foreground">
                 <strong className="font-semibold">¡Bienvenido a Psiconex!</strong> Preparamos este
                 tutorial guiado para que aproveches al máximo la ficha clínica, agenda y asistente
-                IA.
+                IA. Solo se abre automáticamente esta vez: puedes volver a verlo cuando quieras
+                desde el botón «Tutorial».
               </p>
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
               <button
-                onClick={dismissForNow}
+                onClick={closeTutorial}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors"
               >
                 Ver más tarde
-              </button>
-              <button
-                onClick={() => markAsSeen(true)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-all"
-              >
-                No volver a mostrar al inicio
               </button>
             </div>
           </div>
@@ -620,7 +614,7 @@ export default function TutorialModal() {
                 11m 16s total
               </span>
               <button
-                onClick={() => markAsSeen(true)}
+                onClick={() => markAsSeen()}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />

@@ -7,6 +7,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      screens: {
+        // `short:` compacta vistas en pantallas de poca altura (notebooks); va después de lg/xl
+        short: { raw: "(max-height: 820px)" },
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
