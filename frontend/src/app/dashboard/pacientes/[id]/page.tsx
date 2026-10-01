@@ -2372,15 +2372,6 @@ export default function PacienteDetailPage() {
             <span>Sesión Virtual Psiconex</span>
           </button>
           <button
-            type="button"
-            onClick={() => openTutorial(5)}
-            className="order-last sm:order-none col-span-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs sm:text-sm font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 w-full sm:w-auto"
-            title="Ver video tutorial de Registro de Sesión Presencial (Módulo 5)"
-          >
-            <PlayCircle className="h-4 w-4 shrink-0" />
-            <span>Tutorial sesión presencial</span>
-          </button>
-          <button
             onClick={handleNewSession}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs sm:text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card w-full sm:w-auto"
           >
