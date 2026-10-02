@@ -219,6 +219,46 @@ export async function listUsers() {
   return res.json();
 }
 
+export async function getAdminSystemStats() {
+  const res = await apiFetch("/auth/users/stats/");
+  if (!res.ok) throw new Error("No se pudieron cargar las estadísticas del sistema");
+  return res.json();
+}
+
+export async function updateUserSubscription(
+  userId: number,
+  data: { dias_adicionales_prueba?: number; estado?: string }
+) {
+  const res = await apiFetch(`/auth/users/${userId}/subscription/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    let message = "No se pudo actualizar la suscripción.";
+    try {
+      const errData = await res.json();
+      message = errData.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export async function deleteUser(userId: number) {
+  const res = await apiFetch(`/auth/users/${userId}/`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let message = "No se pudo eliminar el usuario.";
+    try {
+      const errData = await res.json();
+      message = errData.detail || message;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export async function createUser(input: {
   username: string;
   password: string;
@@ -248,3 +288,4 @@ export async function createUser(input: {
 export async function logout() {
   clearTokens();
 }
+

@@ -61,3 +61,37 @@ class CodigoVerificacionRegistro(models.Model):
 
     def __str__(self):
         return f"Registro pendiente: {self.email}"
+
+
+class RegistroConsumoIA(models.Model):
+    class Servicio(models.TextChoices):
+        CHAT_CLINICO = "CHAT_CLINICO", "Chat Clínico"
+        EVALUACION_TEST = "EVALUACION_TEST", "Evaluación / Test"
+        OTRO = "OTRO", "Otro"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="consumos_ia",
+    )
+    servicio = models.CharField(
+        max_length=30,
+        choices=Servicio.choices,
+        default=Servicio.OTRO,
+    )
+    modelo = models.CharField(max_length=50, default="deepseek-chat")
+    tokens_prompt = models.PositiveIntegerField(default=0)
+    tokens_completion = models.PositiveIntegerField(default=0)
+    tokens_total = models.PositiveIntegerField(default=0)
+    costo_estimado_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Registro de Consumo IA"
+        verbose_name_plural = "Registros de Consumo IA"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.servicio}: {self.tokens_total} tokens"

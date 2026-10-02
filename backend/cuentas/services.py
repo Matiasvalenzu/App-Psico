@@ -279,3 +279,45 @@ def resend_registration_code(email: str):
         reply_to=settings.EMAIL_SUPPORT_ADDRESS,
     )
     return True
+
+
+def registrar_consumo_ia(
+    user,
+    servicio: str,
+    tokens_prompt: int = 0,
+    tokens_completion: int = 0,
+    tokens_total: int = 0,
+    modelo: str = "deepseek-chat",
+):
+    """
+    Registra el consumo de tokens y estima el costo en USD.
+    Tarifa deepseek-chat: $0.14/1M input, $0.28/1M output.
+    """
+    if not user or not user.is_authenticated:
+        return None
+
+    try:
+        from decimal import Decimal
+        from .models import RegistroConsumoIA
+
+        if tokens_total <= 0:
+            tokens_total = (tokens_prompt or 0) + (tokens_completion or 0)
+
+        # Cálculo de costo aproximado
+        costo_prompt = Decimal(tokens_prompt or 0) * Decimal("0.00000014")
+        costo_completion = Decimal(tokens_completion or 0) * Decimal("0.00000028")
+        costo_total = round(costo_prompt + costo_completion, 6)
+
+        return RegistroConsumoIA.objects.create(
+            user=user,
+            servicio=servicio,
+            modelo=modelo,
+            tokens_prompt=tokens_prompt or 0,
+            tokens_completion=tokens_completion or 0,
+            tokens_total=tokens_total or 0,
+            costo_estimado_usd=costo_total,
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Error al registrar consumo IA: %s", exc)
+        return None

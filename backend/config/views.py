@@ -8,6 +8,15 @@ from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+import os
+import logging
+from django.db.models import Count, Sum
+from cuentas.models import RegistroConsumoIA
+from pacientes.models import Paciente
+from sesiones.models import Sesion
+from suscripciones.models import Suscripcion
+
+logger = logging.getLogger(__name__)
 
 
 def _is_admin_user(user):
@@ -123,24 +132,247 @@ def list_users(request):
         )
 
     User = get_user_model()
-    users = User.objects.order_by("username")
-    return Response(
-        [
-            {
-                "id": user.id,
-                "username": user.username,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "is_active": user.is_active,
-                "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
-                "date_joined": user.date_joined,
-                "last_login": user.last_login,
-            }
-            for user in users
-        ]
+    users = User.objects.order_by("-date_joined")
+
+    # 1. Total pacientes por psicólogo
+    pacientes_map = dict(
+        Paciente.objects.values("psicologo_id").annotate(c=Count("id")).values_list("psicologo_id", "c")
     )
+
+    # 2. Total duración de audio y sesiones por psicólogo
+    sesiones_qs = Sesion.objects.values("paciente__psicologo_id").annotate(
+        c=Count("id"),
+        segundos=Sum("duracion_segundos")
+    )
+    sesiones_map = {
+        item["paciente__psicologo_id"]: (item["c"], item["segundos"] or 0)
+        for item in sesiones_qs
+        if item["paciente__psicologo_id"]
+    }
+
+    # 3. Total tokens y costo IA por usuario
+    tokens_qs = RegistroConsumoIA.objects.values("user_id").annotate(
+        t=Sum("tokens_total"),
+        costo=Sum("costo_estimado_usd")
+    )
+    tokens_map = {
+        item["user_id"]: (item["t"] or 0, float(item["costo"] or 0))
+        for item in tokens_qs
+    }
+
+    # 4. Suscripciones por usuario
+    suscripciones_map = {s.user_id: s for s in Suscripcion.objects.all()}
+
+    now = timezone.now()
+    result = []
+    for user in users:
+        p_count = pacientes_map.get(user.id, 0)
+        s_count, s_segundos = sesiones_map.get(user.id, (0, 0))
+        audio_minutos = round(s_segundos / 60, 1)
+        audio_horas = round(s_segundos / 3600, 2)
+
+        t_total, costo_usd = tokens_map.get(user.id, (0, 0.0))
+
+        susc = suscripciones_map.get(user.id)
+        dias_restantes = None
+        if susc and susc.fin_prueba and susc.estado == "trial":
+            delta = susc.fin_prueba - now
+            dias_restantes = max(0, delta.days + (1 if delta.seconds > 0 else 0))
+
+        susc_info = {
+            "estado": susc.estado if susc else "trial",
+            "is_active_or_trial": susc.is_active_or_trial if susc else True,
+            "fin_prueba": susc.fin_prueba if susc else None,
+            "dias_restantes_prueba": dias_restantes,
+            "card_last_four": susc.card_last_four if susc else "",
+            "card_brand": susc.card_brand if susc else "",
+            "proximo_cobro": susc.proximo_cobro if susc else None,
+            "has_mp_preapproval": bool(susc and susc.mp_preapproval_id),
+        }
+
+        result.append({
+            "id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "is_active": user.is_active,
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+            "date_joined": user.date_joined,
+            "last_login": user.last_login,
+            "pacientes_count": p_count,
+            "sesiones_count": s_count,
+            "audio_segundos_total": s_segundos,
+            "audio_minutos_total": audio_minutos,
+            "audio_horas_total": audio_horas,
+            "tokens_ia_total": t_total,
+            "costo_ia_total_usd": round(costo_usd, 4),
+            "suscripcion": susc_info,
+        })
+
+    return Response(result)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_system_stats(request):
+    if not _is_superuser(request.user):
+        return Response(
+            {"detail": "No tienes permiso para ver estadísticas del sistema."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    User = get_user_model()
+    now = timezone.now()
+    thirty_days_ago = now - timezone.timedelta(days=30)
+
+    total_usuarios = User.objects.count()
+    usuarios_activos_mes = User.objects.filter(last_login__gte=thirty_days_ago).count()
+
+    total_pacientes = Paciente.objects.count()
+    total_sesiones = Sesion.objects.count()
+    total_audio_segundos = Sesion.objects.aggregate(s=Sum("duracion_segundos"))["s"] or 0
+    total_audio_horas = round(total_audio_segundos / 3600, 1)
+
+    ia_agg = RegistroConsumoIA.objects.aggregate(
+        t=Sum("tokens_total"),
+        c=Sum("costo_estimado_usd"),
+    )
+    total_tokens_ia = ia_agg["t"] or 0
+    total_costo_ia_usd = float(ia_agg["c"] or 0)
+
+    susc_counts = Suscripcion.objects.values("estado").annotate(c=Count("id"))
+    susc_dist = {item["estado"]: item["c"] for item in susc_counts}
+    suscripciones_activas = susc_dist.get("activa", 0)
+    suscripciones_trial = susc_dist.get("trial", 0)
+    suscripciones_canceladas = (
+        susc_dist.get("cancelada", 0)
+        + susc_dist.get("expirada", 0)
+        + susc_dist.get("past_due", 0)
+    )
+
+    return Response({
+        "total_usuarios": total_usuarios,
+        "usuarios_activos_mes": usuarios_activos_mes,
+        "total_pacientes": total_pacientes,
+        "total_sesiones": total_sesiones,
+        "total_audio_horas": total_audio_horas,
+        "total_tokens_ia": total_tokens_ia,
+        "total_costo_ia_usd": round(total_costo_ia_usd, 4),
+        "suscripciones_activas": suscripciones_activas,
+        "suscripciones_trial": suscripciones_trial,
+        "suscripciones_canceladas": suscripciones_canceladas,
+    })
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def manage_user_subscription(request, user_id):
+    if not _is_superuser(request.user):
+        return Response(
+            {"detail": "No tienes permiso para gestionar suscripciones."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+    suscripcion, _ = Suscripcion.objects.get_or_create(
+        user=user,
+        defaults={"estado": "trial", "fin_prueba": timezone.now() + timezone.timedelta(days=14)},
+    )
+
+    dias_adicionales = request.data.get("dias_adicionales_prueba")
+    nuevo_estado = request.data.get("estado")
+
+    if dias_adicionales is not None:
+        try:
+            dias = int(dias_adicionales)
+            base_date = suscripcion.fin_prueba if (suscripcion.fin_prueba and suscripcion.fin_prueba > timezone.now()) else timezone.now()
+            suscripcion.fin_prueba = base_date + timezone.timedelta(days=dias)
+            suscripcion.estado = "trial"
+        except (ValueError, TypeError):
+            return Response({"detail": "Días adicionales debe ser un número entero válido."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if nuevo_estado in ["trial", "activa", "past_due", "cancelada", "expirada"]:
+        suscripcion.estado = nuevo_estado
+        if nuevo_estado == "cancelada":
+            suscripcion.cancelada_en = timezone.now()
+
+    suscripcion.save()
+
+    delta = (suscripcion.fin_prueba - timezone.now()) if suscripcion.fin_prueba else None
+    dias_restantes = max(0, delta.days + (1 if delta.seconds > 0 else 0)) if (delta and suscripcion.estado == "trial") else None
+
+    return Response({
+        "detail": "Suscripción actualizada exitosamente.",
+        "suscripcion": {
+            "estado": suscripcion.estado,
+            "is_active_or_trial": suscripcion.is_active_or_trial,
+            "fin_prueba": suscripcion.fin_prueba,
+            "dias_restantes_prueba": dias_restantes,
+            "card_last_four": suscripcion.card_last_four,
+            "card_brand": suscripcion.card_brand,
+            "proximo_cobro": suscripcion.proximo_cobro,
+            "has_mp_preapproval": bool(suscripcion.mp_preapproval_id),
+        },
+    })
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_user(request, user_id):
+    if not _is_superuser(request.user):
+        return Response(
+            {"detail": "No tienes permiso para eliminar usuarios."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.user.id == user_id:
+        return Response(
+            {"detail": "Por seguridad, no puedes eliminar tu propia cuenta de superusuario."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+    username = user.username
+
+    # 1. Cancelar preapproval en Mercado Pago si tiene suscripción con débito recurrente
+    if hasattr(user, "suscripcion") and user.suscripcion.mp_preapproval_id:
+        try:
+            from suscripciones.views import _get_mp_sdk
+            sdk = _get_mp_sdk()
+            sdk.preapproval().update(user.suscripcion.mp_preapproval_id, {"status": "cancelled"})
+        except Exception as exc:
+            logger.warning(
+                "No se pudo cancelar preapproval en MP al borrar usuario %s: %s", username, exc
+            )
+
+    # 2. Limpieza de archivos físicos en disco (audios de sesiones)
+    sesiones_con_audio = Sesion.objects.filter(paciente__psicologo=user).exclude(audio_path="")
+    for ses in sesiones_con_audio:
+        if ses.audio_path and os.path.exists(ses.audio_path):
+            try:
+                os.remove(ses.audio_path)
+            except OSError:
+                pass
+
+    # 3. Borrado atómico de la cuenta y relaciones en cascada
+    with transaction.atomic():
+        user.delete()
+
+    return Response({
+        "detail": f"El usuario {username} y todos sus datos fueron eliminados permanentemente."
+    }, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

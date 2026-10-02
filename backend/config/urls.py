@@ -14,6 +14,9 @@ from .views import (
     register_user,
     verify_registration,
     resend_registration_code_view,
+    admin_system_stats,
+    manage_user_subscription,
+    delete_user,
 )
 
 urlpatterns = [
@@ -26,7 +29,10 @@ urlpatterns = [
     path("api/auth/register/resend/", resend_registration_code_view, name="resend_registration_code"),
     path("api/auth/me/", current_user, name="current_user"),
     path("api/auth/users/", create_user, name="create_user"),
+    path("api/auth/users/stats/", admin_system_stats, name="admin_system_stats"),
+    path("api/auth/users/<int:user_id>/", delete_user, name="delete_user"),
     path("api/auth/users/<int:user_id>/password/", change_user_password, name="change_user_password"),
+    path("api/auth/users/<int:user_id>/subscription/", manage_user_subscription, name="manage_user_subscription"),
     path("api/auth/users/list/", list_users, name="list_users"),
     path("api/pacientes/", include("pacientes.urls")),
     path("api/sesiones/", include("sesiones.urls")),

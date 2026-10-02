@@ -551,6 +551,18 @@ def generate_ai_observation(asignacion, resultado):
         )
         response.raise_for_status()
         data = response.json()
+        if asignacion and getattr(asignacion, "psicologo", None):
+            usage = data.get("usage", {})
+            from cuentas.services import registrar_consumo_ia
+            from cuentas.models import RegistroConsumoIA
+            registrar_consumo_ia(
+                user=asignacion.psicologo,
+                servicio=RegistroConsumoIA.Servicio.EVALUACION_TEST,
+                tokens_prompt=usage.get("prompt_tokens", 0),
+                tokens_completion=usage.get("completion_tokens", 0),
+                tokens_total=usage.get("total_tokens", 0),
+                modelo=data.get("model", "deepseek-chat"),
+            )
         return (
             sanitize_markdown_emphasis(data["choices"][0]["message"]["content"]),
             ResultadoEvaluacion.EstadoIA.GENERADA,

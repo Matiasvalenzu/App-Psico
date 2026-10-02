@@ -88,7 +88,7 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         contexto = "\n\n".join(
             parte for parte in [contexto_paciente, contexto_sesiones] if parte.strip()
         )
-        respuesta = self._consultar_deepseek(contenido, contexto)
+        respuesta = self._consultar_deepseek(contenido, contexto, user=request.user)
 
         mensaje_asistente = ChatMensaje.objects.create(
             conversacion=conversacion,
@@ -231,7 +231,7 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         ]
         return any(activador in pregunta_normalizada for activador in activadores)
 
-    def _consultar_deepseek(self, pregunta, contexto):
+    def _consultar_deepseek(self, pregunta, contexto, user=None):
         if not settings.DEEPSEEK_API_KEY:
             return "API de DeepSeek no configurada. Configura DEEPSEEK_API_KEY en el entorno."
 
@@ -288,6 +288,18 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
                 timeout=60,
             )
             data = response.json()
+            if user:
+                usage = data.get("usage", {})
+                from cuentas.services import registrar_consumo_ia
+                from cuentas.models import RegistroConsumoIA
+                registrar_consumo_ia(
+                    user=user,
+                    servicio=RegistroConsumoIA.Servicio.CHAT_CLINICO,
+                    tokens_prompt=usage.get("prompt_tokens", 0),
+                    tokens_completion=usage.get("completion_tokens", 0),
+                    tokens_total=usage.get("total_tokens", 0),
+                    modelo=data.get("model", "deepseek-chat"),
+                )
             respuesta = data["choices"][0]["message"]["content"]
             return sanitize_markdown_emphasis(respuesta)
         except Exception as e:
