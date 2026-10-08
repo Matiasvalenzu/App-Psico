@@ -40,7 +40,7 @@ export function HeroSection() {
           {/* Left: copy + CTAs */}
           <div className="text-center lg:text-left">
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary"
@@ -50,7 +50,7 @@ export function HeroSection() {
             </motion.div>
 
             <motion.h1
-              initial={{ opacity: 0, y: 16 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
               className="text-display mt-6 text-balance text-foreground"
@@ -60,7 +60,7 @@ export function HeroSection() {
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 16 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
               className="mx-auto mt-5 max-w-xl text-balance text-lg text-muted-foreground lg:mx-0"
@@ -71,7 +71,7 @@ export function HeroSection() {
             </motion.p>
 
             <motion.div
-              initial={{ opacity: 0, y: 16 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
               className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start"
@@ -96,7 +96,7 @@ export function HeroSection() {
             </motion.div>
 
             <motion.p
-              initial={{ opacity: 0 }}
+              initial={false}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mt-6 text-xs text-muted-foreground"
@@ -107,7 +107,7 @@ export function HeroSection() {
 
           {/* Right: video preview */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+            initial={false}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="relative"
