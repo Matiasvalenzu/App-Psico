@@ -55,7 +55,17 @@ const nextConfig = {
     unoptimized: true,
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    const assetCache = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=604800, stale-while-revalidate=86400",
+      },
+    ];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      { source: "/hero-product-demo.mp4", headers: assetCache },
+      { source: "/hero-product-demo-poster.jpg", headers: assetCache },
+    ];
   },
 };
 

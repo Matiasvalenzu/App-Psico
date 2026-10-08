@@ -35,7 +35,8 @@ export function HeroVideoPreview({ className }: { className?: string }) {
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
+          poster="/hero-product-demo-poster.jpg"
           aria-label="Demostración de funcionalidades de Psiconex"
           className="h-full w-full object-cover"
           src="/hero-product-demo.mp4"
