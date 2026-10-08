@@ -61,8 +61,16 @@ const nextConfig = {
         value: "public, max-age=604800, stale-while-revalidate=86400",
       },
     ];
+    const htmlCache = [
+      { key: "Cache-Control", value: "no-cache, must-revalidate" },
+    ];
     return [
       { source: "/(.*)", headers: securityHeaders },
+      { source: "/", headers: htmlCache },
+      {
+        source: "/:path((?!_next/|api/|.*\\.[a-zA-Z0-9]+$).*)",
+        headers: htmlCache,
+      },
       { source: "/hero-product-demo.mp4", headers: assetCache },
       { source: "/hero-product-demo-poster.jpg", headers: assetCache },
     ];
