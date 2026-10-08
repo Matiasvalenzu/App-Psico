@@ -40,6 +40,19 @@ const FAQS = [
   },
 ]
 
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((faq) => ({
+    "@type": "Question",
+    name: faq.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: faq.a,
+    },
+  })),
+}
+
 export function FAQSection() {
   return (
     <section
@@ -47,6 +60,12 @@ export function FAQSection() {
       aria-label="Preguntas frecuentes"
       className="section-perf py-20 md:py-28 lg:py-32"
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
       <div className="mx-auto max-w-3xl px-6 lg:px-8">
         <SectionHeading
           eyebrow="Preguntas"
