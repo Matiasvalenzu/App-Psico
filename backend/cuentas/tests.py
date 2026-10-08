@@ -1,7 +1,10 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core import mail
 from django.test import TestCase, override_settings
+from rest_framework.test import APIClient
 
 from .services import request_notification_email_change, verify_notification_email
 
@@ -178,4 +181,92 @@ class RegistrationFlowTests(TestCase):
         res_me_updated = client.get("/api/auth/me/")
         self.assertEqual(res_me_updated.status_code, 200)
         self.assertTrue(res_me_updated.data["tutorial_visto"])
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    PUBLIC_APP_URL="http://testserver",
+)
+class PasswordResetTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        mail.outbox.clear()
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            username="reset-user",
+            email="reset@psiconex.cl",
+            password="Password123!Safe",
+            first_name="Ana",
+        )
+
+    def _reset_link_parts(self):
+        import re
+
+        raw = mail.outbox[0].message().as_string().replace("=\r\n", "").replace("=\n", "").replace("&amp;", "&")
+        match = re.search(r"/restablecer-contrasena\?uid=([^&\s]+)&token=([^&\s\"<>]+)", raw)
+        self.assertIsNotNone(match)
+        uid, token = match.group(1), match.group(2)
+        return uid, token, f"http://testserver/restablecer-contrasena?uid={uid}&token={token}"
+
+    def test_existing_email_sends_reset_link(self):
+        res = self.client.post(
+            "/api/auth/password-reset/",
+            {"email": "Reset@Psiconex.cl"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, "Restablece tu contraseña de Psiconex")
+        uid, token, url = self._reset_link_parts()
+        self.assertIn("/restablecer-contrasena?", url)
+        self.assertTrue(uid)
+        self.assertTrue(token)
+
+    def test_unknown_email_returns_200_without_email(self):
+        res = self.client.post(
+            "/api/auth/password-reset/",
+            {"email": "nadie@psiconex.cl"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertIn("Si el correo está registrado", res.data["detail"])
+
+    def test_confirm_changes_password_and_invalidates_token(self):
+        self.client.post("/api/auth/password-reset/", {"email": "reset@psiconex.cl"}, format="json")
+        uid, token, _url = self._reset_link_parts()
+        res = self.client.post(
+            "/api/auth/password-reset/confirm/",
+            {"uid": uid, "token": token, "new_password": "NuevaClave456!Segura"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NuevaClave456!Segura"))
+        reused = self.client.post(
+            "/api/auth/password-reset/confirm/",
+            {"uid": uid, "token": token, "new_password": "OtraClave789!Segura"},
+            format="json",
+        )
+        self.assertEqual(reused.status_code, 400)
+
+    def test_invalid_token_returns_400(self):
+        res = self.client.post(
+            "/api/auth/password-reset/confirm/",
+            {"uid": "abc", "token": "invalido", "new_password": "NuevaClave456!Segura"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_weak_password_returns_400(self):
+        self.client.post("/api/auth/password-reset/", {"email": "reset@psiconex.cl"}, format="json")
+        uid, token, _url = self._reset_link_parts()
+        res = self.client.post(
+            "/api/auth/password-reset/confirm/",
+            {"uid": uid, "token": token, "new_password": "corta"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Password123!Safe"))
 

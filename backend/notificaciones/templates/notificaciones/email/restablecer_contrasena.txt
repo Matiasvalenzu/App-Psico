@@ -1,0 +1,10 @@
+Hola {{ first_name }},
+
+Recibimos una solicitud para restablecer la contraseña de tu cuenta en Psiconex.
+
+Abre este enlace para elegir una nueva contraseña (expira en 1 hora):
+{{ reset_url }}
+
+Si no solicitaste este cambio, ignora este correo.
+
+El equipo de Psiconex

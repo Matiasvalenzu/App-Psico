@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   login,
@@ -438,6 +439,11 @@ export default function LoginPage() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Link href="/recuperar-contrasena" className="text-sm font-medium text-primary hover:underline">
+                        ¿Olvidaste tu contraseña?
+                      </Link>
                     </div>
                     <button type="submit" disabled={loading} className={submitClass}>
                       {loading ? (

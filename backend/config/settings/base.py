@@ -91,6 +91,7 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
 ]
+PASSWORD_RESET_TIMEOUT = 60 * 60
 
 LANGUAGE_CODE = "es"
 TIME_ZONE = "America/Santiago"

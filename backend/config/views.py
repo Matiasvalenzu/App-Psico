@@ -1,9 +1,14 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-from notificaciones.services import enqueue_welcome_email
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django_ratelimit.decorators import ratelimit
+from notificaciones.services import enqueue_welcome_email, send_branded_email
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -508,6 +513,73 @@ def register_user(request):
             {"detail": f"Error al procesar el registro: {str(exc)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+_PASSWORD_RESET_MESSAGE = (
+    "Si el correo está registrado, te enviaremos un enlace para restablecer tu contraseña."
+)
+
+
+@ratelimit(key="ip", rate="5/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset(request):
+    email = str(request.data.get("email", "")).strip()
+    User = get_user_model()
+    try:
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user and user.has_usable_password():
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_url = (
+                f"{settings.PUBLIC_APP_URL.rstrip('/')}/restablecer-contrasena"
+                f"?uid={uid}&token={token}"
+            )
+            send_branded_email(
+                subject="Restablece tu contraseña de Psiconex",
+                recipient=user.email,
+                template_name="restablecer_contrasena",
+                context={
+                    "first_name": user.first_name or "Colega",
+                    "reset_url": reset_url,
+                },
+            )
+    except Exception:
+        logger.exception("No se pudo enviar el correo de restablecimiento de contraseña")
+    return Response({"detail": _PASSWORD_RESET_MESSAGE}, status=status.HTTP_200_OK)
+
+
+@ratelimit(key="ip", rate="10/m", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset_confirm(request):
+    uid = str(request.data.get("uid", "")).strip()
+    token = str(request.data.get("token", "")).strip()
+    new_password = str(request.data.get("new_password", ""))
+    User = get_user_model()
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=user_id, is_active=True)
+    except Exception:
+        return Response(
+            {"detail": "El enlace no es válido o expiró. Solicita uno nuevo."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not default_token_generator.check_token(user, token):
+        return Response(
+            {"detail": "El enlace no es válido o expiró. Solicita uno nuevo."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        validate_password(new_password, user)
+    except ValidationError as exc:
+        return Response({"detail": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+    user.set_password(new_password)
+    user.save()
+    return Response(
+        {"detail": "Tu contraseña fue actualizada. Ya puedes iniciar sesión."},
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["POST"])

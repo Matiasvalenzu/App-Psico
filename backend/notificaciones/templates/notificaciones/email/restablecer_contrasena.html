@@ -1,0 +1,13 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Restablece tu contraseña de Psiconex{% endblock %}
+{% block preheader %}Usa este enlace para elegir una nueva contraseña. Expira en 1 hora.{% endblock %}
+{% block eyebrow %}Seguridad de tu cuenta{% endblock %}
+{% block heading %}Restablece tu contraseña{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ first_name }}, recibimos una solicitud para restablecer la contraseña de tu cuenta en Psiconex.</p>
+<p style="margin:0 0 22px;color:#334155;font-size:16px;line-height:1.7;">El enlace es válido por <strong>1 hora</strong>. Si no solicitaste este cambio, ignora este correo.</p>
+{% endblock %}
+{% block action %}
+<p style="margin:8px 0 0;"><a href="{{ reset_url }}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2563eb;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Elegir una nueva contraseña</a></p>
+<p style="margin:18px 0 0;color:#64748b;font-size:13px;line-height:1.6;word-break:break-all;">Si el botón no funciona, copia este enlace:<br>{{ reset_url }}</p>
+{% endblock %}
