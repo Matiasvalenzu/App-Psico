@@ -130,7 +130,7 @@ const PATIENT_STATUS_OPTIONS = [
   {
     value: "EN_SESION",
     label: "Activo",
-    description: "Activo",
+    description: "En tratamiento",
     dotClass: "bg-emerald-500",
     className: "bg-emerald-50 text-emerald-700 border-emerald-200/70 hover:bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60",
   },
@@ -699,7 +699,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-1 overflow-x-auto p-1 bg-muted/40 rounded-xl border border-border/60 text-xs font-medium self-start md:self-auto">
           {[
             { id: "ALL", label: "Todos", count: totalPacientes },
-            { id: "EN_SESION", label: "Activo", count: enSesionCount },
+            { id: "EN_SESION", label: "Activos", count: enSesionCount },
             { id: "PAUSADO", label: "Pausados", count: pausadoCount },
             { id: "ALTA", label: "Altas", count: altaCount },
           ].map((tab) => (
