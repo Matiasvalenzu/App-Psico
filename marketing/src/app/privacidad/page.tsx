@@ -3,10 +3,18 @@ import Link from "next/link"
 
 import { Footer } from "@/components/layout/footer"
 import { Logo } from "@/components/brand/logo"
+import { BASE_OPEN_GRAPH } from "@/lib/seo"
 
 export const metadata: Metadata = {
   title: "Política de privacidad",
   description: "Política de privacidad y tratamiento de datos de Psiconex.",
+  alternates: { canonical: "/privacidad" },
+  openGraph: {
+    ...BASE_OPEN_GRAPH,
+    url: "/privacidad",
+    title: "Política de privacidad | Psiconex",
+    description: "Política de privacidad y tratamiento de datos de Psiconex.",
+  },
 }
 
 export default function PrivacyPage() {

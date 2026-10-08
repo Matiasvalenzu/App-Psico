@@ -3,10 +3,18 @@ import Link from "next/link"
 
 import { Footer } from "@/components/layout/footer"
 import { Logo } from "@/components/brand/logo"
+import { BASE_OPEN_GRAPH } from "@/lib/seo"
 
 export const metadata: Metadata = {
   title: "Términos del servicio",
   description: "Términos y condiciones de uso de Psiconex.",
+  alternates: { canonical: "/terminos" },
+  openGraph: {
+    ...BASE_OPEN_GRAPH,
+    url: "/terminos",
+    title: "Términos del servicio | Psiconex",
+    description: "Términos y condiciones de uso de Psiconex.",
+  },
 }
 
 export default function TermsPage() {

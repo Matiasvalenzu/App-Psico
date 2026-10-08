@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   description:
     "Psiconex transcribe, diariza y resume tus sesiones de psicología. Informes clínicos en un minuto, no en una hora.",
   metadataBase: new URL("https://psiconex.cl"),
+  alternates: {
+    canonical: "/",
+  },
   verification: {
     google: "YyDPpjY540iueP7mAa30gpFJxfMEHuVeEJQRA3BDWGc",
   },
@@ -32,6 +35,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_CL",
     siteName: "Psiconex",
+    url: "/",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Psiconex — La IA que devuelve tiempo a tu consulta",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Psiconex — La IA que devuelve tiempo a tu consulta",
+    description:
+      "Transcripción, diarización por voz, memoria clínica inteligente, informes automáticos y tests psicológicos. Hecho para psicólogos clínicos.",
+    images: ["/og-image.png"],
   },
 };
 

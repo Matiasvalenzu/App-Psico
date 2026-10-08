@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  alternates: { canonical: "/suscripcionok" },
 }
 
 const INCLUDED_FEATURES = [
