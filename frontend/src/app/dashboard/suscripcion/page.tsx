@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getCurrentUser, apiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 import {
   CreditCard,
   CheckCircle2,
@@ -89,21 +90,8 @@ export default function SuscripcionPage() {
   const finPrueba = subData?.fin_prueba || user?.fin_prueba;
   const proximoCobro = subData?.proximo_cobro;
 
-  const formattedFinPrueba = finPrueba
-    ? new Date(finPrueba).toLocaleDateString("es-CL", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null;
-
-  const formattedProximoCobro = proximoCobro
-    ? new Date(proximoCobro).toLocaleDateString("es-CL", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null;
+  const formattedFinPrueba = finPrueba ? formatDateCL(finPrueba) : null;
+  const formattedProximoCobro = proximoCobro ? formatDateCL(proximoCobro) : null;
 
   return (
     <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">

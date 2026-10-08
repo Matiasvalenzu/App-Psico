@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { publicApiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 import {
   FileSignature,
   CheckCircle2,
@@ -320,7 +321,7 @@ export default function PublicConsentimientoPage() {
                     <>
                       <span>•</span>
                       <span>
-                        Fecha: {new Date(payload.fecha_firma).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}
+                        Fecha: {formatDateCL(payload.fecha_firma, true)}
                       </span>
                     </>
                   )}
@@ -395,10 +396,7 @@ export default function PublicConsentimientoPage() {
                   {payload.fecha_firma && (
                     <p>
                       <strong className="text-slate-800">Fecha:</strong>{" "}
-                      {new Date(payload.fecha_firma).toLocaleString("es-CL", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
+                      {formatDateCL(payload.fecha_firma, true)}
                     </p>
                   )}
                   {isAlreadySigned && (

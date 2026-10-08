@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ClientPortal } from "@/components/ui/ClientPortal";
 import { apiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -91,7 +92,7 @@ export function ModalCrearSesionVirtual({ open, onClose, paciente, onSessionCrea
     const cleanPhone = (paciente.telefono_whatsapp || "").replace(/[^\d+]/g, "");
     const fechaObj = new Date(dateTime);
     const horaStr = fechaObj.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
-    const fechaStr = fechaObj.toLocaleDateString("es-CL", { day: "numeric", month: "long" });
+    const fechaStr = formatDateCL(fechaObj);
     const msg = `Hola ${paciente.nombre || ""}, te comparto el enlace de la videollamada de Psiconex para nuestra sesión del ${fechaStr} a las ${horaStr} hrs:\n\n${sesion.url_reunion}\n\nNo necesitas instalar nada: ábrelo desde tu navegador (Chrome, Safari o Edge). Conéctate desde un lugar tranquilo, privado y con audífonos. ¡Nos vemos!`;
     const targetUrl = cleanPhone
       ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`

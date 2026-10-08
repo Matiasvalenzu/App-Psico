@@ -6,6 +6,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import esLocale from "@fullcalendar/core/locales/es";
+import { formatDateCL } from "@/lib/utils";
 import type {
   DatesSetArg,
   DateSelectArg,
@@ -136,6 +137,50 @@ function defaultStartForDate(date: Date) {
   const next = new Date(date);
   next.setHours(9, 0, 0, 0);
   return next;
+}
+
+function nextBookableStart(now = new Date()) {
+  const next = new Date(now);
+  if (next.getMinutes() > 0 || next.getSeconds() > 0 || next.getMilliseconds() > 0) {
+    next.setHours(next.getHours() + 1, 0, 0, 0);
+  } else {
+    next.setMinutes(0, 0, 0);
+  }
+  const minutes = next.getHours() * 60;
+  if (minutes >= 8 * 60 && minutes <= 20 * 60) return next;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  return tomorrow;
+}
+
+function resolveAgendaStart(startDate: Date) {
+  if (startDate.getTime() < Date.now()) return nextBookableStart();
+  return startDate;
+}
+
+const AGENDA_MONTHS = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+function formatAgendaTitle(viewType: string, currentStart: Date, fallback: string) {
+  if (viewType === "dayGridMonth") {
+    return `${AGENDA_MONTHS[currentStart.getMonth()]} de ${currentStart.getFullYear()}`;
+  }
+  const trimmed = fallback.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.charAt(0).toLocaleUpperCase("es-CL") + trimmed.slice(1);
 }
 
 function parseApiPathFromNext(nextUrl: string | null) {
@@ -585,7 +630,7 @@ export default function AgendaPage() {
 
   function handleSelect(info: DateSelectArg) {
     const startDate = info.allDay ? defaultStartForDate(info.start) : info.start;
-    openCreateModal(startDate);
+    openCreateModal(resolveAgendaStart(startDate));
   }
 
   function handleEventClick(info: EventClickArg) {
@@ -616,7 +661,7 @@ export default function AgendaPage() {
 
   function handleDatesSet(info: DatesSetArg) {
     setRange({ start: info.start.toISOString(), end: info.end.toISOString() });
-    setViewTitle(info.view.title);
+    setViewTitle(formatAgendaTitle(info.view.type, info.view.currentStart, info.view.title));
     setActiveView(info.view.type);
   }
 
@@ -845,7 +890,7 @@ export default function AgendaPage() {
           </button>
           <button
             type="button"
-            onClick={() => openCreateModal(defaultStartForDate(new Date()))}
+            onClick={() => openCreateModal(nextBookableStart())}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
@@ -870,7 +915,7 @@ export default function AgendaPage() {
         <aside className="space-y-4 rounded-2xl border border-border/60 bg-card p-4 shadow-card">
           <button
             type="button"
-            onClick={() => openCreateModal(defaultStartForDate(new Date()))}
+            onClick={() => openCreateModal(nextBookableStart())}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium shadow-subtle transition-colors hover:bg-accent"
           >
             <Plus className="h-4 w-4" />
@@ -887,7 +932,7 @@ export default function AgendaPage() {
               {googleStatus?.configured === false
                 ? "Faltan credenciales OAuth de Google."
                 : googleStatus?.connected
-                  ? `Última sync: ${googleStatus.last_synced_at ? new Date(googleStatus.last_synced_at).toLocaleString("es-CL") : "pendiente"}`
+                  ? `Última sync: ${googleStatus.last_synced_at ? formatDateCL(googleStatus.last_synced_at, true) : "pendiente"}`
                   : googleStatus?.requires_reauthorization
                     ? "Reconecta Google para usar el calendario dedicado de Psiconex."
                     : "Envía tus citas al calendario dedicado Agenda Psicológica."}
@@ -1071,7 +1116,7 @@ export default function AgendaPage() {
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
-              <h2 className="min-w-0 text-base md:text-xl font-semibold capitalize tracking-tight">
+              <h2 className="min-w-0 text-base md:text-xl font-semibold tracking-tight">
                 {viewTitle}
               </h2>
               {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

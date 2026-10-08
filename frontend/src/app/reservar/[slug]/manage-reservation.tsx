@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowLeft, Calendar, CheckCircle2, Loader2, RotateCcw, XCircle } from "lucide-react";
 import { publicApiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 
 type DocumentType = "RUT" | "PASAPORTE" | "OTRO";
 
@@ -36,13 +37,7 @@ function errorMessage(data: unknown, fallback: string) {
 }
 
 function localDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "America/Santiago",
-  });
+  return formatDateCL(iso);
 }
 
 function localTime(iso: string) {

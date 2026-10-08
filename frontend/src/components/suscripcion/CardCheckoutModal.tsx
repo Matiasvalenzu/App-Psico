@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 import {
   CreditCard,
   Lock,
@@ -220,13 +221,7 @@ export default function CardCheckoutModal({
     }
   };
 
-  const formattedFinPrueba = finPrueba
-    ? new Date(finPrueba).toLocaleDateString("es-CL", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null;
+  const formattedFinPrueba = finPrueba ? formatDateCL(finPrueba) : null;
 
   return (
     <ClientPortal>

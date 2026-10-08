@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 import {
   Loader2,
   Mic,
@@ -45,7 +46,7 @@ interface VoiceProfile {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateCL(value, true);
 }
 
 function formatS(value: number | null) {

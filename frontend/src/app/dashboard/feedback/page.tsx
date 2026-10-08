@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { formatDateCL } from "@/lib/utils";
 import {
   MessageSquarePlus,
   Inbox,
@@ -420,13 +421,7 @@ export default function FeedbackPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-muted-foreground">
-                        {new Date(item.created_at).toLocaleDateString("es-CL", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatDateCL(item.created_at, true)}
                       </span>
                       {getEstadoBadge(item.estado)}
                     </div>
@@ -637,12 +632,7 @@ export default function FeedbackPage() {
                     <span>·</span>
                     <span>
                       Fecha:{" "}
-                      {new Date(rep.created_at).toLocaleDateString("es-CL", {
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateCL(rep.created_at, true)}
                     </span>
                     {rep.archivo_adjunto && (
                       <>

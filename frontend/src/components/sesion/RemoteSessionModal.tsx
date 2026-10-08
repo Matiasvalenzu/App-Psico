@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { ClientPortal } from "@/components/ui/ClientPortal";
 import { apiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 
 function getApiErrorMessage(data: unknown, fallback: string): string {
   if (!data || typeof data !== "object") return fallback;
@@ -243,7 +244,7 @@ export function RemoteSessionModal({
     const cleanPhone = (paciente.telefono_whatsapp || "").replace(/[^\d+]/g, "");
     const fechaObj = new Date(dateTime);
     const horaStr = fechaObj.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
-    const fechaStr = fechaObj.toLocaleDateString("es-CL", { day: "numeric", month: "long" });
+    const fechaStr = formatDateCL(fechaObj);
 
     const msg = `Hola ${paciente.nombre || ""}, te comparto el enlace de Google Meet para nuestra sesión psicológica del ${fechaStr} a las ${horaStr} hrs:\n\n${meetUrl}\n\nRecomendaciones: Conéctate desde un lugar tranquilo, privado y con audífonos. ¡Nos vemos!`;
     const targetUrl = cleanPhone

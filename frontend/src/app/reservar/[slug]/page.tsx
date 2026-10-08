@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { publicApiFetch } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 import ManageReservation from "./manage-reservation";
 import {
   ArrowLeft,
@@ -57,15 +58,6 @@ type DocumentType = "RUT" | "PASAPORTE" | "OTRO";
 /* ─── Helpers ────────────────────────────────────────────────────── */
 
 const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const DIAS_SEMANA_COMPLETO = [
-  "Domingo",
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-];
 const MESES = [
   "Enero",
   "Febrero",
@@ -82,7 +74,7 @@ const MESES = [
 ];
 
 function formatDate(d: Date) {
-  return `${DIAS_SEMANA_COMPLETO[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
+  return formatDateCL(d);
 }
 
 function formatHora(isoStr: string) {

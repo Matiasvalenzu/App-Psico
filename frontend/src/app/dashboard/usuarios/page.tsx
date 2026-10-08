@@ -10,6 +10,7 @@ import {
   updateUserSubscription,
   deleteUser,
 } from "@/lib/api";
+import { formatDateCL } from "@/lib/utils";
 import {
   ShieldCheck,
   UserCog,
@@ -80,10 +81,7 @@ interface AdminSystemStats {
 
 function formatDate(value: string | null) {
   if (!value) return "Sin registro";
-  return new Intl.DateTimeFormat("es-CL", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateCL(value, true);
 }
 
 function fullName(user: SystemUser) {

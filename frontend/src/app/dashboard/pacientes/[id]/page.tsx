@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { formatDate, formatTime, formatDuration } from "@/lib/utils";
+import { formatDate, formatDateCL, formatTime, formatDuration } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { RemoteSessionModal } from "@/components/sesion/RemoteSessionModal";
 import { ModalCrearSesionVirtual } from "@/components/sesion/ModalCrearSesionVirtual";
@@ -1415,7 +1415,7 @@ export default function PacienteDetailPage() {
               {paciente.consentimiento_estado === "FIRMADO"
                 ? `El paciente completó la firma electrónica de consentimiento${
                     paciente.consentimiento_fecha_firma
-                      ? ` el ${new Date(paciente.consentimiento_fecha_firma).toLocaleDateString("es-CL")}`
+                      ? ` el ${formatDateCL(paciente.consentimiento_fecha_firma)}`
                       : ""
                   }. El documento se encuentra debidamente custodiado.`
                 : paciente.consentimiento_estado === "ENVIADO"

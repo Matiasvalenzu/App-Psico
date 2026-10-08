@@ -196,14 +196,24 @@ function DashboardInner({
                 priority
               />
             ) : (
-              <Image
-                src="/logo-psiconex.png"
-                alt="Psiconex"
-                width={1951}
-                height={393}
-                className="h-full w-auto object-contain drop-shadow-sm"
-                priority
-              />
+              <>
+                <Image
+                  src="/logo-psiconex.png"
+                  alt="Psiconex"
+                  width={1951}
+                  height={393}
+                  className="h-full w-auto object-contain drop-shadow-sm dark:hidden"
+                  priority
+                />
+                <Image
+                  src="/logo-psiconex-sidebar.png"
+                  alt="Psiconex"
+                  width={1951}
+                  height={393}
+                  className="hidden h-full w-auto object-contain dark:block"
+                  priority
+                />
+              </>
             )}
           </Link>
         </div>
@@ -257,7 +267,7 @@ function DashboardInner({
         }`}
       >
         {/* ── Header ── */}
-        <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center justify-between border-b border-border/70 bg-card/75 px-4 md:px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center justify-between gap-2 border-b border-border/70 bg-card/75 px-4 md:px-6 backdrop-blur-md">
           {/* Mobile: logo + title */}
           <div className="flex items-center gap-3">
             <div className="flex md:hidden h-7 w-7 items-center justify-center">
@@ -269,10 +279,10 @@ function DashboardInner({
                 className="h-7 w-7 object-contain"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="hidden md:inline-block text-xs font-medium text-muted-foreground/60">Psiconex</span>
-              <span className="hidden md:inline-block text-xs text-muted-foreground/40">/</span>
-              <span className="text-sm font-semibold tracking-tight text-foreground">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="hidden lg:inline-block text-xs font-medium text-muted-foreground/60">Psiconex</span>
+              <span className="hidden lg:inline-block text-xs text-muted-foreground/40">/</span>
+              <span className="truncate text-sm font-semibold tracking-tight text-foreground">
                 {getSectionTitle()}
               </span>
             </div>
@@ -282,7 +292,7 @@ function DashboardInner({
                 className="flex md:hidden items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span>{diasRestantes}d prueba</span>
+                <span className="whitespace-nowrap">{diasRestantes}d</span>
               </Link>
             )}
             <button
@@ -292,7 +302,7 @@ function DashboardInner({
               title="Ver tutorial guiado"
             >
               <PlayCircle className="h-3.5 w-3.5" />
-              <span>Tutorial</span>
+              <span className="hidden sm:inline">Tutorial</span>
             </button>
           </div>
 
@@ -308,7 +318,8 @@ function DashboardInner({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 </span>
-                <span>
+                <span className="whitespace-nowrap lg:hidden">{diasRestantes}d</span>
+                <span className="hidden whitespace-nowrap lg:inline">
                   Prueba activa: <strong className="font-bold">{diasRestantes}</strong>{" "}
                   {diasRestantes === 1 ? "día restante" : "días restantes"}
                 </span>
@@ -321,7 +332,7 @@ function DashboardInner({
               title="Ver video tutorial de Psiconex (11 min)"
             >
               <PlayCircle className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />
-              <span>Tutorial</span>
+              <span className="hidden lg:inline">Tutorial</span>
             </button>
             <div className="h-4 w-px bg-border/80" />
             <ThemeToggle />
@@ -332,9 +343,11 @@ function DashboardInner({
                 router.replace("/login");
               }}
               className="group flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
+              title="Salir"
+              aria-label="Salir"
             >
               <LogOut className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-              Salir
+              <span className="hidden lg:inline">Salir</span>
             </button>
           </div>
         </header>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { formatDateCL } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import {
   FileSignature,
@@ -794,7 +795,7 @@ Fecha: ${fecha}                                       RUT: ${pRut}
                         <div>
                           <span className="text-muted-foreground font-medium">Fecha y Hora:</span>{" "}
                           <strong className="text-foreground">
-                            {consentRecord.fecha_firma ? new Date(consentRecord.fecha_firma).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" }) : "N/A"}
+                            {consentRecord.fecha_firma ? formatDateCL(consentRecord.fecha_firma, true) : "N/A"}
                           </strong>
                         </div>
                         <div>
@@ -901,7 +902,7 @@ Fecha: ${fecha}                                       RUT: ${pRut}
                       <span>
                         Enviado el{" "}
                         <strong>
-                          {consentRecord.fecha_envio ? new Date(consentRecord.fecha_envio).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" }) : "recientemente"}
+                          {consentRecord.fecha_envio ? formatDateCL(consentRecord.fecha_envio, true) : "recientemente"}
                         </strong>
                         . Esperando que el paciente abra el enlace y complete su firma.
                       </span>
