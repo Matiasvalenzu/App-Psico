@@ -25,8 +25,8 @@ const COLUMNS = [
     links: [
       { href: "/#equipo", label: "Equipo" },
       { href: "mailto:matias@datnexia.com", label: "Contacto" },
-      { href: "#privacidad", label: "Privacidad" },
-      { href: "#terminos", label: "Términos" },
+      { href: "https://psiconex.cl/privacidad", label: "Privacidad" },
+      { href: "https://psiconex.cl/terminos", label: "Términos" },
     ],
   },
 ]
