@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils"
 export function HeroVideoPreview({ className }: { className?: string }) {
   return (
     <div
+      id="demo"
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10",
+        "relative scroll-mt-20 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10",
         className
       )}
     >

@@ -9,11 +9,11 @@ import { ROUTES } from "@/lib/config"
 import { cn } from "@/lib/utils"
 
 const NAV_LINKS = [
-  { href: "#producto", label: "Producto" },
-  { href: "#como-funciona", label: "Cómo funciona" },
-  { href: "#equipo", label: "Equipo" },
-  { href: "#precios", label: "Precios" },
-  { href: "#faq", label: "Preguntas" },
+  { href: "/#producto", label: "Producto" },
+  { href: "/#como-funciona", label: "Cómo funciona" },
+  { href: "/#equipo", label: "Equipo" },
+  { href: "/#precios", label: "Precios" },
+  { href: "/#faq", label: "Preguntas" },
 ]
 
 export function Nav() {
@@ -68,7 +68,7 @@ export function Nav() {
             className="md:hidden ml-1 inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-expanded={mobileMenuOpen}
-            aria-label="Toggle menu"
+            aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>

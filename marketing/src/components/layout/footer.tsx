@@ -6,10 +6,10 @@ const COLUMNS = [
   {
     title: "Producto",
     links: [
-      { href: "#producto", label: "Funciones" },
-      { href: "#como-funciona", label: "Cómo funciona" },
-      { href: "#precios", label: "Precios" },
-      { href: "#seguridad", label: "Seguridad" },
+      { href: "/#producto", label: "Funciones" },
+      { href: "/#como-funciona", label: "Cómo funciona" },
+      { href: "/#precios", label: "Precios" },
+      { href: "/#seguridad", label: "Seguridad" },
     ],
   },
   {
@@ -17,13 +17,13 @@ const COLUMNS = [
     links: [
       { href: ROUTES.login, label: "Iniciar sesión" },
       { href: ROUTES.register, label: "Probar gratis" },
-      { href: "#faq", label: "Preguntas frecuentes" },
+      { href: "/#faq", label: "Preguntas frecuentes" },
     ],
   },
   {
     title: "Empresa",
     links: [
-      { href: "#equipo", label: "Equipo" },
+      { href: "/#equipo", label: "Equipo" },
       { href: "mailto:matiasv.1992@gmail.com", label: "Contacto" },
       { href: "/privacidad", label: "Privacidad" },
       { href: "/terminos", label: "Términos" },

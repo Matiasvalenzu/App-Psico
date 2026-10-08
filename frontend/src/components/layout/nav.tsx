@@ -8,11 +8,11 @@ import { ROUTES } from "@/lib/config"
 import { cn } from "@/lib/utils"
 
 const NAV_LINKS = [
-  { href: "#producto", label: "Producto" },
-  { href: "#como-funciona", label: "Cómo funciona" },
-  { href: "#equipo", label: "Equipo" },
-  { href: "#precios", label: "Precios" },
-  { href: "#faq", label: "Preguntas" },
+  { href: "/#producto", label: "Producto" },
+  { href: "/#como-funciona", label: "Cómo funciona" },
+  { href: "/#equipo", label: "Equipo" },
+  { href: "/#precios", label: "Precios" },
+  { href: "/#faq", label: "Preguntas" },
 ]
 
 export function Nav() {
