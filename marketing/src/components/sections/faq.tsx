@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     q: "¿Funciona en sesiones por Meet o Zoom?",
-    a: "Sí. Hay una extensión opcional que graba localmente la videollamada y la sube cifrada. El paciente solo ve el aviso estándar de grabación.",
+    a: "Sí. Hay una extensión opcional que graba localmente la videollamada y la sube mediante una conexión cifrada (HTTPS). El paciente solo ve el aviso estándar de grabación.",
   },
   {
     q: "¿Qué pasa si cancelo? ¿Me llevo mis datos?",

@@ -101,7 +101,7 @@ export function HeroSection() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mt-6 text-xs text-muted-foreground"
             >
-              Sin tarjeta · Datos cifrados · Cancela cuando quieras
+              Sin tarjeta · Conexión cifrada · Cancela cuando quieras
             </motion.p>
           </div>
 

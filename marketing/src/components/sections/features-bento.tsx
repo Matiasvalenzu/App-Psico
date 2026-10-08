@@ -67,8 +67,8 @@ const FEATURES: Feature[] = [
   },
   {
     icon: ShieldCheck,
-    title: "Datos cifrados de extremo a extremo",
-    body: "AES-256 en reposo, TLS 1.3 en tránsito. Cumple Ley 19.628 de protección de datos personales.",
+    title: "Conexión cifrada",
+    body: "Toda la información viaja cifrada mediante HTTPS. Cumple Ley 19.628 de protección de datos personales.",
   },
 ]
 

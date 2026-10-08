@@ -298,7 +298,7 @@ export default function LoginPage() {
 
               <p className="mt-8 flex max-w-xl items-start gap-2.5 border-t border-border/70 pt-6 text-[13px] leading-relaxed text-muted-foreground short:mt-6 short:pt-4">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                Información clínica cifrada (AES-256 en reposo, TLS 1.3 en tránsito), conforme a la Ley 19.628.
+                Información clínica transmitida cifrada mediante HTTPS, conforme a la Ley 19.628.
               </p>
             </div>
           </section>
@@ -691,7 +691,7 @@ export default function LoginPage() {
 
             <p className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground lg:hidden">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              Datos cifrados · AES-256 · Ley 19.628
+              Conexión cifrada (HTTPS) · Ley 19.628
             </p>
           </section>
         </main>

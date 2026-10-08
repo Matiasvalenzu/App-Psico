@@ -10,7 +10,7 @@ const BENEFITS = [
   "Identifica al psicólogo y al paciente sin etiquetas manuales",
   "Funciona aunque haya ruido de fondo o cambios de tono",
   "Tu voz se entrena una vez con 30 segundos de muestra",
-  "Patrones biométricos cifrados y resguardados solo en tu cuenta",
+  "Patrones biométricos guardados solo en tu cuenta y transmitidos cifrados (HTTPS)",
 ]
 
 export function VoiceBiometricsSection() {

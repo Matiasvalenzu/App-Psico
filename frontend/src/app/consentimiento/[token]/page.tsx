@@ -555,7 +555,7 @@ export default function PublicConsentimientoPage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
                   <Lock className="h-3.5 w-3.5 text-slate-400" />
-                  <span>Transmisión encriptada bajo TLS 1.3 con custodia clínica</span>
+                  <span>Transmisión cifrada mediante HTTPS (TLS) con custodia clínica</span>
                 </div>
 
                 <button

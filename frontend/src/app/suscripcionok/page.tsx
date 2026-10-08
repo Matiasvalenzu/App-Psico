@@ -92,7 +92,7 @@ export default function SubscriptionSuccessPage() {
             <div className="mt-6 pt-5 border-t border-border/60 flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
               <span>
-                Datos clínicos cifrados y resguardados con estrictos estándares de confidencialidad médica.
+                Los datos clínicos se transmiten cifrados mediante HTTPS y se resguardan con estrictos estándares de confidencialidad médica.
               </span>
             </div>
           </div>

@@ -82,7 +82,7 @@ export function CTAFinalSection() {
               transition={{ delay: 0.4 }}
               className="mt-6 text-xs text-white/70"
             >
-              Datos cifrados · Cumple Ley 19.628 · Servidores en Chile
+              Conexión cifrada · Cumple Ley 19.628 · Servidores en Chile
             </motion.p>
           </div>
         </div>

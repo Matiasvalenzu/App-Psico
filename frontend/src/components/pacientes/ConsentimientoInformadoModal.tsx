@@ -254,7 +254,7 @@ export default function ConsentimientoInformadoModal({
 Con el objetivo de resguardar la rigurosidad del proceso terapéutico, optimizar la confección de notas clínicas y preparar adecuadamente cada intervención, el/la profesional tratante podrá apoyarse en la plataforma clínica digital Psiconex.
 En estricto cumplimiento de la Ley N° 19.628 sobre Protección de la Vida Privada y Tratamiento de Datos Personales, se establece y garantiza:
 a) Finalidad Exclusiva: El eventual registro de audio y/o transcripción digital se destina de manera única y exclusiva a fines de apoyo clínico, análisis terapéutico y resguardo de la ficha clínica del/de la profesional tratante.
-b) Cifrado y Confidencialidad: Todos los registros son tratados bajo estrictos protocolos de ciberseguridad, incluyendo cifrado de datos en reposo (AES-256) y transmisión segura (TLS 1.3). La información permanece bajo control del profesional tratante y jamás será vendida, transferida ni compartida con terceros ajenos al proceso terapéutico.
+b) Cifrado y Confidencialidad: Todos los registros son tratados bajo estrictos protocolos de ciberseguridad, incluyendo la transmisión cifrada de la información mediante HTTPS (TLS). La información permanece bajo control del profesional tratante y jamás será vendida, transferida ni compartida con terceros ajenos al proceso terapéutico.
 c) Voluntariedad y Revocación: La autorización para la asistencia digital o registro de audio es enteramente voluntaria. El/la paciente podrá solicitar en cualquier momento la interrupción de la grabación durante una sesión o revocar este consentimiento cuando lo estime oportuno, sin que ello afecte la continuidad ni la calidad de la atención psicológica.`;
       }
 

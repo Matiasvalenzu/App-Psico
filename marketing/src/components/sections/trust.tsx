@@ -4,9 +4,8 @@ import { motion } from "motion/react"
 
 const TRUST_BADGES = [
   "Cumple Ley 19.628",
-  "Cifrado AES-256",
+  "Conexión cifrada (HTTPS)",
   "Datos en Chile",
-  "Auditoría de accesos",
   "Sin entrenamiento con tus datos",
 ]
 

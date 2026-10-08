@@ -10,7 +10,7 @@ const STEPS = [
     eyebrow: "Paso 1",
     title: "Graba la sesión",
     body: "Desde la web, una app de escritorio o tu llamada de Meet/Zoom. Sin instalar nada extra para tus pacientes.",
-    detail: "Audio cifrado al subir. Calidad clínica desde 16 kHz.",
+    detail: "El audio se sube por una conexión segura (HTTPS). Calidad clínica desde 16 kHz.",
   },
   {
     icon: Sparkles,

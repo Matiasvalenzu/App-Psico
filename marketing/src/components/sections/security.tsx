@@ -7,9 +7,9 @@ import { SectionHeading } from "@/components/sections/section-heading"
 const PILLARS = [
   {
     icon: Lock,
-    title: "Cifrado AES-256",
-    body: "Audios, transcripciones y embeddings cifrados en reposo. TLS 1.3 en tránsito.",
-    chip: "AES-256",
+    title: "Conexión cifrada",
+    body: "Toda la información viaja cifrada mediante HTTPS.",
+    chip: "HTTPS",
   },
   {
     icon: Server,
@@ -26,7 +26,7 @@ const PILLARS = [
   {
     icon: FileKey,
     title: "Ley 19.628 + GDPR",
-    body: "Borrado a petición, portabilidad, registro de accesos. Cumple normativa chilena y europea.",
+    body: "Borrado a petición y portabilidad. Cumple normativa chilena y europea.",
     chip: "Compliant",
   },
 ]
