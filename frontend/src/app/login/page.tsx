@@ -78,6 +78,7 @@ export default function LoginPage() {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Estado Registro - Paso 2 (OTP)
   const [registerStep, setRegisterStep] = useState<"form" | "otp">("form");
@@ -138,6 +139,10 @@ export default function LoginPage() {
     }
     if (registerPassword !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (!acceptedTerms) {
+      setError("Debes aceptar los Términos y la Política de Privacidad.");
       return;
     }
 
@@ -553,7 +558,36 @@ export default function LoginPage() {
                         required
                       />
                     </div>
-                    <button type="submit" disabled={loading} className={submitClass}>
+                    <label className="flex items-start gap-2.5 text-sm leading-snug text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
+                        required
+                      />
+                      <span>
+                        Acepto los{" "}
+                        <a
+                          href="https://psiconex.cl/terminos"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-primary underline-offset-4 hover:underline"
+                        >
+                          Términos
+                        </a>{" "}
+                        y la{" "}
+                        <a
+                          href="https://psiconex.cl/privacidad"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-primary underline-offset-4 hover:underline"
+                        >
+                          Política de Privacidad
+                        </a>
+                      </span>
+                    </label>
+                    <button type="submit" disabled={loading || !acceptedTerms} className={submitClass}>
                       {loading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -661,6 +695,27 @@ export default function LoginPage() {
                         text={activeTab === "register" ? "signup_with" : "signin_with"}
                       />
                     </div>
+                    <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                      Al continuar con Google aceptas los{" "}
+                      <a
+                        href="https://psiconex.cl/terminos"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        Términos
+                      </a>{" "}
+                      y la{" "}
+                      <a
+                        href="https://psiconex.cl/privacidad"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        Política de Privacidad
+                      </a>
+                      .
+                    </p>
                   </div>
                 )}
 
