@@ -228,7 +228,7 @@ function getSexoLabel(sexo: string) {
     M: "Masculino",
     F: "Femenino",
     O: "Otro",
-    N: "No especifica",
+    N: "Prefiero no decir",
   };
   return map[sexo] || sexo;
 }
@@ -246,6 +246,18 @@ function getStatusBadge(status: string) {
     return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
   }
   return "bg-muted text-muted-foreground";
+}
+
+function getPacienteEstadoLabel(status?: string | null) {
+  const map: Record<string, string> = {
+    EN_SESION: "Activo",
+    ALTA: "Alta",
+    ABANDONO: "Abandono",
+    PAUSADO: "Pausado",
+    DERIVADO: "Derivado",
+  };
+  if (!status) return "Activo";
+  return map[status] || status;
 }
 
 function getStatusLabel(status: string) {
@@ -1155,6 +1167,16 @@ export default function PacienteDetailPage() {
     return <p className="text-destructive">Paciente no encontrado</p>;
   }
 
+  const hasExpedienteData = Boolean(
+    paciente.rut ||
+      paciente.edad ||
+      (paciente.sexo && paciente.sexo !== "N") ||
+      paciente.fecha_nacimiento ||
+      paciente.ocupacion_laboral ||
+      paciente.nacionalidad ||
+      paciente.religion ||
+      paciente.prevision
+  );
   const hasContactData = Boolean(
     paciente.telefono_whatsapp ||
       paciente.email_contacto ||
@@ -1225,7 +1247,7 @@ export default function PacienteDetailPage() {
           {MOSTRAR_ESTADO_PACIENTE && (
             <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="truncate max-w-[90px] sm:max-w-none">{paciente.estado ? getStatusLabel(paciente.estado) : "En sesión"}</span>
+              <span className="truncate max-w-[90px] sm:max-w-none">{getPacienteEstadoLabel(paciente.estado)}</span>
             </span>
           )}
         </div>
@@ -1423,16 +1445,23 @@ export default function PacienteDetailPage() {
             Expediente y Datos Personales
           </h2>
         </div>
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-4">
-          <DetailItem label="RUT" value={paciente.rut} />
-          <DetailItem label="Edad" value={paciente.edad ? `${paciente.edad} años` : null} />
-          <DetailItem label="Sexo" value={paciente.sexo !== "N" ? getSexoLabel(paciente.sexo) : null} />
-          <DetailItem label="Fecha de nacimiento" value={paciente.fecha_nacimiento ? formatDate(paciente.fecha_nacimiento) : null} />
-          <DetailItem label="Ocupación" value={paciente.ocupacion_laboral} />
-          <DetailItem label="Nacionalidad" value={paciente.nacionalidad} />
-          <DetailItem label="Religión" value={paciente.religion} />
-          <DetailItem label="Previsión de Salud" value={paciente.prevision} />
-        </div>
+        {hasExpedienteData ? (
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-4">
+            <DetailItem label="RUT" value={paciente.rut} />
+            <DetailItem label="Edad" value={paciente.edad ? `${paciente.edad} años` : null} />
+            <DetailItem label="Sexo" value={paciente.sexo !== "N" ? getSexoLabel(paciente.sexo) : null} />
+            <DetailItem label="Fecha de nacimiento" value={paciente.fecha_nacimiento ? formatDate(paciente.fecha_nacimiento) : null} />
+            <DetailItem label="Ocupación" value={paciente.ocupacion_laboral} />
+            <DetailItem label="Nacionalidad" value={paciente.nacionalidad} />
+            <DetailItem label="Religión" value={paciente.religion} />
+            <DetailItem label="Previsión de Salud" value={paciente.prevision} />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">
+            <p>Aún no hay datos personales registrados.</p>
+            <p className="mt-1">Usa <span className="font-semibold text-foreground">Editar</span> para completar el expediente.</p>
+          </div>
+        )}
       </div>
 
       {/* Bloque 3: Motivo de consulta y Objetivos Terapéuticos */}
@@ -1890,7 +1919,7 @@ export default function PacienteDetailPage() {
                     onChange={(e) => setEditSexo(e.target.value)}
                     className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
                   >
-                    <option value="N">No especifica</option>
+                    <option value="N">Prefiero no decir</option>
                     <option value="M">Masculino</option>
                     <option value="F">Femenino</option>
                     <option value="O">Otro</option>
@@ -3093,7 +3122,7 @@ export default function PacienteDetailPage() {
                     <Brain className="h-6 w-6 text-primary" />
                   </div>
                   <p className="text-sm font-medium">
-                    ¿En qué puedo ayudarte con {paciente.nombre}?
+                    ¿En qué puedo ayudarte con {paciente.nombre_completo || `${paciente.nombre} ${paciente.apellido}`.trim()}?
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Pregunta sobre patrones, temas recurrentes o cualquier aspecto clínico
@@ -3265,7 +3294,7 @@ export default function PacienteDetailPage() {
                   className="flex-1 min-w-0 resize-none rounded-xl border border-input bg-background px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
                   placeholder={
                     chatId
-                      ? `Pregunta sobre las sesiones de ${paciente.nombre}...`
+                      ? `Pregunta sobre las sesiones de ${paciente.nombre_completo || `${paciente.nombre} ${paciente.apellido}`.trim()}...`
                       : "Crea una conversación para empezar"
                   }
                 />

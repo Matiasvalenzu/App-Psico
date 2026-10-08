@@ -129,7 +129,7 @@ async function getApiErrorMessage(res: Response, fallback: string) {
 const PATIENT_STATUS_OPTIONS = [
   {
     value: "EN_SESION",
-    label: "En sesión",
+    label: "Activo",
     description: "Activo",
     dotClass: "bg-emerald-500",
     className: "bg-emerald-50 text-emerald-700 border-emerald-200/70 hover:bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60",
@@ -428,7 +428,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              En Sesión Activa
+              Activos
             </span>
             <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110">
               <Activity className="h-4 w-4" />
@@ -589,7 +589,7 @@ export default function DashboardPage() {
                     onChange={(e) => setSexo(e.target.value)}
                     className="flex h-10 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <option value="N">No especifica</option>
+                    <option value="N">Prefiero no decir</option>
                     <option value="M">Masculino</option>
                     <option value="F">Femenino</option>
                     <option value="O">Otro</option>
@@ -699,7 +699,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-1 overflow-x-auto p-1 bg-muted/40 rounded-xl border border-border/60 text-xs font-medium self-start md:self-auto">
           {[
             { id: "ALL", label: "Todos", count: totalPacientes },
-            { id: "EN_SESION", label: "En sesión", count: enSesionCount },
+            { id: "EN_SESION", label: "Activo", count: enSesionCount },
             { id: "PAUSADO", label: "Pausados", count: pausadoCount },
             { id: "ALTA", label: "Altas", count: altaCount },
           ].map((tab) => (
