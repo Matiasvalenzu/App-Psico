@@ -38,7 +38,7 @@ export default function PrivacyPage() {
               <h2 className="text-xl font-semibold text-foreground">1. Responsable del tratamiento</h2>
               <p className="mt-3">
                 Psiconex es operado por Sociedad de Profesionales Informática y Tecnología Limitada, RUT 77.781.977-1, con domicilio en Martín de Zamora 5375, Las Condes, Santiago de Chile. Para consultas sobre esta política o el tratamiento de datos, escríbenos a{" "}
-                <a className="text-primary underline underline-offset-4" href="mailto:matiasv.1992@gmail.com">matiasv.1992@gmail.com</a>.
+                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com">matias@datnexia.com</a>.
               </p>
             </section>
 
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
               <h2 className="text-xl font-semibold text-foreground">6. Eliminación de cuentas y retención</h2>
               <p className="mt-3">
                 El usuario puede solicitar la eliminación total de su cuenta y sus datos escribiendo a{" "}
-                <a className="text-primary underline underline-offset-4" href="mailto:matiasv.1992@gmail.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20y%20Datos">matiasv.1992@gmail.com</a> con el asunto &ldquo;Solicitud de Eliminación de Cuenta y Datos&rdquo;. Procesamos las solicitudes verificadas en un plazo máximo de 48 horas hábiles.
+                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20y%20Datos">matias@datnexia.com</a> con el asunto &ldquo;Solicitud de Eliminación de Cuenta y Datos&rdquo;. Procesamos las solicitudes verificadas en un plazo máximo de 48 horas hábiles.
               </p>
               <p className="mt-3">
                 Al completar la eliminación, se purgan permanentemente los datos de la cuenta, incluidos perfiles, configuraciones, tokens de OAuth, citas, fichas y registros clínicos asociados. Las copias de seguridad automatizadas se sobrescriben y eliminan dentro de un plazo máximo de 30 días naturales.

@@ -91,7 +91,7 @@ export default function TermsPage() {
               <h2 className="text-xl font-semibold text-foreground">8. Contacto, vigencia y ley aplicable</h2>
               <p className="mt-3">
                 Para consultas sobre estos términos, contáctanos en{" "}
-                <a className="text-primary underline underline-offset-4" href="mailto:matiasv.1992@gmail.com">matiasv.1992@gmail.com</a>. Estos términos se rigen por las leyes de la República de Chile, sin perjuicio de los derechos irrenunciables que correspondan a los usuarios.
+                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com">matias@datnexia.com</a>. Estos términos se rigen por las leyes de la República de Chile, sin perjuicio de los derechos irrenunciables que correspondan a los usuarios.
               </p>
             </section>
           </div>

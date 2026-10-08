@@ -24,7 +24,7 @@ const COLUMNS = [
     title: "Empresa",
     links: [
       { href: "/#equipo", label: "Equipo" },
-      { href: "mailto:matiasv.1992@gmail.com", label: "Contacto" },
+      { href: "mailto:matias@datnexia.com", label: "Contacto" },
       { href: "/privacidad", label: "Privacidad" },
       { href: "/terminos", label: "Términos" },
     ],

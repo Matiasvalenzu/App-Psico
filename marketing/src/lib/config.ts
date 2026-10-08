@@ -17,5 +17,5 @@ export const SITE = {
   name: "Psiconex",
   domain: "psiconex.cl",
   tagline: "La IA que devuelve tiempo a tu consulta",
-  email: "hola@psiconex.cl",
+  email: "matias@datnexia.com",
 } as const

@@ -346,10 +346,10 @@ export default function FeedbackPage() {
               </span>
               Escríbenos directamente a{" "}
               <a
-                href="mailto:psiconex@datnexia.com"
+                href="mailto:matias@datnexia.com"
                 className="font-medium text-primary underline"
               >
-                psiconex@datnexia.com
+                matias@datnexia.com
               </a>
             </div>
           </div>
