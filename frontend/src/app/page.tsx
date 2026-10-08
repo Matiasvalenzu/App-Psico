@@ -7,6 +7,7 @@ import { FeaturesBentoSection } from "@/components/sections/features-bento";
 import { HowItWorksSection } from "@/components/sections/how-it-works";
 import { VoiceBiometricsSection } from "@/components/sections/voice-biometrics";
 import { SecuritySection } from "@/components/sections/security";
+import { TeamSection } from "@/components/sections/team";
 import { PricingSection } from "@/components/sections/pricing";
 import { FAQSection } from "@/components/sections/faq";
 
@@ -22,6 +23,7 @@ export default function Home() {
         <HowItWorksSection />
         <VoiceBiometricsSection />
         <SecuritySection />
+        <TeamSection />
         <PricingSection />
         <FAQSection />
       </main>
