@@ -222,18 +222,21 @@ export default function SuscripcionPage() {
             </p>
 
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground pt-2">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Sesiones clínicas ilimitadas
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Transcripción y diarización
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Integración con Google Calendar
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Tests psicométricos automáticos
-              </li>
+              {[
+                "Sesiones ilimitadas",
+                "Transcripción + diarización",
+                "1 perfil de voz",
+                "Informes y resúmenes IA",
+                "Chat IA independiente por paciente",
+                "Agenda con Google Calendar",
+                "Test de Creencias Ellis y Rueda de la Vida",
+                "Sesiones por Meet/Zoom",
+                "Enlace privado para reserva de horas",
+              ].map((feature) => (
+                <li key={feature} className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> {feature}
+                </li>
+              ))}
             </ul>
           </div>
 

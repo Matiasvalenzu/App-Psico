@@ -53,7 +53,7 @@ const FEATURES: Feature[] = [
   {
     icon: ClipboardList,
     title: "Tests psicológicos aplicados",
-    body: "PHQ-9, GAD-7, BAI/BDI: aplica, puntúa e interpreta con un click. Resultados guardados en la ficha.",
+    body: "Test de Creencias Ellis y Rueda de la Vida: envía el enlace al paciente, se puntúan automáticamente y quedan en la sesión.",
   },
   {
     icon: Calendar,

@@ -34,10 +34,9 @@ const PLANS: Plan[] = [
       "Informes y resúmenes IA",
       "Chat IA independiente por paciente",
       "Agenda con Google Calendar",
-      "Tests psicológicos integrados",
+      "Test de Creencias Ellis y Rueda de la Vida",
       "Sesiones por Meet/Zoom",
       "Enlace privado para reserva de horas",
-      "Soporte prioritario",
     ],
   },
   {

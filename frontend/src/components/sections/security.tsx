@@ -25,9 +25,9 @@ const PILLARS = [
   },
   {
     icon: FileKey,
-    title: "Ley 19.628 + GDPR",
+    title: "Ley 19.628 + RGPD (GDPR)",
     body: "Borrado a petición y portabilidad. Cumple normativa chilena y europea.",
-    chip: "Compliant",
+    chip: "Normativa",
   },
 ]
 

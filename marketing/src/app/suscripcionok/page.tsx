@@ -18,12 +18,15 @@ export const metadata: Metadata = {
 }
 
 const INCLUDED_FEATURES = [
-  "Sesiones clínicas ilimitadas con procesamiento seguro",
-  "Transcripción y reconocimiento de voces (diarización)",
-  "Fichas clínicas, notas de evolución e informes automáticos",
-  "Agenda con sincronización bidireccional en Google Calendar",
-  "Tests psicológicos integrados (PHQ-9, GAD-7 y más)",
-  "Enlace privado y personalizado para reserva de pacientes",
+  "Sesiones ilimitadas",
+  "Transcripción + diarización",
+  "1 perfil de voz",
+  "Informes y resúmenes IA",
+  "Chat IA independiente por paciente",
+  "Agenda con Google Calendar",
+  "Test de Creencias Ellis y Rueda de la Vida",
+  "Sesiones por Meet/Zoom",
+  "Enlace privado para reserva de horas",
 ]
 
 export default function SubscriptionSuccessPage() {
