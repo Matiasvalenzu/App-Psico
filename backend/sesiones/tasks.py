@@ -184,7 +184,7 @@ def _extract_pyannote_turns(job_data):
     return turns
 
 
-def _run_diarization(audio_path):
+def _run_pyannote_diarization(audio_path):
     if not settings.PYANNOTE_AUTH_TOKEN:
         logger.info("PYANNOTE_AUTH_TOKEN no configurado; se omite diarización.")
         return []
@@ -197,6 +197,91 @@ def _run_diarization(audio_path):
     turns = _extract_pyannote_turns(job_data)
     logger.info("PyannoteAI job %s completado con %s turnos.", job_id, len(turns))
     return turns
+
+
+def _deepgram_content_type(audio_path):
+    content_type, _ = mimetypes.guess_type(str(audio_path))
+    return content_type or "application/octet-stream"
+
+
+def _extract_deepgram_turns(response_data):
+    """Convierte results.utterances de Deepgram a turnos {start, end, speaker}.
+
+    El hablante se formatea como SPEAKER_00, SPEAKER_01... igual que pyannote.
+    """
+    utterances = (response_data.get("results") or {}).get("utterances") or []
+    turns = []
+    for utterance in utterances:
+        start = utterance.get("start")
+        end = utterance.get("end")
+        speaker = utterance.get("speaker")
+        if start is None or end is None or speaker is None:
+            continue
+        try:
+            speaker_label = f"SPEAKER_{int(speaker):02d}"
+        except (TypeError, ValueError):
+            speaker_label = str(speaker)
+        turns.append(
+            {
+                "start": float(start),
+                "end": float(end),
+                "speaker": speaker_label,
+            }
+        )
+    return turns
+
+
+def _run_deepgram_diarization(audio_path):
+    api_key = settings.DEEPGRAM_API_KEY
+    if not api_key:
+        logger.info("DEEPGRAM_API_KEY no configurado; se omite diarización.")
+        return []
+
+    headers = {
+        "Authorization": f"Token {api_key}",
+        "Content-Type": _deepgram_content_type(audio_path),
+    }
+    params = {
+        "model": settings.DEEPGRAM_MODEL,
+        "language": settings.DEEPGRAM_LANGUAGE,
+        "diarize": "true",
+        "utterances": "true",
+        "punctuate": "true",
+    }
+
+    logger.info("Enviando audio a Deepgram para diarización.")
+    response = None
+    for attempt in range(2):  # 1 reintento ante 5xx
+        with open(audio_path, "rb") as audio_file:
+            response = requests.post(
+                settings.DEEPGRAM_API_URL,
+                params=params,
+                headers=headers,
+                data=audio_file,
+                timeout=settings.DEEPGRAM_REQUEST_TIMEOUT_SECONDS,
+            )
+        if response.status_code < 500:
+            break
+        logger.warning(
+            "Deepgram respondió %s (intento %s/2).", response.status_code, attempt + 1
+        )
+
+    if response.status_code >= 400:
+        # No se incluye el cuerpo completo para no filtrar datos en logs.
+        raise RuntimeError(f"Deepgram diarización falló ({response.status_code}).")
+
+    turns = _extract_deepgram_turns(response.json())
+    logger.info("Deepgram completó con %s turnos.", len(turns))
+    return turns
+
+
+def _run_diarization(audio_path):
+    backend = (getattr(settings, "DIARIZATION_BACKEND", "deepgram") or "deepgram").lower()
+    if backend == "pyannote":
+        return _run_pyannote_diarization(audio_path)
+    if backend != "deepgram":
+        logger.warning("DIARIZATION_BACKEND '%s' desconocido; se usa deepgram.", backend)
+    return _run_deepgram_diarization(audio_path)
 
 
 def _speaker_at_time(turns, second):
