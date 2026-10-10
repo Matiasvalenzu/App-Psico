@@ -45,9 +45,8 @@ export type GoogleAdsConversionName =
 
 /**
  * Etiquetas `send_to` por conversión (formato `AW-18504135969/<etiqueta>`).
- * TODO: completar con la etiqueta de cada conversión (Google Ads > Objetivos >
- * Conversiones > acción > Configuración de la etiqueta). Mientras un valor esté
- * vacío (o no sea `<GOOGLE_ADS_ID>/<etiqueta>`), esa conversión NO se dispara.
+ * Etiquetas de las conversiones "... Web" (sitio web). Si un valor queda
+ * vacío (o no es `<GOOGLE_ADS_ID>/<etiqueta>`), esa conversión NO se dispara.
  *
  * IDs de conversión en la cuenta 499-465-5197 (solo referencia):
  *  - registro_app (principal): 7833257213
@@ -55,9 +54,9 @@ export type GoogleAdsConversionName =
  *  - suscripcion_pagada (secundaria): 7833257216
  */
 export const GOOGLE_ADS_SEND_TO: Record<GoogleAdsConversionName, string> = {
-  registro_app: "", // TODO: AW-18504135969/<etiqueta de "Registro app">
-  clic_probar_gratis: "", // TODO: AW-18504135969/<etiqueta de "Clic Probar gratis">
-  suscripcion_pagada: "", // TODO: AW-18504135969/<etiqueta de "Suscripcion pagada">
+  registro_app: "AW-18504135969/HTPtCLaLqJgdEKHquvdE", // "Registro app Web"
+  clic_probar_gratis: "AW-18504135969/OBzCCLmLqJgdEKHquvdE", // "Clic Probar gratis Web"
+  suscripcion_pagada: "AW-18504135969/-XFUCLyLqJgdEKHquvdE", // "Suscripcion pagada Web"
 }
 
 /** `send_to` válido para la conversión o cadena vacía si falta/ es inválido. */
