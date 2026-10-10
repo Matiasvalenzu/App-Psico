@@ -9,7 +9,7 @@ import { ROUTES, SITE } from "@/lib/config"
 
 export const metadata: Metadata = {
   title: "Suscripción confirmada · Psiconex",
-  description: "¡Gracias por suscribirte al Plan Estándar de Psiconex! Tu cuenta ha sido activada con éxito.",
+  description: "¡Gracias por suscribirte al Plan Estándar de Psiconex! Tu suscripción quedó registrada.",
   robots: {
     index: false,
     follow: false,
@@ -52,13 +52,16 @@ export default function SubscriptionSuccessPage() {
           </div>
 
           <p className="text-sm font-semibold tracking-wide uppercase text-emerald-600 dark:text-emerald-400">
-            ¡Pago confirmado con éxito!
+            ¡Suscripción confirmada!
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
             ¡Gracias por suscribirte a Psiconex!
           </h1>
           <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Tu suscripción al <strong className="text-foreground font-semibold">Plan Estándar</strong> se ha procesado correctamente. Ya tienes acceso inmediato a todas las herramientas de asistencia clínica e inteligencia artificial diseñadas para devolverle tiempo a tu consulta.
+            Tu suscripción al <strong className="text-foreground font-semibold">Plan Estándar</strong> quedó registrada y ya tienes acceso inmediato a todas las herramientas de asistencia clínica e inteligencia artificial diseñadas para devolverle tiempo a tu consulta.
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            Si estás en tu período de prueba de 14 días, no se te cobra hoy: el primer cobro de $4.990 CLP se realiza al terminar la prueba. Puedes ver la fecha en la sección Suscripción de tu cuenta.
           </p>
 
           {/* Card Resumen del Plan */}
@@ -104,8 +107,8 @@ export default function SubscriptionSuccessPage() {
           {/* Action Buttons */}
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button asChild size="lg" className="w-full sm:w-auto h-12 px-7 text-base font-semibold shadow-lg shadow-primary/20">
-              <Link href={ROUTES.login} className="inline-flex items-center justify-center gap-2">
-                <span>Ir a mi cuenta / Iniciar sesión</span>
+              <Link href={ROUTES.dashboard} className="inline-flex items-center justify-center gap-2">
+                <span>Ir a mi cuenta</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
