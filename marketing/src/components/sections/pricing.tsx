@@ -216,7 +216,7 @@ export function PricingSection() {
                     variant={plan.featured ? "default" : "outline"}
                     className="w-full"
                   >
-                    <Link href={ROUTES.register}>{plan.cta}</Link>
+                    <Link href={ROUTES.register} data-meta-lead>{plan.cta}</Link>
                   </Button>
                 )}
                 {plan.featured && (

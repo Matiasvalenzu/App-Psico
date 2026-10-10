@@ -16,7 +16,7 @@ const COLUMNS = [
     title: "Acceder",
     links: [
       { href: ROUTES.login, label: "Iniciar sesión" },
-      { href: ROUTES.register, label: "Probar gratis" },
+      { href: ROUTES.register, label: "Probar gratis", lead: true },
       { href: "/#faq", label: "Preguntas frecuentes" },
     ],
   },
@@ -54,6 +54,7 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
+                      {...("lead" in link && link.lead ? { "data-meta-lead": true } : {})}
                       className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                     >
                       {link.label}

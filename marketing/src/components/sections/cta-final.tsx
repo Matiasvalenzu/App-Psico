@@ -61,7 +61,7 @@ export function CTAFinalSection() {
                 variant="secondary"
                 className="bg-white text-primary hover:bg-white/90 w-full sm:w-auto"
               >
-                <Link href={ROUTES.register}>
+                <Link href={ROUTES.register} data-meta-lead>
                   Crear cuenta gratis
                   <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
                 </Link>

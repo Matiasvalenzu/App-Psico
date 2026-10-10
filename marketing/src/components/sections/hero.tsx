@@ -77,7 +77,7 @@ export function HeroSection() {
               className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start"
             >
               <Button asChild size="xl" className="w-full sm:w-auto">
-                <Link href={ROUTES.register}>
+                <Link href={ROUTES.register} data-meta-lead>
                   Probar gratis 14 días
                   <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
                 </Link>

@@ -179,6 +179,7 @@ services:
         NEXT_PUBLIC_TURN_URL: ${NEXT_PUBLIC_TURN_URL:-}
         NEXT_PUBLIC_TURN_USERNAME: ${NEXT_PUBLIC_TURN_USERNAME:-}
         NEXT_PUBLIC_TURN_PASSWORD: ${NEXT_PUBLIC_TURN_PASSWORD:-}
+        NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
     restart: unless-stopped
     depends_on:
       - backend
@@ -196,6 +197,7 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_APP_URL: https://app.psiconex.cl
+        NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3002:3001"

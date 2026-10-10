@@ -5,6 +5,7 @@ import { CheckCircle2, ArrowRight, Check, Sparkles, ShieldCheck } from "lucide-r
 import { Footer } from "@/components/layout/footer"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
+import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 import { ROUTES, SITE } from "@/lib/config"
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ const INCLUDED_FEATURES = [
 export default function SubscriptionSuccessPage() {
   return (
     <>
+      <PurchaseTracker />
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-6 lg:px-8">
           <Link

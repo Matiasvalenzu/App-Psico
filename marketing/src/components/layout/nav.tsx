@@ -62,7 +62,7 @@ export function Nav() {
             <Link href={ROUTES.login}>Iniciar sesión</Link>
           </Button>
           <Button asChild size="sm">
-            <Link href={ROUTES.register}>Probar gratis</Link>
+            <Link href={ROUTES.register} data-meta-lead>Probar gratis</Link>
           </Button>
           <button
             type="button"

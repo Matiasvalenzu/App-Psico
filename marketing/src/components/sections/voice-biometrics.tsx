@@ -169,7 +169,7 @@ export function VoiceBiometricsSection() {
                 variant="secondary"
                 className="bg-white text-primary hover:bg-white/90"
               >
-                <Link href={ROUTES.register}>
+                <Link href={ROUTES.register} data-meta-lead>
                   Probar la biometría
                   <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden="true" />
                 </Link>

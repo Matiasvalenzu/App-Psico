@@ -1,15 +1,16 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
+const metaPixel = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim());
 
 const cspReportOnly = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${metaPixel ? " https://connect.facebook.net" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob:${metaPixel ? " https://www.facebook.com" : ""}`,
   "font-src 'self'",
   "media-src 'self' blob:",
-  "connect-src 'self' https://app.psiconex.cl",
+  `connect-src 'self' https://app.psiconex.cl${metaPixel ? " https://www.facebook.com https://connect.facebook.net" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://app.psiconex.cl",

@@ -9,7 +9,13 @@ import {
   registerUser,
   verifyRegistrationCode,
   resendRegistrationCode,
+  getCurrentUser,
 } from "@/lib/api";
+import {
+  isFreshlyCreatedAccount,
+  isMetaPixelEnabled,
+  trackCompleteRegistration,
+} from "@/lib/metaPixel";
 import {
   AlertCircle,
   ArrowLeft,
@@ -179,6 +185,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await verifyRegistrationCode(registerEmail, cleanCode);
+      // Registro por OTP = cuenta nueva (sin PII en el evento).
+      trackCompleteRegistration();
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Código inválido o expirado.");
@@ -214,7 +222,20 @@ export default function LoginPage() {
     setSuccessMessage("");
     setLoading(true);
     try {
-      await loginWithGoogle(credentialResponse.credential);
+      const googleData = await loginWithGoogle(credentialResponse.credential);
+      if (isMetaPixelEnabled) {
+        // /auth/google/login/ no informa si la cuenta es nueva: se usa
+        // `is_new_user` si algún día existe; si no, el perfil recién creado.
+        let isNewUser = googleData?.is_new_user === true;
+        if (!isNewUser && googleData?.is_new_user === undefined) {
+          try {
+            isNewUser = isFreshlyCreatedAccount(await getCurrentUser());
+          } catch {
+            /* sin medición: no bloquea el login */
+          }
+        }
+        if (isNewUser) trackCompleteRegistration();
+      }
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Error al iniciar sesión con Google");

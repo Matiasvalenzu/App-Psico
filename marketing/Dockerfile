@@ -18,7 +18,9 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 
 ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_META_PIXEL_ID
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_META_PIXEL_ID=${NEXT_PUBLIC_META_PIXEL_ID}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN rm -rf .next && npm run build

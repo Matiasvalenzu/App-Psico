@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV === "development";
+const metaPixel = Boolean((process.env.NEXT_PUBLIC_META_PIXEL_ID || "").trim());
 
 const cspReportOnly = [
   "default-src 'self'",
@@ -10,11 +11,12 @@ const cspReportOnly = [
     "https://http2.mlstatic.com",
     "https://accounts.google.com",
     "https://apis.google.com",
+    metaPixel ? "https://connect.facebook.net" : "",
   ]
     .filter(Boolean)
     .join(" "),
   "style-src 'self' 'unsafe-inline' https://accounts.google.com",
-  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com https://http2.mlstatic.com https://*.mercadopago.com",
+  `img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com https://http2.mlstatic.com https://*.mercadopago.com${metaPixel ? " https://www.facebook.com" : ""}`,
   "font-src 'self' data:",
   "media-src 'self' blob:",
   [
@@ -28,6 +30,7 @@ const cspReportOnly = [
     "https://api.mercadopago.cl",
     "https://sdk.mercadopago.com",
     "https://http2.mlstatic.com",
+    ...(metaPixel ? ["https://www.facebook.com", "https://connect.facebook.net"] : []),
     // STUN/TURN no se rigen por CSP (y "stun:host" es una fuente inválida que genera avisos en consola).
   ].join(" "),
   "object-src 'none'",
