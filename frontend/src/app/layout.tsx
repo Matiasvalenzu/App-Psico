@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import ThemeProvider from "@/components/ThemeProvider";
 import "./globals.css";
 import { MetaPixel } from "@/components/analytics/meta-pixel";
+import { ConsentBanner } from "@/components/analytics/consent-banner";
 
 export const metadata: Metadata = {
   title: "Psicólogo – Asistente de Sesiones",
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background antialiased">
         <ThemeProvider>{children}</ThemeProvider>
         <MetaPixel />
+        <ConsentBanner />
       </body>
     </html>
   );

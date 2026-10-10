@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   login,
   loginWithGoogle,
@@ -66,7 +65,6 @@ const submitClass =
   "group inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_10px_24px_-10px_hsl(var(--primary)/0.7)] transition hover:bg-primary/90 hover:shadow-[0_14px_28px_-10px_hsl(var(--primary)/0.75)] focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none";
 
 export default function LoginPage() {
-  const router = useRouter();
   const { theme } = useTheme();
 
   // Modo: 'login' | 'register'
@@ -106,6 +104,15 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [resendCooldown]);
 
+  // Navegación completa (no SPA) para que el Meta Pixel nunca sobreviva en /dashboard.
+  // Pequeña espera para que salga el evento CompleteRegistration.
+  function goToDashboard() {
+    window.setTimeout(
+      () => window.location.assign("/dashboard"),
+      isMetaPixelEnabled ? 300 : 0,
+    );
+  }
+
   function switchTab(tab: "login" | "register") {
     setActiveTab(tab);
     setError("");
@@ -123,7 +130,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(loginIdentifier, loginPassword);
-      router.push("/dashboard");
+      goToDashboard();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
     } finally {
@@ -185,7 +192,7 @@ export default function LoginPage() {
       await verifyRegistrationCode(registerEmail, cleanCode);
       // Registro por OTP = cuenta nueva (sin PII en el evento).
       trackCompleteRegistration();
-      router.push("/dashboard");
+      goToDashboard();
     } catch (err: any) {
       setError(err.message || "Código inválido o expirado.");
     } finally {
@@ -225,7 +232,7 @@ export default function LoginPage() {
         // /auth/google/login/ devuelve `is_new_user` (true solo si se creó la cuenta).
         if (googleData?.is_new_user === true) trackCompleteRegistration();
       }
-      router.push("/dashboard");
+      goToDashboard();
     } catch (err: any) {
       setError(err.message || "Error al iniciar sesión con Google");
     } finally {

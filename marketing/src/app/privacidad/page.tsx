@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
+import { ConsentPreferences } from "@/components/analytics/consent-preferences"
 import { Footer } from "@/components/layout/footer"
 import { Logo } from "@/components/brand/logo"
 import { BASE_OPEN_GRAPH } from "@/lib/seo"
@@ -31,7 +32,7 @@ export default function PrivacyPage() {
         <article className="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-24">
           <p className="text-sm font-medium text-primary">Información legal</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">Política de privacidad</h1>
-          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 14 de agosto de 2026</p>
+          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 10 de octubre de 2026</p>
 
           <div className="mt-12 space-y-10 text-base leading-7 text-muted-foreground">
             <section>
@@ -101,8 +102,30 @@ export default function PrivacyPage() {
               </p>
             </section>
 
+            {/* TODO: un abogado debe revisar esta sección (Ley 19.628 / Ley 21.719) antes de activar el píxel en producción. No es asesoría legal. */}
+            <section id="meta-pixel">
+              <h2 className="text-xl font-semibold text-foreground">8. Cookies y medición publicitaria (Meta Pixel)</h2>
+              <p className="mt-3">
+                Para saber si nuestra publicidad funciona, y solo si tú lo aceptas, usamos el Meta Pixel de Meta Platforms en las páginas públicas de Psiconex (psiconex.cl) y en la pantalla de acceso y registro y de confirmación de suscripción de la aplicación (app.psiconex.cl). Si lo rechazas, o no eliges, el Meta Pixel no se carga y no se envía nada a Meta.
+              </p>
+              <p className="mt-3">
+                Qué medimos: la visita a esas páginas, el clic en los botones &ldquo;Probar gratis&rdquo;, el registro completado y la contratación de la suscripción (con el monto del plan, $4.990 CLP, y un identificador técnico de la suscripción). Meta también recibe de forma estándar la dirección de la página, el navegador, la dirección IP y cookies propias del píxel (_fbp y _fbc).
+              </p>
+              <p className="mt-3">
+                Qué no enviamos: nunca enviamos datos clínicos ni de pacientes, ni nombres, correos o teléfonos en los eventos. El Meta Pixel no funciona dentro de la plataforma (agenda, fichas, sesiones, informes ni ninguna pantalla de trabajo clínico).
+              </p>
+              <p className="mt-3">
+                Finalidad: medir y mejorar nuestras campañas publicitarias. Meta puede tratar estos datos en el extranjero según sus propias políticas.
+              </p>
+              <p className="mt-3">
+                Cómo rechazar o cambiar tu elección: puedes hacerlo en cualquier momento con los botones de abajo, desde el aviso que aparece al entrar, o escribiéndonos a{" "}
+                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com">matias@datnexia.com</a>. También puedes borrar las cookies de tu navegador.
+              </p>
+              <ConsentPreferences />
+            </section>
+
             <section>
-              <h2 className="text-xl font-semibold text-foreground">8. Cambios a esta política</h2>
+              <h2 className="text-xl font-semibold text-foreground">9. Cambios a esta política</h2>
               <p className="mt-3">
                 Podemos actualizar esta política cuando cambien el servicio, las integraciones o las obligaciones aplicables. Publicaremos la fecha de actualización en esta página.
               </p>

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
 import { formatDateCL } from "@/lib/utils";
+import { SUBSCRIBE_SESSION_KEY } from "@/lib/metaPixel";
 import {
   CreditCard,
   Lock,
@@ -209,9 +210,19 @@ export default function CardCheckoutModal({
       }
 
       setSuccess(true);
+      // Meta Pixel (Subscribe): el id viaja por sessionStorage (no por la URL) y
+      // /suscripcionok (ruta de la allowlist) dispara el evento tras una carga
+      // completa, así el píxel nunca vive dentro de /dashboard.
+      try {
+        const subId = data?.preapproval_id ? String(data.preapproval_id) : "";
+        if (subId) window.sessionStorage.setItem(SUBSCRIBE_SESSION_KEY, subId);
+      } catch {
+        /* sessionStorage no disponible */
+      }
       setTimeout(() => {
         onSuccess(data);
         onClose();
+        window.location.assign("/suscripcionok");
       }, 1600);
     } catch (err: any) {
       console.error("Error al contratar suscripción:", err);
