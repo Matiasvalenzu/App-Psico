@@ -448,10 +448,12 @@ def google_login(request):
         last_name = idinfo.get("family_name", "")
 
         User = get_user_model()
+        is_new_user = False
         with transaction.atomic():
             user = User.objects.filter(email__iexact=email).first()
 
             if not user:
+                is_new_user = True
                 username = email.split("@")[0]
                 original_username = username
                 counter = 1
@@ -475,7 +477,8 @@ def google_login(request):
 
         return Response({
             "access": str(refresh.access_token),
-            "refresh": str(refresh)
+            "refresh": str(refresh),
+            "is_new_user": is_new_user,
         })
 
     except ValueError as exc:

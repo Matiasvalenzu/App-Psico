@@ -9,10 +9,8 @@ import {
   registerUser,
   verifyRegistrationCode,
   resendRegistrationCode,
-  getCurrentUser,
 } from "@/lib/api";
 import {
-  isFreshlyCreatedAccount,
   isMetaPixelEnabled,
   trackCompleteRegistration,
 } from "@/lib/metaPixel";
@@ -224,17 +222,8 @@ export default function LoginPage() {
     try {
       const googleData = await loginWithGoogle(credentialResponse.credential);
       if (isMetaPixelEnabled) {
-        // /auth/google/login/ no informa si la cuenta es nueva: se usa
-        // `is_new_user` si algún día existe; si no, el perfil recién creado.
-        let isNewUser = googleData?.is_new_user === true;
-        if (!isNewUser && googleData?.is_new_user === undefined) {
-          try {
-            isNewUser = isFreshlyCreatedAccount(await getCurrentUser());
-          } catch {
-            /* sin medición: no bloquea el login */
-          }
-        }
-        if (isNewUser) trackCompleteRegistration();
+        // /auth/google/login/ devuelve `is_new_user` (true solo si se creó la cuenta).
+        if (googleData?.is_new_user === true) trackCompleteRegistration();
       }
       router.push("/dashboard");
     } catch (err: any) {
