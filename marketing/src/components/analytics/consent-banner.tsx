@@ -3,20 +3,33 @@
 import Link from "next/link"
 
 import { setMetaConsent, useMetaConsent } from "@/lib/metaConsent"
+import { isGoogleAdsEnabled } from "@/lib/googleAds"
 import { isMetaPixelEnabled, isPixelPath } from "@/lib/metaPixel"
 import { usePathname } from "next/navigation"
 
 /**
- * Banner Aceptar / Rechazar para el Meta Pixel. Solo aparece en rutas de la
+ * Banner Aceptar / Rechazar para el Meta Pixel y la etiqueta de Google Ads
+ * (mismo consentimiento para ambos). Solo aparece en rutas de la
  * allowlist y mientras el usuario no haya decidido. Nunca en /dashboard.
  */
 export function ConsentBanner() {
   const pathname = usePathname()
   const consent = useMetaConsent()
 
-  if (!isMetaPixelEnabled || !isPixelPath(pathname) || consent !== "unset") {
+  if (
+    !(isMetaPixelEnabled || isGoogleAdsEnabled) ||
+    !isPixelPath(pathname) ||
+    consent !== "unset"
+  ) {
     return null
   }
+
+  const tools =
+    isMetaPixelEnabled && isGoogleAdsEnabled
+      ? "el Meta Pixel y la etiqueta de Google Ads"
+      : isGoogleAdsEnabled
+        ? "la etiqueta de Google Ads"
+        : "el Meta Pixel"
 
   const btn =
     "inline-flex h-9 items-center justify-center rounded-md border border-border px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -29,7 +42,7 @@ export function ConsentBanner() {
     >
       <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Usamos el Meta Pixel para medir nuestra publicidad en estas páginas
+          Usamos {tools} para medir nuestra publicidad en estas páginas
           públicas. No enviamos datos clínicos ni de pacientes. Puedes aceptar o
           rechazar, y cambiar tu elección cuando quieras.{" "}
           <Link

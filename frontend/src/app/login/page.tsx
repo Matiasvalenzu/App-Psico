@@ -9,6 +9,7 @@ import {
   verifyRegistrationCode,
   resendRegistrationCode,
 } from "@/lib/api";
+import { isGoogleAdsEnabled, trackGoogleAdsConversion } from "@/lib/googleAds";
 import {
   isMetaPixelEnabled,
   trackCompleteRegistration,
@@ -104,12 +105,12 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [resendCooldown]);
 
-  // Navegación completa (no SPA) para que el Meta Pixel nunca sobreviva en /dashboard.
-  // Pequeña espera para que salga el evento CompleteRegistration.
+  // Navegación completa (no SPA) para que Meta Pixel y Google Ads nunca sobrevivan en /dashboard.
+  // Pequeña espera para que salgan los eventos de registro.
   function goToDashboard() {
     window.setTimeout(
       () => window.location.assign("/dashboard"),
-      isMetaPixelEnabled ? 300 : 0,
+      isMetaPixelEnabled || isGoogleAdsEnabled ? 300 : 0,
     );
   }
 
@@ -192,6 +193,7 @@ export default function LoginPage() {
       await verifyRegistrationCode(registerEmail, cleanCode);
       // Registro por OTP = cuenta nueva (sin PII en el evento).
       trackCompleteRegistration();
+      trackGoogleAdsConversion("registro_app");
       goToDashboard();
     } catch (err: any) {
       setError(err.message || "Código inválido o expirado.");
@@ -228,9 +230,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const googleData = await loginWithGoogle(credentialResponse.credential);
-      if (isMetaPixelEnabled) {
+      if (isMetaPixelEnabled || isGoogleAdsEnabled) {
         // /auth/google/login/ devuelve `is_new_user` (true solo si se creó la cuenta).
-        if (googleData?.is_new_user === true) trackCompleteRegistration();
+        if (googleData?.is_new_user === true) {
+          trackCompleteRegistration();
+          trackGoogleAdsConversion("registro_app");
+        }
       }
       goToDashboard();
     } catch (err: any) {

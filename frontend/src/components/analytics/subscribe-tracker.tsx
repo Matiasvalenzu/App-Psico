@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 
+import { isGoogleAdsEnabled, trackGoogleAdsSubscribe } from "@/lib/googleAds"
 import { useMetaConsent } from "@/lib/metaConsent"
 import {
   SUBSCRIBE_SESSION_KEY,
@@ -18,7 +19,7 @@ function clearStoredId() {
 }
 
 /**
- * Dispara Subscribe una sola vez tras contratar el plan. El id de la
+ * Dispara Subscribe (Meta) y la conversión "Suscripción pagada" (Google Ads) una sola vez tras contratar el plan. El id de la
  * suscripción llega por sessionStorage (no por la URL); sin id no se envía
  * nada (visitas directas / recargas). Limpia el id al enviar o al rechazar.
  */
@@ -34,11 +35,21 @@ export function SubscribeTracker() {
       /* noop */
     }
     if (!id) return
-    if (!isMetaPixelEnabled || consent === "rejected") {
+    if (!(isMetaPixelEnabled || isGoogleAdsEnabled) || consent === "rejected") {
       clearStoredId()
       return
     }
-    if (consent === "accepted") trackSubscribe(id, clearStoredId)
+    if (consent === "accepted") {
+      // El id se borra de sessionStorage cuando todos los destinos activos
+      // terminaron (Meta y/o Google Ads), para que ninguno lo pierda.
+      let pending = (isMetaPixelEnabled ? 1 : 0) + (isGoogleAdsEnabled ? 1 : 0)
+      const done = () => {
+        pending -= 1
+        if (pending <= 0) clearStoredId()
+      }
+      if (isMetaPixelEnabled) trackSubscribe(id, done)
+      if (isGoogleAdsEnabled) trackGoogleAdsSubscribe(id, done)
+    }
   }, [consent])
 
   return null

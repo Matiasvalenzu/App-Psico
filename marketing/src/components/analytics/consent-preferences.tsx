@@ -1,19 +1,21 @@
 "use client"
 
 import { setMetaConsent, useMetaConsent } from "@/lib/metaConsent"
+import { isGoogleAdsEnabled } from "@/lib/googleAds"
 import { isMetaPixelEnabled } from "@/lib/metaPixel"
 
 /**
- * Permite ver y cambiar la elección sobre el Meta Pixel desde /privacidad.
+ * Permite ver y cambiar la elección sobre el Meta Pixel y Google Ads (mismo
+ * consentimiento) desde /privacidad.
  * Al rechazar se recarga la página para descargar el script si ya estaba activo.
  */
 export function ConsentPreferences() {
   const consent = useMetaConsent()
 
-  if (!isMetaPixelEnabled) {
+  if (!isMetaPixelEnabled && !isGoogleAdsEnabled) {
     return (
       <p className="mt-3 text-sm">
-        Actualmente la medición publicitaria con Meta Pixel está desactivada.
+        Actualmente la medición publicitaria (Meta Pixel y Google Ads) está desactivada.
       </p>
     )
   }
@@ -27,7 +29,8 @@ export function ConsentPreferences() {
         : "Aún no has elegido"
 
   const choose = (value: "accepted" | "rejected") => {
-    const wasLoaded = typeof window.fbq === "function"
+    const wasLoaded =
+      typeof window.fbq === "function" || typeof window.gtag === "function"
     setMetaConsent(value)
     if (value === "rejected" && wasLoaded) window.location.reload()
   }

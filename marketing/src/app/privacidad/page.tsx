@@ -102,20 +102,23 @@ export default function PrivacyPage() {
               </p>
             </section>
 
-            {/* TODO: un abogado debe revisar esta sección (Ley 19.628 / Ley 21.719) antes de activar el píxel en producción. No es asesoría legal. */}
+            {/* TODO: un abogado debe revisar esta sección (Ley 19.628 / Ley 21.719) antes de activar el píxel y la etiqueta de Google Ads en producción. No es asesoría legal. */}
             <section id="meta-pixel">
-              <h2 className="text-xl font-semibold text-foreground">8. Cookies y medición publicitaria (Meta Pixel)</h2>
+              <h2 className="text-xl font-semibold text-foreground">8. Cookies y medición publicitaria (Meta Pixel y Google Ads)</h2>
               <p className="mt-3">
-                Para saber si nuestra publicidad funciona, y solo si tú lo aceptas, usamos el Meta Pixel de Meta Platforms en las páginas públicas de Psiconex (psiconex.cl) y en la pantalla de acceso y registro y de confirmación de suscripción de la aplicación (app.psiconex.cl). Si lo rechazas, o no eliges, el Meta Pixel no se carga y no se envía nada a Meta.
+                Para saber si nuestra publicidad funciona, y solo si tú lo aceptas, usamos el Meta Pixel de Meta Platforms y la etiqueta de Google Ads (gtag.js) de Google en las páginas públicas de Psiconex (psiconex.cl) y en la pantalla de acceso y registro y de confirmación de suscripción de la aplicación (app.psiconex.cl). Un solo aviso cubre ambas herramientas. Si lo rechazas, o no eliges, no se cargan y no se envía nada a Meta ni a Google.
               </p>
               <p className="mt-3">
-                Qué medimos: la visita a esas páginas, el clic en los botones &ldquo;Probar gratis&rdquo;, el registro completado y la contratación de la suscripción (con el monto del plan, $4.990 CLP, y un identificador técnico de la suscripción). Meta también recibe de forma estándar la dirección de la página, el navegador, la dirección IP y cookies propias del píxel (_fbp y _fbc).
+                Qué medimos: la visita a esas páginas (Meta), el clic en los botones &ldquo;Probar gratis&rdquo;, el registro completado y la contratación de la suscripción (con el monto del plan, $4.990 CLP, y un identificador técnico de la suscripción). Meta y Google también reciben de forma estándar la dirección de la página, el navegador, la dirección IP y cookies propias de cada herramienta (en Meta, _fbp y _fbc; en Google Ads, cookies de medición de conversiones como _gcl_aw).
               </p>
               <p className="mt-3">
-                Qué no enviamos: nunca enviamos datos clínicos ni de pacientes, ni nombres, correos o teléfonos en los eventos. El Meta Pixel no funciona dentro de la plataforma (agenda, fichas, sesiones, informes ni ninguna pantalla de trabajo clínico).
+                Cómo configuramos Google Ads: usamos la etiqueta solo para medir conversiones de nuestros anuncios. Mientras no aceptes, el consentimiento para almacenamiento publicitario y datos de usuario permanece denegado; al aceptar concedemos solo esos dos permisos de medición, y no activamos la personalización de anuncios ni Google Analytics.
               </p>
               <p className="mt-3">
-                Finalidad: medir y mejorar nuestras campañas publicitarias. Meta puede tratar estos datos en el extranjero según sus propias políticas.
+                Qué no enviamos: nunca enviamos datos clínicos ni de pacientes, ni nombres, correos o teléfonos en los eventos. Ni el Meta Pixel ni la etiqueta de Google Ads funcionan dentro de la plataforma (agenda, fichas, sesiones, informes ni ninguna pantalla de trabajo clínico).
+              </p>
+              <p className="mt-3">
+                Finalidad: medir y mejorar nuestras campañas publicitarias. Meta y Google pueden tratar estos datos en el extranjero según sus propias políticas.
               </p>
               <p className="mt-3">
                 Cómo rechazar o cambiar tu elección: puedes hacerlo en cualquier momento con los botones de abajo, desde el aviso que aparece al entrar, o escribiéndonos a{" "}

@@ -2,15 +2,16 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
 const metaPixel = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim());
+const googleAds = Boolean(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim());
 
 const cspReportOnly = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${metaPixel ? " https://connect.facebook.net" : ""}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${metaPixel ? " https://connect.facebook.net" : ""}${googleAds ? " https://www.googletagmanager.com" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob:${metaPixel ? " https://www.facebook.com" : ""}`,
+  `img-src 'self' data: blob:${metaPixel ? " https://www.facebook.com" : ""}${googleAds ? " https://www.google.com https://googleads.g.doubleclick.net https://www.googletagmanager.com" : ""}`,
   "font-src 'self'",
   "media-src 'self' blob:",
-  `connect-src 'self' https://app.psiconex.cl${metaPixel ? " https://www.facebook.com https://connect.facebook.net" : ""}`,
+  `connect-src 'self' https://app.psiconex.cl${metaPixel ? " https://www.facebook.com https://connect.facebook.net" : ""}${googleAds ? " https://www.google.com https://googleads.g.doubleclick.net https://www.googletagmanager.com https://www.googleadservices.com" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://app.psiconex.cl",
