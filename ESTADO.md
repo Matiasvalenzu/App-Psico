@@ -1,5 +1,5 @@
-# ESTADO — Psiconex   (actualizado: 2026-10-10 por Omega)
-Producción: commit 69c77d1 · desplegado 2026-10-10 · app.psiconex.cl (Next 14 + Django) · landing psiconex.cl (Next 16)
+# ESTADO — Psiconex   (actualizado: 2026-10-10 por Troy)
+Producción: commit 1de384d (+ESTADO) · desplegado 2026-10-10 · app.psiconex.cl (Next 14 + Django) · landing psiconex.cl (Next 16)
 Cómo correr/verificar: curl -sI https://app.psiconex.cl · ssh psiconex-vps 'docker ps --filter name=psiconex'
 Rutas clave: repo /workspace/psiconex-app (box) · VPS /srv/psiconex-docker/current · docker-compose.prod.yml · .env en /srv/psiconex-docker/shared/.env (nunca imprimir)
 En curso: nada
@@ -13,3 +13,4 @@ Decisiones:
 - 2026-10-09 — Deploy solo con pedido explícito de Matías
 Problemas conocidos: SSH a GitHub bloqueado desde la box → usar remoto `vps`
 - 2026-10-10 — diarización por Deepgram desplegada; DIARIZATION_BACKEND=deepgram por defecto; pyannote queda como alternativa (falta prueba en vivo y suite completa con Postgres)
+- 2026-10-10 — Píxel de Meta (ID público 1067979556235866) + banner de consentimiento + evento Subscribe + is_new_user (backend) desplegados (commit 1de384d; autorizado por Matías). Falta: prueba con Pixel Helper en producción, pago real con Mercado Pago, revisión legal de /privacidad sección 8. Rollback: imágenes psiconex-{frontend,marketing,backend}:rollback-pre-metapixel
