@@ -16,9 +16,15 @@ from agenda.models import (
 from agenda.security import document_digest, sign_email_verification
 from agenda.serializers import ReservaPublicaSerializer
 from pacientes.models import Paciente
+from sesiones import tasks as sesiones_tasks
+from sesiones.models import Sesion
 
 from .models import NotificacionEmail
-from .services import enqueue_booking_confirmations, enqueue_welcome_email
+from .services import (
+    enqueue_booking_confirmations,
+    enqueue_session_ready_email,
+    enqueue_welcome_email,
+)
 from .tasks import send_notification
 
 
@@ -233,3 +239,186 @@ class NotificationFlowTests(TestCase):
         )
         self.assertEqual(delay.call_count, 2)
         sync_google.assert_called_once()
+
+
+@override_settings(**EMAIL_TEST_SETTINGS)
+class SessionReadyEmailTests(TestCase):
+    """Aviso "Tu sesión está lista": sin datos clínicos, sin duplicados, sin romper el flujo."""
+
+    PATIENT_FIRST = "Zulema"
+    PATIENT_LAST = "Ficticiaperez"
+
+    def setUp(self):
+        self.psychologist = get_user_model().objects.create_user(
+            username="psicologa-sl",
+            email="psicologa-sl@example.com",
+            first_name="Ana",
+            last_name="Rojas",
+        )
+        self.patient = Paciente.objects.create(
+            psicologo=self.psychologist,
+            nombre=self.PATIENT_FIRST,
+            apellido=self.PATIENT_LAST,
+            email_contacto="paciente-ficticio@example.com",
+        )
+        self.sesion = Sesion.objects.create(
+            paciente=self.patient,
+            psicologo=self.psychologist,
+            audio_path="/tmp/audio-ficticio.wav",
+            notas_sesion="NOTA-CLINICA-RESERVADA",
+        )
+
+    def _run_pipeline(self, *, whisper_error=None):
+        patches = [
+            patch.object(
+                sesiones_tasks,
+                "_run_whisper",
+                side_effect=whisper_error,
+                return_value=[],
+            ),
+            patch.object(sesiones_tasks, "_run_diarization", return_value=[]),
+            patch.object(sesiones_tasks, "_build_speaker_map", return_value=({}, [])),
+            patch.object(sesiones_tasks, "_merge_transcription_segments", return_value=[]),
+            patch("notificaciones.tasks.send_notification.delay"),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _send_pending(self):
+        results = [
+            send_notification(pk)
+            for pk in NotificacionEmail.objects.filter(
+                tipo=NotificacionEmail.Tipo.SESION_LISTA
+            ).values_list("pk", flat=True)
+        ]
+        return results
+
+    @patch("notificaciones.tasks.send_notification.delay")
+    def test_sends_one_email_without_patient_data_and_with_correct_link(self, delay):
+        with self.captureOnCommitCallbacks(execute=True):
+            notification = enqueue_session_ready_email(self.sesion)
+        delay.assert_called_once_with(notification.pk)
+        self.assertEqual(notification.clave_deduplicacion, f"sesion_lista:{self.sesion.pk}")
+        self.assertEqual(notification.destinatario, "psicologa-sl@example.com")
+
+        self.assertEqual(send_notification(notification.pk), "sent")
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.subject, "Tu sesión está lista en Psiconex")
+        self.assertEqual(message.to, ["psicologa-sl@example.com"])
+        expected_url = (
+            f"https://app.psiconex.cl/dashboard/pacientes/{self.patient.pk}"
+            f"/sesiones/{self.sesion.pk}"
+        )
+        html = message.alternatives[0][0]
+        self.assertIn(expected_url, message.body)
+        self.assertIn(expected_url, html)
+        self.assertIn("cid:psiconex-logo", html)
+        for forbidden in (
+            self.PATIENT_FIRST,
+            self.PATIENT_LAST,
+            "paciente-ficticio@example.com",
+            "NOTA-CLINICA-RESERVADA",
+        ):
+            for part in (message.subject, message.body, html):
+                self.assertNotIn(forbidden, part)
+
+    @patch("notificaciones.tasks.send_notification.delay")
+    def test_enqueue_is_deduplicated(self, delay):
+        with self.captureOnCommitCallbacks(execute=True):
+            first = enqueue_session_ready_email(self.sesion)
+            second = enqueue_session_ready_email(self.sesion)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(
+            NotificacionEmail.objects.filter(
+                tipo=NotificacionEmail.Tipo.SESION_LISTA
+            ).count(),
+            1,
+        )
+        delay.assert_called_once_with(first.pk)
+        send_notification(first.pk)
+        self.assertEqual(send_notification(first.pk), "already-sent")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_completed_pipeline_queues_email_and_retry_does_not_duplicate(self):
+        self._run_pipeline()
+        self.assertTrue(sesiones_tasks.procesar_audio_sesion.run(self.sesion.pk))
+        self.assertTrue(sesiones_tasks.procesar_audio_sesion.run(self.sesion.pk))
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, Sesion.Estado.COMPLETADO)
+        self.assertEqual(
+            NotificacionEmail.objects.filter(
+                tipo=NotificacionEmail.Tipo.SESION_LISTA
+            ).count(),
+            1,
+        )
+        self.assertEqual(self._send_pending(), ["sent"])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_error_state_does_not_send(self):
+        self._run_pipeline(whisper_error=RuntimeError("fallo simulado"))
+        with self.assertRaises(Exception):
+            sesiones_tasks.procesar_audio_sesion.run(self.sesion.pk)
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, Sesion.Estado.ERROR)
+        self.assertFalse(
+            NotificacionEmail.objects.filter(
+                tipo=NotificacionEmail.Tipo.SESION_LISTA
+            ).exists()
+        )
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_enqueue_failure_does_not_break_transcription(self):
+        self._run_pipeline()
+        with patch(
+            "notificaciones.services.enqueue_session_ready_email",
+            side_effect=RuntimeError("cola caída"),
+        ), self.assertLogs(sesiones_tasks.logger, level="ERROR"):
+            result = sesiones_tasks.procesar_audio_sesion.run(self.sesion.pk)
+        self.assertTrue(result)
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, Sesion.Estado.COMPLETADO)
+
+    def test_email_send_failure_does_not_break_transcription(self):
+        self._run_pipeline()
+        with patch(
+            "notificaciones.tasks.send_branded_email",
+            side_effect=ConnectionError("smtp caído"),
+        ):
+            self.assertTrue(sesiones_tasks.procesar_audio_sesion.run(self.sesion.pk))
+            notification = NotificacionEmail.objects.get(
+                tipo=NotificacionEmail.Tipo.SESION_LISTA
+            )
+            with self.assertLogs("notificaciones.tasks", level="ERROR"):
+                try:
+                    send_notification.run(notification.pk)
+                except Exception:
+                    pass  # el reintento de Celery es el comportamiento esperado
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, Sesion.Estado.COMPLETADO)
+        notification.refresh_from_db()
+        self.assertEqual(notification.estado, NotificacionEmail.Estado.ERROR)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_uses_verified_notification_email_when_available(self):
+        from django.utils import timezone as tz
+
+        from cuentas.services import get_or_create_profile
+
+        profile = get_or_create_profile(self.psychologist)
+        profile.email_notificaciones = "avisos@example.com"
+        profile.email_notificaciones_verificado_at = tz.now()
+        profile.save()
+        notification = enqueue_session_ready_email(self.sesion)
+        self.assertEqual(notification.destinatario, "avisos@example.com")
+
+    def test_no_recipient_means_no_notification(self):
+        no_email_user = get_user_model().objects.create_user(
+            username="sin-correo", email=""
+        )
+        sesion = Sesion.objects.create(
+            paciente=self.patient, psicologo=no_email_user, audio_path="/tmp/a.wav"
+        )
+        self.assertIsNone(enqueue_session_ready_email(sesion))
+        self.assertEqual(NotificacionEmail.objects.count(), 0)

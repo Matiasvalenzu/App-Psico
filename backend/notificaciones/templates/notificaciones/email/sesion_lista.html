@@ -1,0 +1,12 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Tu sesión está lista en Psiconex{% endblock %}
+{% block preheader %}Ya puedes revisar la transcripción en Psiconex.{% endblock %}
+{% block eyebrow %}Sesión procesada{% endblock %}
+{% block heading %}Tu sesión está lista{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Terminamos de procesar una de tus sesiones. Ya puedes ingresar a Psiconex para revisar la transcripción.</p>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Por privacidad, este correo no incluye datos de tus pacientes. Para ver la sesión tendrás que iniciar sesión en tu cuenta.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ session_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Revisar la sesión</a></td></tr></table>
+{% endblock %}

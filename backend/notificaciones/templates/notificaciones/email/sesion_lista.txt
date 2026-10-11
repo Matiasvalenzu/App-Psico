@@ -1,0 +1,11 @@
+Hola,
+
+Terminamos de procesar una de tus sesiones. Ya puedes ingresar a Psiconex para revisar la transcripción.
+
+Revisar la sesión: {{ session_url }}
+
+Por privacidad, este correo no incluye datos de tus pacientes. Para ver la sesión tendrás que iniciar sesión en tu cuenta.
+
+Si necesitas ayuda, escribe a {{ support_email }}.
+
+Equipo Psiconex

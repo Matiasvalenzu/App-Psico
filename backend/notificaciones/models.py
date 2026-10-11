@@ -11,6 +11,7 @@ class NotificacionEmail(models.Model):
         REPROGRAMACION_PSICOLOGO = "REPROGRAMACION_PSICOLOGO", "Reprogramación para psicólogo"
         CANCELACION_PACIENTE = "CANCELACION_PACIENTE", "Cancelación para paciente"
         CANCELACION_PSICOLOGO = "CANCELACION_PSICOLOGO", "Cancelación para psicólogo"
+        SESION_LISTA = "SESION_LISTA", "Sesión lista"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"

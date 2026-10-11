@@ -93,6 +93,34 @@ def enqueue_welcome_email(user):
     return notification
 
 
+def enqueue_session_ready_email(sesion):
+    """Avisa al psicólogo que la transcripción de su sesión terminó.
+
+    Sin datos clínicos: el correo solo lleva un enlace (exige iniciar sesión).
+    Idempotente por sesión mediante la clave de deduplicación.
+    """
+    from cuentas.services import get_notification_email
+
+    if not sesion.psicologo_id:
+        return None
+    recipient = get_notification_email(sesion.psicologo)
+    if not recipient:
+        return None
+
+    notification, created = NotificacionEmail.objects.get_or_create(
+        clave_deduplicacion=f"sesion_lista:{sesion.pk}",
+        defaults={
+            "tipo": NotificacionEmail.Tipo.SESION_LISTA,
+            "destinatario": recipient,
+            "responder_a": settings.EMAIL_SUPPORT_ADDRESS,
+            "usuario_id": sesion.psicologo_id,
+        },
+    )
+    if created:
+        _schedule(notification)
+    return notification
+
+
 def enqueue_booking_confirmations(cita, patient_email):
     from cuentas.services import get_notification_email
 
@@ -202,6 +230,26 @@ def notification_content(notification):
                 "first_name": first_name,
                 "trial_end": trial_end_text,
                 "dashboard_url": f"{settings.PUBLIC_APP_URL.rstrip('/')}/dashboard",
+            },
+        }
+
+    if notification.tipo == NotificacionEmail.Tipo.SESION_LISTA:
+        from sesiones.models import Sesion
+
+        try:
+            session_id = int(notification.clave_deduplicacion.split(":", 1)[1])
+            sesion = Sesion.objects.only("id", "paciente_id").get(pk=session_id)
+        except (IndexError, ValueError, Sesion.DoesNotExist):
+            raise ValueError("La notificación de sesión lista no tiene sesión válida.")
+        base_url = settings.PUBLIC_APP_URL.rstrip("/")
+        return {
+            "subject": "Tu sesión está lista en Psiconex",
+            "template": "sesion_lista",
+            "context": {
+                "session_url": (
+                    f"{base_url}/dashboard/pacientes/{sesion.paciente_id}"
+                    f"/sesiones/{sesion.pk}"
+                ),
             },
         }
 

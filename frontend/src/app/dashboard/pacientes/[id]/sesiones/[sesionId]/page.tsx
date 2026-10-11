@@ -708,9 +708,9 @@ export default function SesionDetailPage() {
               <div className="flex items-start gap-3.5">
                 <Loader2 className="mt-0.5 h-5 w-5 animate-spin text-amber-600 shrink-0" />
                 <div>
-                  <h2 className="font-semibold text-amber-900 dark:text-amber-200">Procesando audio de la sesión</h2>
+                  <h2 className="font-semibold text-amber-900 dark:text-amber-200">Estamos procesando tu sesión</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Diarización, transcripción con Whisper y reconocimiento de voz (ECAPA-TDNN) en curso. Esta vista se actualizará automáticamente.
+                    Estamos transcribiendo el audio y preparando tu sesión. No necesitas quedarte en esta página: puedes seguir usando Psiconex y volver cuando termine. Te avisaremos por correo cuando esté lista. Aquí aparecerá la transcripción lista para revisar.
                   </p>
                 </div>
               </div>

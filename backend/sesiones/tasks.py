@@ -30,6 +30,16 @@ PYANNOTE_TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
 _whisper_model = None
 
 
+def _notify_session_ready(sesion):
+    """Avisa por correo que la sesión quedó COMPLETADO. Nunca rompe la transcripción."""
+    try:
+        from notificaciones.services import enqueue_session_ready_email
+
+        enqueue_session_ready_email(sesion)
+    except Exception:
+        logger.exception("No se pudo encolar el aviso de sesión lista %s", sesion.pk)
+
+
 def _get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
@@ -616,6 +626,7 @@ def procesar_audio_sesion(self, sesion_id):
         sesion.estado = Sesion.Estado.COMPLETADO
         sesion.save(update_fields=["estado", "updated_at"])
         logger.info("Sesión %s procesada exitosamente", sesion_id)
+        _notify_session_ready(sesion)
         return True
 
     except Sesion.DoesNotExist:
@@ -732,6 +743,7 @@ def procesar_audio_dual_track(
         sesion.estado = Sesion.Estado.COMPLETADO
         sesion.save(update_fields=update_fields)
         logger.info("Sesión dual-track %s procesada exitosamente (%s segmentos)", sesion_id, len(merged_segments))
+        _notify_session_ready(sesion)
         return True
 
     except Sesion.DoesNotExist:
