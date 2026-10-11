@@ -37,9 +37,9 @@ export function Nav() {
           : "border-b border-transparent bg-transparent"
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
-        <Link href="/" aria-label="Inicio Psiconex" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Logo />
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <Link href="/" aria-label="Inicio Psiconex" className="shrink-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Logo className="h-7 min-[400px]:h-8 sm:h-10" />
         </Link>
 
         <nav
@@ -57,7 +57,7 @@ export function Nav() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <Link href={ROUTES.login}>Iniciar sesión</Link>
           </Button>
@@ -66,7 +66,7 @@ export function Nav() {
           </Button>
           <button
             type="button"
-            className="md:hidden ml-1 inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="md:hidden sm:ml-1 inline-flex items-center justify-center rounded-md p-1.5 sm:p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
