@@ -1,0 +1,14 @@
+Hola {{ first_name }},
+
+Tu suscripción no está activa y tu cuenta está en solo lectura. El {{ fecha_purga }} eliminaremos de forma definitiva tu cuenta y todos sus datos: pacientes, sesiones, transcripciones, evaluaciones e informes.
+
+Antes de esa fecha puedes descargar una copia completa de tus datos (ZIP con JSON y PDF) o reactivar tu plan para seguir trabajando como siempre.
+
+Exportar mis datos: {{ export_url }}
+Reactivar plan: {{ reactivate_url }}
+
+Si reactivas tu plan, no se elimina nada. Si ya exportaste tus datos y no piensas volver, no necesitas hacer nada más.
+
+Si necesitas ayuda, escribe a {{ support_email }}.
+
+Equipo Psiconex

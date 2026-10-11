@@ -12,12 +12,15 @@ class NotificacionEmail(models.Model):
         CANCELACION_PACIENTE = "CANCELACION_PACIENTE", "Cancelación para paciente"
         CANCELACION_PSICOLOGO = "CANCELACION_PSICOLOGO", "Cancelación para psicólogo"
         SESION_LISTA = "SESION_LISTA", "Sesión lista"
+        AVISO_PURGA_7D = "AVISO_PURGA_7D", "Aviso de eliminación (7 días)"
+        AVISO_PURGA_1D = "AVISO_PURGA_1D", "Aviso de eliminación (1 día)"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
         ENVIANDO = "ENVIANDO", "Enviando"
         ENVIADA = "ENVIADA", "Enviada"
         ERROR = "ERROR", "Error"
+        OMITIDA = "OMITIDA", "Omitida"
 
     tipo = models.CharField(max_length=30, choices=Tipo.choices)
     destinatario = models.EmailField()

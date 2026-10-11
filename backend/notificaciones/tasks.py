@@ -22,7 +22,10 @@ def send_notification(self, notification_id):
         notification = NotificacionEmail.objects.select_for_update().get(
             pk=notification_id
         )
-        if notification.estado == NotificacionEmail.Estado.ENVIADA:
+        if notification.estado in (
+            NotificacionEmail.Estado.ENVIADA,
+            NotificacionEmail.Estado.OMITIDA,
+        ):
             return "already-sent"
         if (
             notification.estado == NotificacionEmail.Estado.ENVIANDO
@@ -49,6 +52,11 @@ def send_notification(self, notification_id):
 
     try:
         content = notification_content(notification)
+        if content is None:
+            NotificacionEmail.objects.filter(pk=notification_id).update(
+                estado=NotificacionEmail.Estado.OMITIDA, updated_at=timezone.now()
+            )
+            return "skipped"
         send_branded_email(
             subject=content["subject"],
             recipient=notification.destinatario,

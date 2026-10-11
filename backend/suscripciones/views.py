@@ -33,10 +33,7 @@ class SuscripcionEstadoView(APIView):
         )
 
         # Update trial status if expired
-        if suscripcion.estado == "trial" and suscripcion.fin_prueba:
-            if timezone.now() > suscripcion.fin_prueba:
-                suscripcion.estado = "expirada"
-                suscripcion.save(update_fields=["estado", "actualizada_en"])
+        suscripcion.expirar_si_vencida()
 
         dias_restantes = None
         if suscripcion.fin_prueba and suscripcion.estado == "trial":

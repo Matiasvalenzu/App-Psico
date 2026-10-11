@@ -173,11 +173,18 @@ CELERY_BEAT_SCHEDULE = {
         "task": "sesiones.tasks.purgar_audios_vencidos",
         "schedule": crontab(hour=4, minute=10),
     },
+    "ciclo-suscripciones": {
+        "task": "suscripciones.tasks.ciclo_suscripciones",
+        "schedule": crontab(hour=9, minute=5),
+    },
     "purgar-registros-acceso": {
         "task": "cuentas.tasks.purgar_registros_acceso",
         "schedule": crontab(hour=4, minute=20, day_of_week=0),
     },
 }
+
+# Cuentas inactivas: sin esto, la purga a los 30 días solo se registra en el log.
+PURGA_ACTIVA = env_bool("PURGA_ACTIVA", False)
 
 # Audio storage
 AUDIO_STORAGE_PATH = os.environ.get("AUDIO_STORAGE_PATH", "/data/audio")

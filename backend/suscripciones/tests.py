@@ -172,3 +172,92 @@ class SoloLecturaTests(APITestCase):
         self.suscripcion.refresh_from_db()
         self.assertEqual(self.suscripcion.estado, "activa")
         self.assertIsNone(self.suscripcion.inactiva_desde)
+
+
+class CicloSuscripcionesTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="ciclo@psiconex.cl", email="ciclo@psiconex.cl", password="TestPassword123!"
+        )
+        self.suscripcion = self.user.suscripcion
+
+    def _inactiva_hace(self, dias):
+        self.suscripcion.estado = "cancelada"
+        self.suscripcion.save()
+        Suscripcion.objects.filter(pk=self.suscripcion.pk).update(
+            inactiva_desde=timezone.now() - timedelta(days=dias)
+        )
+
+    def _avisos(self, tipo):
+        from notificaciones.models import NotificacionEmail
+
+        return NotificacionEmail.objects.filter(usuario=self.user, tipo=tipo).count()
+
+    def test_expira_trial_vencido_desde_fin_prueba(self):
+        from .tasks import ciclo_suscripciones
+
+        fin = timezone.now() - timedelta(days=3)
+        Suscripcion.objects.filter(pk=self.suscripcion.pk).update(fin_prueba=fin)
+        ciclo_suscripciones()
+        self.suscripcion.refresh_from_db()
+        self.assertEqual(self.suscripcion.estado, "expirada")
+        self.assertEqual(self.suscripcion.inactiva_desde, fin)
+        self.assertEqual(self.suscripcion.dias_para_purga, 27)
+
+    def test_aviso_siete_dias_una_sola_vez(self):
+        from .tasks import ciclo_suscripciones
+
+        self._inactiva_hace(25)
+        ciclo_suscripciones()
+        ciclo_suscripciones()
+        self.assertEqual(self._avisos("AVISO_PURGA_7D"), 1)
+        self.assertEqual(self._avisos("AVISO_PURGA_1D"), 0)
+
+    def test_aviso_un_dia(self):
+        from .tasks import ciclo_suscripciones
+
+        self._inactiva_hace(29.5)
+        ciclo_suscripciones()
+        self.assertEqual(self._avisos("AVISO_PURGA_1D"), 1)
+        self.assertEqual(self._avisos("AVISO_PURGA_7D"), 0)
+
+    def test_sin_purga_activa_no_borra(self):
+        from .tasks import ciclo_suscripciones
+
+        self._inactiva_hace(31)
+        with self.settings(PURGA_ACTIVA=False):
+            ciclo_suscripciones()
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_purga_a_los_treinta_dias(self):
+        from .tasks import ciclo_suscripciones
+
+        self._inactiva_hace(31)
+        with self.settings(PURGA_ACTIVA=True):
+            resultado = ciclo_suscripciones()
+        self.assertEqual(resultado["purgadas"], 1)
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_staff_no_se_purga(self):
+        from .tasks import ciclo_suscripciones
+
+        User.objects.filter(pk=self.user.pk).update(is_staff=True)
+        self._inactiva_hace(31)
+        with self.settings(PURGA_ACTIVA=True):
+            ciclo_suscripciones()
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_aviso_se_omite_si_se_reactivo(self):
+        from notificaciones.services import enqueue_purge_notice, notification_content
+
+        self._inactiva_hace(25)
+        self.suscripcion.refresh_from_db()
+        aviso = enqueue_purge_notice(self.suscripcion, 7)
+        contenido = notification_content(aviso)
+        self.assertEqual(contenido["template"], "aviso_purga")
+        self.assertIn("/dashboard/configuracion/privacidad", contenido["context"]["export_url"])
+        self.suscripcion.estado = "activa"
+        self.suscripcion.save()
+        aviso.usuario.refresh_from_db()
+        aviso = type(aviso).objects.get(pk=aviso.pk)
+        self.assertIsNone(notification_content(aviso))

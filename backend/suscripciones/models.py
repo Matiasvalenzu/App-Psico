@@ -41,13 +41,12 @@ class Suscripcion(models.Model):
     actualizada_en = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        anterior = self.inactiva_desde
         if self.estado in ESTADOS_INACTIVOS:
             self.inactiva_desde = self.inactiva_desde or timezone.now()
         else:
             self.inactiva_desde = None
         update_fields = kwargs.get("update_fields")
-        if update_fields is not None and self.inactiva_desde != anterior:
+        if update_fields is not None and "estado" in update_fields:
             kwargs["update_fields"] = {*update_fields, "inactiva_desde"}
         super().save(*args, **kwargs)
 
@@ -59,6 +58,15 @@ class Suscripcion(models.Model):
         if self.estado == 'activa':
             return True
         if self.estado == 'trial' and self.fin_prueba and timezone.now() < self.fin_prueba:
+            return True
+        return False
+
+    def expirar_si_vencida(self):
+        """Pasa un trial vencido a 'expirada'; el plazo de purga corre desde fin_prueba."""
+        if self.estado == "trial" and self.fin_prueba and self.fin_prueba <= timezone.now():
+            self.estado = "expirada"
+            self.inactiva_desde = self.fin_prueba
+            self.save(update_fields=["estado", "actualizada_en"])
             return True
         return False
 

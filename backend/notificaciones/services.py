@@ -121,6 +121,35 @@ def enqueue_session_ready_email(sesion):
     return notification
 
 
+def enqueue_purge_notice(suscripcion, dias):
+    """Avisa que la cuenta inactiva se eliminará en `dias` (7 o 1).
+
+    La clave incluye la fecha de purga: si la cuenta se reactiva y vuelve a
+    quedar inactiva, corresponde un aviso nuevo.
+    """
+    from cuentas.services import get_notification_email
+
+    user = suscripcion.user
+    recipient = get_notification_email(user) or (user.email or "").strip().lower()
+    if not recipient or not suscripcion.fecha_purga:
+        return None
+    tipo = (
+        NotificacionEmail.Tipo.AVISO_PURGA_7D if dias == 7 else NotificacionEmail.Tipo.AVISO_PURGA_1D
+    )
+    notification, created = NotificacionEmail.objects.get_or_create(
+        clave_deduplicacion=f"aviso_purga:{dias}d:{user.pk}:{int(suscripcion.fecha_purga.timestamp())}",
+        defaults={
+            "tipo": tipo,
+            "destinatario": recipient,
+            "responder_a": settings.EMAIL_SUPPORT_ADDRESS,
+            "usuario": user,
+        },
+    )
+    if created:
+        _schedule(notification)
+    return notification
+
+
 def enqueue_booking_confirmations(cita, patient_email):
     from cuentas.services import get_notification_email
 
@@ -250,6 +279,35 @@ def notification_content(notification):
                     f"{base_url}/dashboard/pacientes/{sesion.paciente_id}"
                     f"/sesiones/{sesion.pk}"
                 ),
+            },
+        }
+
+    if notification.tipo in (
+        NotificacionEmail.Tipo.AVISO_PURGA_7D,
+        NotificacionEmail.Tipo.AVISO_PURGA_1D,
+    ):
+        user = notification.usuario
+        suscripcion = getattr(user, "suscripcion", None) if user else None
+        if not suscripcion or suscripcion.puede_escribir or not suscripcion.fecha_purga:
+            return None  # La cuenta se reactivó (o ya no existe): no hay nada que avisar.
+        base_url = settings.PUBLIC_APP_URL.rstrip("/")
+        first_name = user.first_name.strip() or user.get_full_name().strip() or user.username
+        dias = 7 if notification.tipo == NotificacionEmail.Tipo.AVISO_PURGA_7D else 1
+        return {
+            "subject": (
+                "Tus datos en Psiconex se eliminarán mañana"
+                if dias == 1
+                else "Tus datos en Psiconex se eliminarán en 7 días"
+            ),
+            "template": "aviso_purga",
+            "context": {
+                "first_name": first_name,
+                "dias": dias,
+                "fecha_purga": date_format(
+                    timezone.localtime(suscripcion.fecha_purga), "j \\d\\e F \\d\\e Y"
+                ),
+                "export_url": f"{base_url}/dashboard/configuracion/privacidad",
+                "reactivate_url": f"{base_url}/dashboard/suscripcion",
             },
         }
 
