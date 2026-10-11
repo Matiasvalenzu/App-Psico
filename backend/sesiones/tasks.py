@@ -19,6 +19,7 @@ from voz.services import (
     get_audio_duration_seconds,
 )
 
+from .audio import borrar_audio_sesion, purgar_audios
 from .models import Sesion, SpeakerIdentificationResult, TranscripcionSegmento
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,14 @@ def _notify_session_ready(sesion):
         enqueue_session_ready_email(sesion)
     except Exception:
         logger.exception("No se pudo encolar el aviso de sesión lista %s", sesion.pk)
+
+
+def _borrar_audio_procesado(sesion):
+    """El audio se elimina apenas la transcripción queda guardada. Nunca rompe la tarea."""
+    try:
+        borrar_audio_sesion(sesion)
+    except Exception:
+        logger.exception("No se pudo borrar el audio de la sesión %s", sesion.pk)
 
 
 def _get_whisper_model():
@@ -626,6 +635,7 @@ def procesar_audio_sesion(self, sesion_id):
         sesion.estado = Sesion.Estado.COMPLETADO
         sesion.save(update_fields=["estado", "updated_at"])
         logger.info("Sesión %s procesada exitosamente", sesion_id)
+        _borrar_audio_procesado(sesion)
         _notify_session_ready(sesion)
         return True
 
@@ -743,6 +753,7 @@ def procesar_audio_dual_track(
         sesion.estado = Sesion.Estado.COMPLETADO
         sesion.save(update_fields=update_fields)
         logger.info("Sesión dual-track %s procesada exitosamente (%s segmentos)", sesion_id, len(merged_segments))
+        _borrar_audio_procesado(sesion)
         _notify_session_ready(sesion)
         return True
 
@@ -758,3 +769,11 @@ def procesar_audio_dual_track(
             ).strip()
             sesion.save(update_fields=["estado", "notas_sesion", "updated_at"])
         raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task
+def purgar_audios_vencidos():
+    archivos, total_bytes = purgar_audios()
+    if archivos:
+        logger.info("Purga de audio: %s archivos, %.1f MB", archivos, total_bytes / 1_048_576)
+    return archivos

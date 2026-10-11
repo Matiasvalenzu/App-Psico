@@ -15,6 +15,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from .audio import borrar_archivos_audio
 from .documentos import (
     DocumentTextExtractionError,
     UnsupportedDocumentType,
@@ -51,17 +52,8 @@ class SesionViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_destroy(self, instance):
-        audio_path = instance.audio_path
+        borrar_archivos_audio(instance)
         instance.delete()
-        paths = [audio_path]
-        if audio_path and audio_path.endswith("_psicologo.webm"):
-            paths.append(audio_path.replace("_psicologo.webm", "_paciente.webm"))
-        for path in paths:
-            if path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
 
     def perform_create(self, serializer):
         serializer.save(psicologo=self.request.user)
@@ -93,11 +85,14 @@ class SesionViewSet(viewsets.ModelViewSet):
         filename = f"{sesion.id}{extension}"
         filepath = os.path.join(audio_dir, filename)
 
+        # Un audio previo (quizá con otra extensión) no debe quedar huérfano.
+        borrar_archivos_audio(sesion)
         with open(filepath, "wb") as f:
             for chunk in audio_file.chunks():
                 f.write(chunk)
 
         sesion.audio_path = filepath
+        sesion.audio_eliminado_en = None
         sesion.duracion_segundos = duracion
         sesion.estado = Sesion.Estado.PROCESANDO
         if sesion.psicologo_id is None:
@@ -360,6 +355,7 @@ class SesionViewSet(viewsets.ModelViewSet):
         path_stereo = None
         path_psi = None
         path_pac = None
+        borrar_archivos_audio(sesion)
 
         if audio_stereo:
             path_stereo = os.path.join(storage_dir, f"{sesion.id}_stereo.webm")
@@ -375,7 +371,7 @@ class SesionViewSet(viewsets.ModelViewSet):
                     for chunk in archivo.chunks():
                         destination.write(chunk)
 
-        update_fields = ["estado_videollamada", "estado", "audio_path", "updated_at"]
+        update_fields = ["estado_videollamada", "estado", "audio_path", "audio_eliminado_en", "updated_at"]
         notas = request.data.get("notas_sesion")
         if notas is not None:
             sesion.notas_sesion = notas
@@ -383,6 +379,7 @@ class SesionViewSet(viewsets.ModelViewSet):
         sesion.estado_videollamada = Sesion.EstadoVideollamada.FINALIZADA
         sesion.estado = Sesion.Estado.PROCESANDO
         sesion.audio_path = path_stereo or path_psi
+        sesion.audio_eliminado_en = None
         sesion.save(update_fields=update_fields)
 
         from .tasks import procesar_audio_dual_track

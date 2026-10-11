@@ -2,6 +2,8 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
+
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -166,10 +168,16 @@ CELERY_BEAT_SCHEDULE = {
         "task": "notificaciones.tasks.dispatch_pending_notifications",
         "schedule": 60.0,
     },
+    "purgar-audios-vencidos": {
+        "task": "sesiones.tasks.purgar_audios_vencidos",
+        "schedule": crontab(hour=4, minute=10),
+    },
 }
 
 # Audio storage
 AUDIO_STORAGE_PATH = os.environ.get("AUDIO_STORAGE_PATH", "/data/audio")
+# El audio se borra al terminar la transcripción; si falla, se conserva estos días para reintentar.
+AUDIO_RETENCION_ERROR_DIAS = int(os.environ.get("AUDIO_RETENCION_ERROR_DIAS", "7"))
 
 # Document upload
 DOCUMENT_UPLOAD_MAX_BYTES = int(

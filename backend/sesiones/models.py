@@ -43,6 +43,7 @@ class Sesion(models.Model):
     fecha_hora_inicio = models.DateTimeField(default=timezone.now)
     duracion_segundos = models.PositiveIntegerField(null=True, blank=True)
     audio_path = models.CharField(max_length=500, blank=True, default="")
+    audio_eliminado_en = models.DateTimeField(null=True, blank=True)
     origen = models.CharField(
         max_length=30, choices=Origen.choices, default=Origen.AUDIO
     )

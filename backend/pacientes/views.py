@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from agenda.models import AgendaCita
+from sesiones.audio import borrar_carpeta_paciente
 from sesiones.models import Sesion
 
 from .models import ConsentimientoInformado, Paciente
@@ -78,6 +79,11 @@ class PacienteViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(psicologo=self.request.user)
+
+    def perform_destroy(self, instance):
+        paciente_id = instance.pk
+        instance.delete()
+        borrar_carpeta_paciente(paciente_id)
 
 
 class PacienteConsentimientoView(APIView):
