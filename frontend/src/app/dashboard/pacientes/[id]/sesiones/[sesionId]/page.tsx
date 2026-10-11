@@ -207,6 +207,7 @@ export default function SesionDetailPage() {
   const [deletingSession, setDeletingSession] = useState(false);
   const [deleteSessionError, setDeleteSessionError] = useState("");
   const [downloadingTestSection, setDownloadingTestSection] = useState<string | null>(null);
+  const [generatingObservacion, setGeneratingObservacion] = useState(false);
   const [remoteAssistantOpen, setRemoteAssistantOpen] = useState(false);
   const [transcriptTab, setTranscriptTab] = useState<"dialogue" | "editor">("dialogue");
   const [mobileTab, setMobileTab] = useState<"dialogo" | "notas">("dialogo");
@@ -378,6 +379,27 @@ export default function SesionDetailPage() {
       setError(`No se pudo descargar la sección en ${format.toUpperCase()}.`);
     } finally {
       setDownloadingTestSection(null);
+    }
+  }
+
+  async function generarObservacionIA() {
+    if (!sesion?.resultado_test) return;
+    setGeneratingObservacion(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/evaluaciones/resultados/${sesion.resultado_test.id}/observacion-ia/`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.estado_ia === "ERROR") {
+        setError("No se pudo generar la observación con IA. Intenta nuevamente.");
+      }
+      // Solo se refresca la sesión: las notas en edición no se pisan.
+      const sesionRes = await apiFetch(`/sesiones/${sesionId}/`);
+      if (sesionRes.ok) setSesion(await sesionRes.json());
+    } catch (err) {
+      console.error(err);
+      setError("No se pudo generar la observación con IA. Intenta nuevamente.");
+    } finally {
+      setGeneratingObservacion(false);
     }
   }
 
@@ -1000,6 +1022,23 @@ export default function SesionDetailPage() {
                       cargaTotal={sesion.resultado_test.puntajes.total_score as number}
                     />
                   )}
+                </div>
+              )}
+
+              {sesion.resultado_test.estado_ia !== "GENERADA" && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/80 px-4 py-3 shadow-xs">
+                  <p className="text-sm text-muted-foreground">
+                    La observación con IA solo se genera si la pides. Se envían los puntajes y el contexto clínico, sin el nombre del paciente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={generarObservacionIA}
+                    disabled={generatingObservacion}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold shadow-xs transition-all hover:bg-accent disabled:opacity-50 cursor-pointer"
+                  >
+                    {generatingObservacion ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Generar observación con IA
+                  </button>
                 </div>
               )}
 
