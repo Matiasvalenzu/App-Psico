@@ -53,6 +53,12 @@ const TEAM: TeamMember[] = [
     bio: "Más de 25 años en tecnologías de la información, liderando software, infraestructura crítica y sistemas de comunicación, incluida la implementación de una ficha clínica electrónica. En Psiconex lidera la tecnología.",
     photo: "/equipo-paulo.jpg",
   },
+  {
+    name: "Lina Barraza",
+    role: "Psicóloga clínica · Colaboradora de producto",
+    bio: "Psicóloga clínica con enfoque cognitivo-conductual, centrada en la regulación emocional. Aporta la mirada psicológica a las características y definiciones de Psiconex, y usa la plataforma con frecuencia en su práctica.",
+    photo: "/equipo-lina.jpg",
+  },
 ]
 
 const FEEDBACK_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Quiero aportar a Psiconex")}`
@@ -129,7 +135,7 @@ export function TeamSection() {
                 delay: (i % 2) * 0.08,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="card-premium flex flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-start"
+              className="card-premium flex flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-start md:last:odd:col-span-2 md:last:odd:w-[calc(50%-0.625rem)] md:last:odd:justify-self-center"
             >
               <Image
                 src={member.photo}
