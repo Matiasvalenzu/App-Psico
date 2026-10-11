@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from chat.seudonimo import seudonimizar
 from cuentas.services import get_notification_email
 from notificaciones.services import send_branded_email
 from sesiones.documentos import split_text_into_segments
@@ -484,7 +485,7 @@ def build_ai_prompt_context(asignacion, resultado):
         f"Diagnóstico sospechado registrado por profesional: {paciente.diagnostico_sospechado}",
         f"Medicación actual: {paciente.medicacion_actual}",
     ]
-    patient_context = "\n".join(line for line in patient_lines if line)
+    patient_context = seudonimizar("\n".join(line for line in patient_lines if line), paciente)
     result_context = "\n\n".join(build_result_text_parts(resultado, include_observation=False))
     dsm_context = retrieve_dsm_context(result_context)
     return patient_context, result_context, dsm_context

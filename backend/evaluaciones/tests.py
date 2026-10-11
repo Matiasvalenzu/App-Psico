@@ -210,6 +210,10 @@ class ObservacionIAAPedidoTests(TestCase):
 
     def test_prompt_no_incluye_nombre(self):
         resultado = self._completar()
+        paciente = resultado.asignacion.paciente
+        paciente.motivo_consulta = "Laura consulta por ansiedad"
+        paciente.save(update_fields=["motivo_consulta"])
         patient_context, _, _ = build_ai_prompt_context(resultado.asignacion, resultado)
+        self.assertIn("[Paciente] consulta por ansiedad", patient_context)
         self.assertNotIn("Laura", patient_context)
         self.assertNotIn("Gómez", patient_context)
