@@ -1,6 +1,9 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .catalog import ELLIS_SLUG, get_test
-from .models import EvaluacionAsignada
+from .models import EvaluacionAsignada, ResultadoEvaluacion
 from .serializers import (
     CrearEvaluacionAsignadaSerializer,
     EvaluacionAsignadaSerializer,
@@ -21,6 +24,7 @@ from .services import (
     complete_assignment,
     find_assignment_by_token,
     fixed_email_message,
+    generate_observation_for_result,
     generate_token,
     hash_token,
     send_assignment_email,
@@ -125,6 +129,26 @@ class EvaluacionAsignadaDetailView(generics.RetrieveDestroyAPIView):
         instance.delete()
         if sesion:
             sesion.delete()
+
+
+@method_decorator(ratelimit(key="user", rate="10/m", method="POST", block=True), name="post")
+class ObservacionIAView(APIView):
+    """Genera, a pedido del profesional, la observación IA de un test completado."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        resultado = get_object_or_404(
+            ResultadoEvaluacion.objects.select_related("asignacion__paciente", "asignacion__sesion"),
+            pk=pk,
+            asignacion__psicologo=request.user,
+        )
+        if resultado.estado_ia == ResultadoEvaluacion.EstadoIA.GENERADA:
+            return Response(
+                {"error": "La observación IA ya fue generada."}, status=status.HTTP_409_CONFLICT
+            )
+        resultado = generate_observation_for_result(resultado)
+        return Response({"estado_ia": resultado.estado_ia, "error_ia": resultado.error_ia})
 
 
 class EvaluacionPublicaView(APIView):

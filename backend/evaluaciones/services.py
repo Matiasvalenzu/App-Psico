@@ -248,12 +248,19 @@ def complete_assignment(asignacion, raw_responses):
         )
         create_test_segments(sesion, resultado)
 
+    # La observación IA no se genera sola: el profesional la pide explícitamente.
+    return resultado
+
+
+def generate_observation_for_result(resultado):
+    asignacion = resultado.asignacion
     observation, ia_status, ia_error = generate_ai_observation(asignacion, resultado)
     resultado.observacion_ia = sanitize_markdown_emphasis(observation)
     resultado.estado_ia = ia_status
     resultado.error_ia = ia_error
     resultado.save(update_fields=["observacion_ia", "estado_ia", "error_ia", "updated_at"])
-    append_observation_segment(asignacion.sesion, resultado.observacion_ia)
+    if ia_status == ResultadoEvaluacion.EstadoIA.GENERADA:
+        append_observation_segment(asignacion.sesion, resultado.observacion_ia)
     return resultado
 
 
@@ -470,7 +477,6 @@ def build_ellis_result_sections(resultado, test, include_observation=True):
 def build_ai_prompt_context(asignacion, resultado):
     paciente = asignacion.paciente
     patient_lines = [
-        f"Nombre paciente: {paciente.nombre_completo}",
         f"Edad: {paciente.edad} años" if paciente.edad else "",
         f"Sexo: {paciente.get_sexo_display()}" if paciente.sexo else "",
         f"Motivo de consulta: {paciente.motivo_consulta}",

@@ -7,6 +7,7 @@ from .views import (
     EvaluacionAsignadaListCreateView,
     EvaluacionPublicaResponderView,
     EvaluacionPublicaView,
+    ObservacionIAView,
 )
 
 urlpatterns = [
@@ -14,6 +15,7 @@ urlpatterns = [
     path("catalogo/<slug:slug>/", CatalogoEvaluacionDetalleView.as_view(), name="evaluaciones-catalogo-detalle"),
     path("asignaciones/", EvaluacionAsignadaListCreateView.as_view(), name="evaluaciones-asignaciones"),
     path("asignaciones/<int:pk>/", EvaluacionAsignadaDetailView.as_view(), name="evaluaciones-asignacion-detalle"),
+    path("resultados/<int:pk>/observacion-ia/", ObservacionIAView.as_view(), name="evaluaciones-observacion-ia"),
     path("publicas/<str:token>/", EvaluacionPublicaView.as_view(), name="evaluaciones-publica"),
     path("publicas/<str:token>/responder/", EvaluacionPublicaResponderView.as_view(), name="evaluaciones-publica-responder"),
 ]

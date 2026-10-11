@@ -1,5 +1,9 @@
+from datetime import timedelta
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from pacientes.models import Paciente
@@ -11,8 +15,8 @@ from evaluaciones.catalog import (
     get_test,
     list_tests,
 )
-from evaluaciones.models import EvaluacionAsignada
-from evaluaciones.services import generate_token, hash_token, complete_assignment
+from evaluaciones.models import EvaluacionAsignada, ResultadoEvaluacion
+from evaluaciones.services import build_ai_prompt_context, generate_token, hash_token, complete_assignment
 
 User = get_user_model()
 
@@ -158,3 +162,54 @@ class EvaluacionesTestCase(TestCase):
         self.assertEqual(submit_res.data["paciente_id"], self.paciente.id)
         self.assertIsNotNone(submit_res.data["sesion_id"])
 
+
+
+class ObservacionIAAPedidoTests(TestCase):
+    setUp = EvaluacionesTestCase.setUp
+
+    def _completar(self):
+        asignacion = EvaluacionAsignada.objects.create(
+            paciente=self.paciente,
+            psicologo=self.psicologo,
+            test_slug=RUEDA_VIDA_SLUG,
+            token_hash=hash_token(generate_token()),
+            fecha_expiracion=timezone.now() + timedelta(days=7),
+        )
+        return complete_assignment(asignacion, {str(i): 5 for i in range(1, 11)})
+
+    @patch("evaluaciones.services.generate_ai_observation")
+    def test_completar_test_no_llama_a_la_ia(self, generar):
+        resultado = self._completar()
+        generar.assert_not_called()
+        self.assertEqual(resultado.estado_ia, ResultadoEvaluacion.EstadoIA.PENDIENTE)
+
+    @patch(
+        "evaluaciones.services.generate_ai_observation",
+        return_value=("Observación de prueba", ResultadoEvaluacion.EstadoIA.GENERADA, ""),
+    )
+    def test_profesional_pide_la_observacion(self, generar):
+        resultado = self._completar()
+        url = f"/api/evaluaciones/resultados/{resultado.id}/observacion-ia/"
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.data["estado_ia"], ResultadoEvaluacion.EstadoIA.GENERADA)
+        resultado.refresh_from_db()
+        self.assertEqual(resultado.observacion_ia, "Observación de prueba")
+        self.assertTrue(resultado.asignacion.sesion.segmentos.filter(texto__contains="Observación de prueba").exists())
+        self.assertEqual(self.client.post(url).status_code, 409)
+        generar.assert_called_once()
+
+    def test_otro_profesional_no_puede_pedirla(self):
+        resultado = self._completar()
+        otro = User.objects.create_user(username="otro", email="o@test.com", password="x")
+        self.client.force_authenticate(user=otro)
+        response = self.client.post(f"/api/evaluaciones/resultados/{resultado.id}/observacion-ia/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_prompt_no_incluye_nombre(self):
+        resultado = self._completar()
+        patient_context, _, _ = build_ai_prompt_context(resultado.asignacion, resultado)
+        self.assertNotIn("Laura", patient_context)
+        self.assertNotIn("Gómez", patient_context)
