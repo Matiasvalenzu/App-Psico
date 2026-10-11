@@ -263,7 +263,7 @@ export default function FeedbackPage() {
             <Inbox className="h-3.5 w-3.5" />
             <span>Mis Reportes</span>
             {misReportes.length > 0 && (
-              <span className="ml-1 rounded-full bg-primary/15 text-primary px-1.5 py-0.2 text-[10px] font-bold">
+              <span className="ml-1 rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[10px] font-bold">
                 {misReportes.length}
               </span>
             )}
@@ -280,7 +280,7 @@ export default function FeedbackPage() {
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>Gestión (Admin)</span>
               {stats && stats.nuevos > 0 && (
-                <span className="ml-1 rounded-full bg-rose-500 text-white px-1.5 py-0.2 text-[10px] font-bold">
+                <span className="ml-1 rounded-full bg-rose-500 text-white px-1.5 py-0.5 text-[10px] font-bold">
                   {stats.nuevos}
                 </span>
               )}

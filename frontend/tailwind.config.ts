@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
   darkMode: "class",
@@ -70,8 +71,19 @@ const config: Config = {
         sm: "var(--radius-sm)",
         xl: "var(--radius-lg)",
         "2xl": "var(--radius-xl)",
+        "4xl": "2rem",
+      },
+      spacing: {
+        "4.5": "1.125rem",
+        "8.5": "2.125rem",
+        "10.5": "2.625rem",
+        "13": "3.25rem",
+      },
+      ringWidth: {
+        "3": "3px",
       },
       boxShadow: {
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         subtle: "var(--shadow-subtle)",
         card: "var(--shadow-card)",
         elevated: "var(--shadow-elevated)",
@@ -84,7 +96,17 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Variantes de Tailwind v4 que usan los componentes shadcn (base-nova) de src/components/ui
+    plugin(({ addVariant, matchVariant }) => {
+      for (const attr of ["open", "closed", "disabled", "inset", "popup-open", "highlighted", "checked"]) {
+        addVariant(`data-${attr}`, `&[data-${attr}]`);
+      }
+      matchVariant("has-data", (value: string) => `&:has([data-${value}])`);
+      matchVariant("in-data", (value: string) => `[data-${value}] &`);
+      matchVariant("not-aria", (value: string) => `&:not([aria-${value}])`);
+    }),
+  ],
 };
 
 export default config;
