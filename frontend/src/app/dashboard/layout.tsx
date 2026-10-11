@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
 import {
@@ -30,6 +32,99 @@ import { AudioRecordingProvider } from "@/context/AudioRecordingContext";
 import PersistentRecordingBar from "@/components/recording/PersistentRecordingBar";
 import { TutorialProvider, useTutorial } from "@/context/TutorialContext";
 import TutorialModal from "@/components/tutorial/TutorialModal";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Inter solo en el dashboard (la landing conserva su tipografía)
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+
+function isActivePath(pathname: string, path: string) {
+  if (path === "/dashboard") {
+    return pathname === "/dashboard" || pathname.startsWith("/dashboard/pacientes");
+  }
+  return pathname.startsWith(path);
+}
+
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  pathname,
+  isCollapsed,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  pathname: string;
+  isCollapsed: boolean;
+}) {
+  const active = isActivePath(pathname, href);
+  return (
+    <Link
+      href={href}
+      title={isCollapsed ? label : undefined}
+      aria-current={active ? "page" : undefined}
+      className={`group relative flex items-center gap-3 rounded-xl py-2 text-sm font-medium transition-colors duration-200 ${
+        isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
+      } ${
+        active
+          ? "bg-primary/10 text-primary font-semibold"
+          : "text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+      }`}
+    >
+      <Icon
+        className={`h-4.5 w-4.5 shrink-0 ${
+          active ? "text-primary" : "text-muted-foreground/70 group-hover:text-foreground"
+        }`}
+      />
+      {!isCollapsed && <span className="tracking-tight">{label}</span>}
+    </Link>
+  );
+}
+
+function NavGroup({
+  label,
+  isCollapsed,
+  children,
+}: {
+  label: string;
+  isCollapsed: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      {isCollapsed ? (
+        <div className="mx-4 my-2 h-px bg-border/60" />
+      ) : (
+        <div className="mb-1 mt-3 px-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+          {label}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function ShellSkeleton() {
+  return (
+    <div className="flex min-h-screen w-full bg-background" aria-busy="true" aria-label="Cargando">
+      <div className="hidden w-64 flex-col gap-3 border-r border-border/70 bg-card/95 p-6 md:flex">
+        <Skeleton className="mb-6 h-8 w-36" />
+        {Array.from({ length: 7 }).map((_, i) => (
+          <Skeleton key={i} className="h-9 w-full rounded-xl" />
+        ))}
+      </div>
+      <div className="flex flex-1 flex-col">
+        <div className="flex h-14 items-center border-b border-border/70 bg-card/75 px-6 md:h-16">
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6 lg:p-8">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -39,8 +134,11 @@ export default function DashboardLayout({
   return (
     <TutorialProvider>
       <AudioRecordingProvider>
-        <DashboardInner>{children}</DashboardInner>
+        <div className={inter.className}>
+          <DashboardInner>{children}</DashboardInner>
+        </div>
         <TutorialModal />
+        <Toaster richColors closeButton position="top-right" className={inter.className} />
       </AudioRecordingProvider>
     </TutorialProvider>
   );
@@ -62,6 +160,12 @@ function DashboardInner({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const isMobile = useIsMobile();
+
+  // Los diálogos se montan en un portal en <body>: aplicar Inter también ahí mientras el dashboard esté montado
+  useEffect(() => {
+    document.body.classList.add(inter.className);
+    return () => document.body.classList.remove(inter.className);
+  }, []);
 
   useEffect(() => {
     async function verifySession() {
@@ -106,48 +210,8 @@ function DashboardInner({
     setMoreOpen(false);
   }, [pathname]);
 
-  if (!ready) return null;
-
-  const isActive = (path: string) => {
-    if (path === "/dashboard") {
-      return pathname === "/dashboard" || pathname.startsWith("/dashboard/pacientes");
-    }
-    return pathname.startsWith(path);
-  };
-
-  const NavItem = ({
-    href,
-    icon: Icon,
-    label,
-  }: {
-    href: string;
-    icon: React.ElementType;
-    label: string;
-  }) => {
-    const active = isActive(href);
-    return (
-      <Link
-        href={href}
-        title={isCollapsed ? label : undefined}
-        className={`group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 ${
-          isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
-        } ${
-          active
-            ? "bg-primary/10 text-primary font-semibold shadow-xs border border-primary/20"
-            : "text-muted-foreground hover:bg-accent/80 hover:text-foreground"
-        }`}
-      >
-        <Icon
-          className={`h-4.5 w-4.5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-            active
-              ? "text-primary"
-              : "text-muted-foreground/70 group-hover:text-foreground"
-          }`}
-        />
-        {!isCollapsed && <span className="tracking-tight">{label}</span>}
-      </Link>
-    );
-  };
+  // Solo la primera verificación bloquea; las siguientes (por cambio de ruta) corren en segundo plano
+  if (!ready) return <ShellSkeleton />;
 
   const getSectionTitle = () => {
     if (pathname === "/dashboard") return "Pacientes";
@@ -161,11 +225,10 @@ function DashboardInner({
     return "";
   };
 
-  const showAdminSection = isAdmin || isSuperuser;
+  const navProps = { pathname, isCollapsed };
 
   return (
-    <AudioRecordingProvider>
-      <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-background">
       {/* ── Desktop Sidebar ── */}
       <aside
         className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col border-r border-border/70 bg-card/95 py-6 backdrop-blur-md transition-all duration-300 ${
@@ -218,51 +281,43 @@ function DashboardInner({
           </Link>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1.5">
-          <NavItem href="/dashboard" icon={Users} label="Pacientes" />
-          <NavItem href="/dashboard/voz" icon={Mic} label="Voz" />
-          <NavItem href="/dashboard/agenda" icon={CalendarDays} label="Agenda" />
-          <NavItem href="/dashboard/tests" icon={ClipboardList} label="Tests" />
-          <NavItem
-            href="/dashboard/suscripcion"
-            icon={CreditCard}
-            label="Mi Suscripción"
-          />
-          <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" />
-          <NavItem href="/dashboard/feedback" icon={MessageSquarePlus} label="Feedback y Ayuda" />
-          <button
-            type="button"
-            onClick={() => openTutorial(0)}
-            title={isCollapsed ? "Video Tutorial Maestro" : undefined}
-            className={`group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-accent/80 hover:text-foreground ${
-              isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
-            }`}
-          >
-            <Video className="h-4.5 w-4.5 shrink-0 text-primary transition-transform duration-200 group-hover:scale-110" />
-            {!isCollapsed && <span className="tracking-tight">Video Tutorial</span>}
-          </button>
-          {showAdminSection && (
-            <div className="mt-8">
-              {!isCollapsed && (
-                <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                  Administración
-                </div>
-              )}
-              {isCollapsed && <div className="mb-2 h-px w-full bg-border/60" />}
-              {isAdmin && (
-                <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" />
-              )}
-              {isSuperuser && (
-                <NavItem href="/dashboard/usuarios" icon={UserCog} label="Usuarios" />
-              )}
-            </div>
-          )}
+        <nav className="flex flex-1 flex-col gap-2 overflow-y-auto" aria-label="Navegación principal">
+          <NavGroup label="Clínica" isCollapsed={isCollapsed}>
+            <NavItem href="/dashboard" icon={Users} label="Pacientes" {...navProps} />
+            <NavItem href="/dashboard/agenda" icon={CalendarDays} label="Agenda" {...navProps} />
+            <NavItem href="/dashboard/tests" icon={ClipboardList} label="Tests" {...navProps} />
+            <NavItem href="/dashboard/voz" icon={Mic} label="Voz" {...navProps} />
+          </NavGroup>
+          <NavGroup label="Cuenta" isCollapsed={isCollapsed}>
+            <NavItem href="/dashboard/suscripcion" icon={CreditCard} label="Mi Suscripción" {...navProps} />
+            <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" {...navProps} />
+            {isAdmin && (
+              <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" {...navProps} />
+            )}
+            {isSuperuser && (
+              <NavItem href="/dashboard/usuarios" icon={UserCog} label="Usuarios" {...navProps} />
+            )}
+          </NavGroup>
+          <NavGroup label="Ayuda" isCollapsed={isCollapsed}>
+            <NavItem href="/dashboard/feedback" icon={MessageSquarePlus} label="Feedback y Ayuda" {...navProps} />
+            <button
+              type="button"
+              onClick={() => openTutorial(0)}
+              title={isCollapsed ? "Video Tutorial" : undefined}
+              className={`group relative flex items-center gap-3 rounded-xl py-2 text-sm font-medium transition-colors duration-200 text-muted-foreground hover:bg-accent/80 hover:text-foreground ${
+                isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
+              }`}
+            >
+              <Video className="h-4.5 w-4.5 shrink-0 text-muted-foreground/70 group-hover:text-foreground" />
+              {!isCollapsed && <span className="tracking-tight">Video Tutorial</span>}
+            </button>
+          </NavGroup>
         </nav>
       </aside>
 
       {/* ── Main content ── */}
       <div
-        className={`flex flex-1 flex-col transition-all duration-300 ${
+        className={`flex min-w-0 flex-1 flex-col transition-all duration-300 ${
           isMobile ? "pl-0" : isCollapsed ? "pl-20" : "pl-64"
         }`}
       >
@@ -380,6 +435,5 @@ function DashboardInner({
       {/* ── Barra Flotante Global de Grabación Persistente ── */}
       <PersistentRecordingBar />
     </div>
-    </AudioRecordingProvider>
   );
 }

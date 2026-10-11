@@ -1,3 +1,4 @@
+from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -5,6 +6,9 @@ from rest_framework import filters, generics, status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from agenda.models import AgendaCita
+from sesiones.models import Sesion
 
 from .models import ConsentimientoInformado, Paciente
 from .serializers import (
@@ -40,7 +44,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
     ]
     filterset_fields = ["activo"]
     search_fields = ["nombre", "apellido", "motivo_consulta"]
-    ordering_fields = ["apellido", "nombre", "created_at", "updated_at"]
+    ordering_fields = ["apellido", "nombre", "created_at", "updated_at", "ultima_sesion", "proxima_cita"]
     ordering = ["apellido", "nombre"]
 
     def get_serializer_class(self):
@@ -49,7 +53,28 @@ class PacienteViewSet(viewsets.ModelViewSet):
         return PacienteSerializer
 
     def get_queryset(self):
-        return super().get_queryset().filter(psicologo=self.request.user)
+        qs = super().get_queryset().filter(psicologo=self.request.user)
+        if self.action == "list":
+            # Datos de la tabla de trabajo: una subconsulta por columna, sin N+1
+            qs = qs.annotate(
+                ultima_sesion=Subquery(
+                    Sesion.objects.filter(paciente=OuterRef("pk"))
+                    .order_by("-fecha_hora_inicio")
+                    .values("fecha_hora_inicio")[:1]
+                ),
+                proxima_cita=Subquery(
+                    AgendaCita.objects.filter(paciente=OuterRef("pk"), inicio__gte=timezone.now())
+                    .exclude(estado=AgendaCita.Estado.ANULADA)
+                    .order_by("inicio")
+                    .values("inicio")[:1]
+                ),
+                consentimiento_estado=Subquery(
+                    ConsentimientoInformado.objects.filter(paciente=OuterRef("pk"))
+                    .order_by("-created_at")
+                    .values("estado")[:1]
+                ),
+            )
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(psicologo=self.request.user)

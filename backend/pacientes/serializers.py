@@ -105,6 +105,11 @@ class PacienteSerializer(serializers.ModelSerializer):
 
 
 class PacienteListSerializer(serializers.ModelSerializer):
+    # Anotados en PacienteViewSet.get_queryset (solo action "list")
+    ultima_sesion = serializers.DateTimeField(read_only=True, allow_null=True)
+    proxima_cita = serializers.DateTimeField(read_only=True, allow_null=True)
+    consentimiento_estado = serializers.CharField(read_only=True, allow_null=True)
+
     class Meta:
         model = Paciente
         fields = [
@@ -123,6 +128,12 @@ class PacienteListSerializer(serializers.ModelSerializer):
             "estado",
             "activo",
             "updated_at",
+            "riesgo_suicida",
+            "ideacion_suicida_nivel",
+            "es_menor_edad",
+            "ultima_sesion",
+            "proxima_cita",
+            "consentimiento_estado",
         ]
         read_only_fields = ["id", "psicologo", "nombre_completo", "updated_at"]
 

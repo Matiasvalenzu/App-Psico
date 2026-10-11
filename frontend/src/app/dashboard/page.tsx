@@ -1,34 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
+import { formatDateCL } from "@/lib/utils";
+import { formatRut, isValidRut } from "@/lib/rut";
 import {
-  Loader2,
-  Plus,
-  Search,
-  UserPlus,
-  X,
-  MoreHorizontal,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Eye,
+  Loader2,
+  MoreHorizontal,
   Pencil,
-  Trash,
-  Activity,
-  Users,
-  Clock,
-  Sparkles,
-  Phone,
-  Calendar,
   PlayCircle,
+  RotateCw,
+  Search,
+  Trash,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useTutorial } from "@/context/TutorialContext";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -45,9 +59,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuGroup,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
@@ -57,12 +68,25 @@ interface Paciente {
   nombre: string;
   apellido: string;
   nombre_completo: string;
+  rut?: string;
+  edad?: number | null;
+  fecha_nacimiento?: string | null;
   estado: string;
   activo: boolean;
   updated_at: string;
+  riesgo_suicida?: boolean;
+  ideacion_suicida_nivel?: number | null;
+  es_menor_edad?: boolean;
+  ultima_sesion?: string | null;
+  proxima_cita?: string | null;
+  consentimiento_estado?: string | null;
 }
 
-function calcularEdad(fecha: string): number | null {
+type SortKey = "nombre" | "ultima_sesion" | "proxima_cita";
+
+const PAGE_SIZE = 25;
+
+function calcularEdad(fecha?: string | null): number | null {
   if (!fecha) return null;
   const hoy = new Date();
   const nac = new Date(fecha);
@@ -78,24 +102,6 @@ function getInitials(nombre: string, apellido: string) {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
 }
 
-function getAvatarColor(name: string) {
-  const colors = [
-    "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-    "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-    "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
-    "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
 async function getApiErrorMessage(res: Response, fallback: string) {
   try {
     const data = await res.json();
@@ -106,6 +112,7 @@ async function getApiErrorMessage(res: Response, fallback: string) {
       apellido: "Apellido",
       fecha_nacimiento: "Fecha de nacimiento",
       rut: "RUT",
+      numero_documento: "Documento",
       edad: "Edad",
       sexo: "Sexo",
       ocupacion_laboral: "Ocupación laboral",
@@ -115,9 +122,10 @@ async function getApiErrorMessage(res: Response, fallback: string) {
     };
 
     for (const [field, value] of Object.entries(data)) {
-      const label = fieldLabels[field] || field;
-      if (Array.isArray(value)) return `${label}: ${value.join(" ")}`;
-      if (typeof value === "string") return `${label}: ${value}`;
+      const message = Array.isArray(value) ? value.join(" ") : typeof value === "string" ? value : "";
+      if (!message) continue;
+      if (field === "non_field_errors") return message;
+      return `${fieldLabels[field] || field}: ${message}`;
     }
   } catch {
     // Keep the generic message when the response is not JSON.
@@ -132,35 +140,35 @@ const PATIENT_STATUS_OPTIONS = [
     label: "Activo",
     description: "En tratamiento",
     dotClass: "bg-emerald-500",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200/70 hover:bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60",
   },
   {
     value: "ALTA",
     label: "Alta",
     description: "Finalizado",
     dotClass: "bg-blue-500",
-    className: "bg-blue-50 text-blue-700 border-blue-200/70 hover:bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60",
+    className: "bg-blue-50 text-blue-700 border-blue-200/70 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60",
   },
   {
     value: "ABANDONO",
     label: "Abandono",
     description: "Interrumpido",
     dotClass: "bg-rose-500",
-    className: "bg-rose-50 text-rose-700 border-rose-200/70 hover:bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60",
+    className: "bg-rose-50 text-rose-700 border-rose-200/70 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60",
   },
   {
     value: "PAUSADO",
     label: "Pausado",
     description: "Interrupción temporal",
     dotClass: "bg-amber-500",
-    className: "bg-amber-50 text-amber-700 border-amber-200/70 hover:bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60",
+    className: "bg-amber-50 text-amber-700 border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60",
   },
   {
     value: "DERIVADO",
     label: "Derivado",
     description: "Referido a otro profesional",
     dotClass: "bg-violet-500",
-    className: "bg-violet-50 text-violet-700 border-violet-200/70 hover:bg-violet-50 dark:bg-violet-950/50 dark:text-violet-300 dark:border-violet-800/60",
+    className: "bg-violet-50 text-violet-700 border-violet-200/70 dark:bg-violet-950/50 dark:text-violet-300 dark:border-violet-800/60",
   },
 ] as const;
 
@@ -171,13 +179,162 @@ function getPatientStatus(value?: string) {
   );
 }
 
+const CONSENTIMIENTO_LABELS: Record<string, { label: string; className: string }> = {
+  FIRMADO: { label: "Firmado", className: "text-emerald-700 dark:text-emerald-400" },
+  ENVIADO: { label: "Pendiente de firma", className: "text-amber-700 dark:text-amber-400" },
+  BORRADOR: { label: "Borrador", className: "text-muted-foreground" },
+  RECHAZADO: { label: "Rechazado", className: "text-rose-700 dark:text-rose-400" },
+};
+
+function getEdad(p: Paciente) {
+  return p.edad ?? calcularEdad(p.fecha_nacimiento);
+}
+
+function tieneRiesgo(p: Paciente) {
+  return Boolean(p.riesgo_suicida) || (p.ideacion_suicida_nivel ?? 0) > 0;
+}
+
+function compareDates(a: string | null | undefined, b: string | null | undefined, dir: 1 | -1) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return (new Date(a).getTime() - new Date(b).getTime()) * dir;
+}
+
+function StatusBadge({ estado }: { estado: string }) {
+  const status = getPatientStatus(estado);
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${status.className}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${status.dotClass}`} aria-hidden="true" />
+      {status.label}
+    </span>
+  );
+}
+
+function AlertChips({ paciente }: { paciente: Paciente }) {
+  const riesgo = tieneRiesgo(paciente);
+  if (!riesgo && !paciente.es_menor_edad) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {riesgo && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+          Riesgo
+        </span>
+      )}
+      {paciente.es_menor_edad && (
+        <span className="inline-flex items-center rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-300">
+          Menor
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ConsentimientoText({ estado }: { estado?: string | null }) {
+  const info = estado ? CONSENTIMIENTO_LABELS[estado] : null;
+  if (!info) return <span className="text-xs text-muted-foreground">Sin consentimiento</span>;
+  return <span className={`text-xs font-medium ${info.className}`}>{info.label}</span>;
+}
+
+function PacienteMeta({ paciente }: { paciente: Paciente }) {
+  const edad = getEdad(paciente);
+  const parts = [paciente.rut, edad !== null ? `${edad} años` : null].filter(Boolean);
+  if (parts.length === 0) return null;
+  return <div className="truncate text-xs text-muted-foreground">{parts.join(" · ")}</div>;
+}
+
+function PatientActionsMenu({
+  paciente,
+  updating,
+  onOpen,
+  onEdit,
+  onChangeEstado,
+  onDelete,
+}: {
+  paciente: Paciente;
+  updating: boolean;
+  onOpen: () => void;
+  onEdit: () => void;
+  onChangeEstado: (estado: string) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label={`Acciones para ${paciente.nombre_completo}`}>
+          {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-elevated">
+        <DropdownMenuGroup>
+          <DropdownMenuItem className="cursor-pointer" onClick={onOpen}>
+            <Eye className="mr-2 h-4 w-4" />
+            Ver ficha
+          </DropdownMenuItem>
+          <DropdownMenuItem className="cursor-pointer" onClick={onEdit}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Editar paciente
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            Cambiar estado
+          </DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={paciente.estado || "EN_SESION"}
+            onValueChange={(estado) => onChangeEstado(estado as string)}
+          >
+            {PATIENT_STATUS_OPTIONS.map((status) => (
+              <DropdownMenuRadioItem key={status.value} value={status.value} className="cursor-pointer">
+                <span className={`mr-2 h-2 w-2 rounded-full ${status.dotClass}`} aria-hidden="true" />
+                {status.label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" className="cursor-pointer" onClick={onDelete}>
+          <Trash className="mr-2 h-4 w-4" />
+          Eliminar paciente
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TableSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/70 bg-card" aria-busy="true" aria-label="Cargando pacientes">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 border-b border-border/60 px-4 py-3 last:border-0">
+          <Skeleton className="h-9 w-9 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+          <Skeleton className="hidden h-4 w-24 md:block" />
+          <Skeleton className="hidden h-4 w-24 md:block" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { openTutorial } = useTutorial();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [sort, setSort] = useState<SortKey>("nombre");
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
@@ -190,8 +347,7 @@ export default function DashboardPage() {
   const [telefonoWhatsapp, setTelefonoWhatsapp] = useState("");
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [formError, setFormError] = useState("");
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [pacienteToDelete, setPacienteToDelete] = useState<Paciente | null>(null);
   const [deletingPaciente, setDeletingPaciente] = useState(false);
@@ -206,23 +362,56 @@ export default function DashboardPage() {
     loadPacientes();
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, sort]);
+
   async function loadPacientes() {
+    setLoading(true);
+    setLoadError("");
     try {
-      const res = await apiFetch("/pacientes/");
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setPacientes(data.results || data);
+      // La API pagina de a 20: se recorren todas las páginas para que contadores y búsqueda sean completos.
+      const all: Paciente[] = [];
+      for (let p = 1; ; p++) {
+        const res = await apiFetch(`/pacientes/?page=${p}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          all.push(...data);
+          break;
+        }
+        all.push(...(data.results || []));
+        if (!data.next) break;
+      }
+      setPacientes(all);
     } catch {
-      setError("No se pudieron cargar los pacientes.");
+      setLoadError("No se pudieron cargar los pacientes. Revisa tu conexión e inténtalo de nuevo.");
     } finally {
       setLoading(false);
     }
   }
 
+  function resetForm() {
+    setNombre("");
+    setApellido("");
+    setFechaNacimiento("");
+    setRut("");
+    setEdad("");
+    setSexo("N");
+    setOcupacion("");
+    setEmailContacto("");
+    setTelefonoWhatsapp("");
+    setMotivo("");
+    setFormError("");
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+    setFormError("");
+    if (rut.trim() && !isValidRut(rut)) {
+      setFormError("RUT: el dígito verificador no es válido.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await apiFetch("/pacientes/", {
@@ -231,7 +420,7 @@ export default function DashboardPage() {
           nombre: nombre.trim(),
           apellido: apellido.trim(),
           fecha_nacimiento: fechaNacimiento || null,
-          rut: rut.trim(),
+          rut: rut.trim() ? formatRut(rut) : "",
           edad: edad ? parseInt(edad) : null,
           sexo,
           ocupacion_laboral: ocupacion.trim(),
@@ -244,29 +433,17 @@ export default function DashboardPage() {
       const nuevo = await res.json();
       setPacientes((prev) => [nuevo, ...prev]);
       setShowForm(false);
-      setNombre("");
-      setApellido("");
-      setFechaNacimiento("");
-      setRut("");
-      setEdad("");
-      setSexo("N");
-      setOcupacion("");
-      setEmailContacto("");
-      setTelefonoWhatsapp("");
-      setMotivo("");
-      setSuccess("Paciente creado correctamente.");
-      setTimeout(() => setSuccess(""), 3000);
+      resetForm();
+      toast.success("Paciente creado correctamente.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar el paciente.");
+      setFormError(err instanceof Error ? err.message : "No se pudo guardar el paciente.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleChangeEstado(paciente: Paciente, estado: string) {
-    if (paciente.estado === estado) return;
-    setError("");
-    setSuccess("");
+    if ((paciente.estado || "EN_SESION") === estado) return;
     setUpdatingStatusId(paciente.id);
     try {
       const res = await apiFetch(`/pacientes/${paciente.id}/`, {
@@ -282,10 +459,9 @@ export default function DashboardPage() {
             : item
         )
       );
-      setSuccess(`Estado actualizado a ${getPatientStatus(estado).label}.`);
-      setTimeout(() => setSuccess(""), 3000);
+      toast.success(`Estado actualizado a ${getPatientStatus(estado).label}.`);
     } catch {
-      setError("No se pudo actualizar el estado del paciente.");
+      toast.error("No se pudo actualizar el estado del paciente.");
     } finally {
       setUpdatingStatusId(null);
     }
@@ -295,17 +471,14 @@ export default function DashboardPage() {
     if (!pacienteToDelete) return;
     setDeletingPaciente(true);
     setDeletePacienteError("");
-    setError("");
-    setSuccess("");
     try {
       const res = await apiFetch(`/pacientes/${pacienteToDelete.id}/`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
       setPacientes((prev) => prev.filter((paciente) => paciente.id !== pacienteToDelete.id));
-      setSuccess("Paciente eliminado correctamente.");
       setPacienteToDelete(null);
-      setTimeout(() => setSuccess(""), 3000);
+      toast.success("Paciente eliminado correctamente.");
     } catch {
       setDeletePacienteError("No se pudo eliminar el paciente.");
     } finally {
@@ -313,698 +486,368 @@ export default function DashboardPage() {
     }
   }
 
-  const totalPacientes = pacientes.length;
-  const enSesionCount = pacientes.filter(
-    (p) => !p.estado || p.estado === "EN_SESION"
-  ).length;
-  const pausadoCount = pacientes.filter((p) => p.estado === "PAUSADO").length;
-  const altaCount = pacientes.filter((p) => p.estado === "ALTA").length;
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { ALL: pacientes.length };
+    for (const status of PATIENT_STATUS_OPTIONS) result[status.value] = 0;
+    for (const p of pacientes) {
+      const key = p.estado || "EN_SESION";
+      result[key] = (result[key] || 0) + 1;
+    }
+    return result;
+  }, [pacientes]);
 
-  const filtered = pacientes.filter((p) => {
+  const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
-    const matchesSearch =
-      !term ||
-      p.nombre.toLowerCase().includes(term) ||
-      p.apellido.toLowerCase().includes(term) ||
-      (p.nombre_completo && p.nombre_completo.toLowerCase().includes(term));
-    const matchesStatus =
-      statusFilter === "ALL" ||
-      (statusFilter === "EN_SESION" && (!p.estado || p.estado === "EN_SESION")) ||
-      p.estado === statusFilter;
-    return matchesSearch && matchesStatus;
+    const termRut = term.replace(/[^0-9k]/g, "");
+    const list = pacientes.filter((p) => {
+      const matchesSearch =
+        !term ||
+        p.nombre_completo?.toLowerCase().includes(term) ||
+        `${p.nombre} ${p.apellido}`.toLowerCase().includes(term) ||
+        (termRut.length >= 3 && (p.rut || "").toLowerCase().replace(/[^0-9k]/g, "").includes(termRut));
+      const matchesStatus = statusFilter === "ALL" || (p.estado || "EN_SESION") === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+    return list.sort((a, b) => {
+      if (sort === "ultima_sesion") return compareDates(a.ultima_sesion, b.ultima_sesion, -1);
+      if (sort === "proxima_cita") return compareDates(a.proxima_cita, b.proxima_cita, 1);
+      return (a.nombre_completo || "").localeCompare(b.nombre_completo || "", "es");
+    });
+  }, [pacientes, search, statusFilter, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const hasFilters = Boolean(search) || statusFilter !== "ALL";
+
+  const openFicha = (p: Paciente) => router.push(`/dashboard/pacientes/${p.id}`);
+  const menuProps = (p: Paciente) => ({
+    paciente: p,
+    updating: updatingStatusId === p.id,
+    onOpen: () => openFicha(p),
+    onEdit: () => router.push(`/dashboard/pacientes/${p.id}?editar=1`),
+    onChangeEstado: (estado: string) => handleChangeEstado(p, estado),
+    onDelete: () => {
+      setPacienteToDelete(p);
+      setDeletePacienteError("");
+    },
   });
 
-  if (loading) {
-    return (
-      <div className="flex h-72 flex-col items-center justify-center gap-3 text-muted-foreground">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-        <span className="text-sm font-medium tracking-tight">Cargando directorio clínico...</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 sm:space-y-8 animate-fade-in-up">
-      {/* ── Header Principal ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      {/* ── Header ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
-              Directorio de Pacientes
-            </h1>
-            <span className="inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-              {totalPacientes} total
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gestión de expedientes clínicos, seguimiento terapéutico y estados de tratamiento.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pacientes</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Busca, filtra y abre la ficha de tus pacientes.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => openTutorial(2)}
-            className="gap-2 rounded-xl !h-11 text-xs sm:text-sm font-semibold border-primary/30 text-primary hover:bg-primary/10 transition-all hover:-translate-y-0.5"
-            title="Ver video tutorial sobre creación y gestión de pacientes"
-          >
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => openTutorial(2)} className="gap-1.5 text-muted-foreground">
             <PlayCircle className="h-4 w-4" />
-            <span className="hidden sm:inline">Ver tutorial de Pacientes</span>
-            <span className="sm:hidden">Tutorial</span>
+            Tutorial
           </Button>
-
-          <Button
-            onClick={() => {
-              setError("");
-              setSuccess("");
-              setShowForm(!showForm);
-            }}
-            className="gap-2.5 rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 bg-primary text-primary-foreground font-semibold !px-6 !h-11 text-sm shrink-0"
-          >
-            <UserPlus className="h-4.5 w-4.5" />
-            <span>Nuevo paciente</span>
+          <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Nuevo paciente
           </Button>
         </div>
       </div>
 
-      {/* ── Clinical Cockpit: Tarjetas de Métricas ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <button
-          type="button"
-          onClick={() => setStatusFilter("ALL")}
-          className={`text-left group relative overflow-hidden rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${
-            statusFilter === "ALL"
-              ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20 shadow-xs"
-              : "border-border/70 bg-card hover:border-border hover:shadow-subtle"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Registrados
-            </span>
-            <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform group-hover:scale-110">
-              <Users className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {totalPacientes}
-            </span>
-            <span className="text-xs text-muted-foreground">pacientes</span>
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground/80">
-            Fichas clínicas en sistema
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter("EN_SESION")}
-          className={`text-left group relative overflow-hidden rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${
-            statusFilter === "EN_SESION"
-              ? "border-emerald-500/50 bg-emerald-500/[0.04] ring-1 ring-emerald-500/20 shadow-xs"
-              : "border-border/70 bg-card hover:border-border hover:shadow-subtle"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Activos
-            </span>
-            <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110">
-              <Activity className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {enSesionCount}
-            </span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-              en curso
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground/80">
-            Tratamiento activo regular
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter("PAUSADO")}
-          className={`text-left group relative overflow-hidden rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${
-            statusFilter === "PAUSADO"
-              ? "border-amber-500/50 bg-amber-500/[0.04] ring-1 ring-amber-500/20 shadow-xs"
-              : "border-border/70 bg-card hover:border-border hover:shadow-subtle"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              En Pausa / Espera
-            </span>
-            <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-transform group-hover:scale-110">
-              <Clock className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {pausadoCount}
-            </span>
-            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-              en pausa
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground/80">
-            Interrupción temporal o espera
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter("ALTA")}
-          className={`text-left group relative overflow-hidden rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${
-            statusFilter === "ALTA"
-              ? "border-blue-500/50 bg-blue-500/[0.04] ring-1 ring-blue-500/20 shadow-xs"
-              : "border-border/70 bg-card hover:border-border hover:shadow-subtle"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400">
-              Altas Clínicas
-            </span>
-            <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-transform group-hover:scale-110">
-              <Sparkles className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {altaCount}
-            </span>
-            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-              concluidos
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground/80">
-            Objetivos terapéuticos cumplidos
-          </p>
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="rounded-2xl border border-primary/20 bg-card p-6 sm:p-7 shadow-elevated transition-all">
-          <div className="mb-6 flex items-center justify-between border-b border-border/70 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <UserPlus className="h-4.5 w-4.5" />
-              </div>
-              <div>
-                <h2 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
-                  Registrar nuevo paciente
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Ingresa los datos para generar el expediente clínico inicial.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowForm(false)}
-              className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <form onSubmit={handleCreate} className="space-y-6">
-            <div className="space-y-4">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Información Personal
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Nombre *</label>
-                  <Input
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    placeholder="Ej. Sofía"
-                    maxLength={100}
-                    required
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Apellido *</label>
-                  <Input
-                    value={apellido}
-                    onChange={(e) => setApellido(e.target.value)}
-                    placeholder="Ej. Martínez"
-                    maxLength={100}
-                    required
-                    className="rounded-xl"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">RUT / Identificación</label>
-                  <Input
-                    value={rut}
-                    onChange={(e) => setRut(e.target.value)}
-                    placeholder="Ej: 12.345.678-9"
-                    maxLength={12}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Fecha de nacimiento</label>
-                  <Input
-                    type="date"
-                    value={fechaNacimiento}
-                    onChange={(e) => setFechaNacimiento(e.target.value)}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Sexo</label>
-                  <select
-                    value={sexo}
-                    onChange={(e) => setSexo(e.target.value)}
-                    className="flex h-10 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="N">Prefiero no decir</option>
-                    <option value="M">Masculino</option>
-                    <option value="F">Femenino</option>
-                    <option value="O">Otro</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-2 border-t border-border/50">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Contacto y Consulta
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Ocupación laboral</label>
-                  <Input
-                    value={ocupacion}
-                    onChange={(e) => setOcupacion(e.target.value)}
-                    placeholder="Ej: Ingeniero, Docente..."
-                    maxLength={200}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Correo de contacto</label>
-                  <Input
-                    type="email"
-                    value={emailContacto}
-                    onChange={(e) => setEmailContacto(e.target.value)}
-                    placeholder="paciente@correo.com"
-                    maxLength={254}
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">WhatsApp</label>
-                  <Input
-                    value={telefonoWhatsapp}
-                    onChange={(e) => setTelefonoWhatsapp(e.target.value)}
-                    placeholder="+56 9 1234 5678"
-                    maxLength={30}
-                    className="rounded-xl"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground/80">Motivo inicial de consulta</label>
-                <Input
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="Ej: Manejo de estrés laboral, duelo, síntomas ansiosos..."
-                  className="rounded-xl"
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-                {error}
-              </div>
-            )}
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="rounded-xl text-xs">
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={saving} className="rounded-xl text-xs font-semibold px-5">
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {saving ? "Guardando..." : "Crear expediente"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {success && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-            <Plus className="h-3 w-3 rotate-45" />
-          </div>
-          <span className="font-medium">{success}</span>
-        </div>
-      )}
-
-      {/* ── Toolbar: Buscador y Pestañas de Filtro Rápido ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Buscador */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10.5 w-full rounded-xl border-border/70 bg-card pl-10 pr-10 text-sm shadow-xs transition-all focus-visible:ring-primary/25 placeholder:text-muted-foreground/60"
-            placeholder="Buscar por nombre o apellido..."
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground p-1 rounded-full transition-colors"
-              aria-label="Limpiar búsqueda"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Pestañas de Filtro Rápido */}
-        <div className="flex items-center gap-1 overflow-x-auto p-1 bg-muted/40 rounded-xl border border-border/60 text-xs font-medium self-start md:self-auto">
-          {[
-            { id: "ALL", label: "Todos", count: totalPacientes },
-            { id: "EN_SESION", label: "Activos", count: enSesionCount },
-            { id: "PAUSADO", label: "Pausados", count: pausadoCount },
-            { id: "ALTA", label: "Altas", count: altaCount },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                statusFilter === tab.id
-                  ? "bg-card text-foreground font-semibold shadow-xs border border-border/60"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                  statusFilter === tab.id
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
+      {/* ── Filtros ── */}
+      <div className="space-y-3">
+        <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as string)}>
+          <TabsList aria-label="Filtrar por estado">
+            <TabsTrigger value="ALL">
+              Todos <span className="text-xs text-muted-foreground">{counts.ALL}</span>
+            </TabsTrigger>
+            {PATIENT_STATUS_OPTIONS.map((status) => (
+              <TabsTrigger key={status.value} value={status.value}>
+                {status.label} <span className="text-xs text-muted-foreground">{counts[status.value] || 0}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              type="search"
+              aria-label="Buscar pacientes"
+              placeholder="Buscar por nombre o RUT..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {tab.count}
-              </span>
-            </button>
-          ))}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Label htmlFor="orden-pacientes" className="shrink-0 text-sm text-muted-foreground">Ordenar por</Label>
+            <NativeSelect id="orden-pacientes" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-44">
+              <option value="nombre">Nombre</option>
+              <option value="ultima_sesion">Última sesión</option>
+              <option value="proxima_cita">Próxima cita</option>
+            </NativeSelect>
+          </div>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-border/60 bg-card/60 shadow-subtle">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground/70">
-            <Search className="h-6 w-6" />
-          </div>
-          <p className="text-base font-semibold text-foreground">Sin pacientes encontrados</p>
-          <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-            {search
-              ? "No hay pacientes que coincidan con los términos de búsqueda o filtros seleccionados."
-              : "Comienza registrando tu primer paciente con el botón 'Nuevo paciente'."}
-          </p>
-          {(search || statusFilter !== "ALL") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("ALL");
-              }}
-              className="mt-4 rounded-xl text-xs"
-            >
-              Restablecer filtros
+      {/* ── Contenido ── */}
+      {loading ? (
+        <TableSkeleton />
+      ) : loadError ? (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>Error al cargar pacientes</AlertTitle>
+          <AlertDescription>
+            <p>{loadError}</p>
+            <Button variant="outline" size="sm" onClick={loadPacientes} className="mt-3 gap-1.5">
+              <RotateCw className="h-3.5 w-3.5" />
+              Reintentar
             </Button>
+          </AlertDescription>
+        </Alert>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+            <Users className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          </div>
+          {hasFilters ? (
+            <>
+              <h2 className="text-base font-semibold text-foreground">Sin resultados</h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">Ningún paciente coincide con la búsqueda o el filtro seleccionado.</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => { setSearch(""); setStatusFilter("ALL"); }}>
+                Limpiar filtros
+              </Button>
+            </>
+          ) : (
+            <>
+              <h2 className="text-base font-semibold text-foreground">Aún no tienes pacientes</h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">Registra tu primer paciente para comenzar a gestionar sus sesiones.</p>
+              <Button size="sm" className="mt-4 gap-2" onClick={() => { resetForm(); setShowForm(true); }}>
+                <UserPlus className="h-4 w-4" />
+                Nuevo paciente
+              </Button>
+            </>
           )}
         </div>
       ) : (
         <>
-          {/* ── Mobile: Patient Cards ── */}
-          <div className="space-y-3 md:hidden">
-            {filtered.map((paciente) => (
-              <div
-                key={paciente.id}
-                className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4 shadow-subtle active:bg-muted/40 transition-colors cursor-pointer"
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest(".action-menu")) return;
-                  router.push(`/dashboard/pacientes/${paciente.id}`);
-                }}
-              >
-                <Avatar className={`h-11 w-11 shrink-0 rounded-xl border ${getAvatarColor(paciente.nombre_completo)}`}>
-                  <AvatarFallback className="font-semibold bg-transparent text-sm">
-                    {getInitials(paciente.nombre, paciente.apellido)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm text-foreground truncate">{paciente.nombre_completo}</div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPatientStatus(paciente.estado).className}`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${getPatientStatus(paciente.estado).dotClass || "bg-emerald-500"}`}
-                      />
-                      <span>{getPatientStatus(paciente.estado).label}</span>
-                    </span>
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      {formatDate(paciente.updated_at)}
-                    </span>
+          {/* ── Móvil: tarjetas ── */}
+          <ul className="space-y-2 md:hidden">
+            {pageItems.map((p) => (
+              <li key={p.id} className="rounded-xl border border-border/70 bg-card p-3">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-10 w-10 shrink-0 rounded-lg border border-border/70">
+                    <AvatarFallback className="rounded-lg bg-muted text-sm font-semibold text-muted-foreground">
+                      {getInitials(p.nombre, p.apellido)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/dashboard/pacientes/${p.id}`} className="block truncate text-sm font-medium text-foreground hover:underline focus-visible:underline focus-visible:outline-none">
+                      {p.nombre_completo}
+                    </Link>
+                    <PacienteMeta paciente={p} />
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <StatusBadge estado={p.estado} />
+                      {(tieneRiesgo(p) || p.es_menor_edad) && <AlertChips paciente={p} />}
+                    </div>
                   </div>
+                  <PatientActionsMenu {...menuProps(p)} />
                 </div>
-                <div className="action-menu shrink-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0 rounded-lg text-muted-foreground">
-                        <span className="sr-only">Abrir menú</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-elevated">
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                          Acciones
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dashboard/pacientes/${paciente.id}`);
-                          }}
-                        >
-                          <Eye className="mr-2 h-4 w-4 text-primary" />
-                          Ver ficha
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dashboard/pacientes/${paciente.id}?editar=1`);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar paciente
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        className="cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPacienteToDelete(paciente);
-                          setDeletePacienteError("");
-                        }}
-                      >
-                        <Trash className="mr-2 h-4 w-4" />
-                        Eliminar paciente
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-2 text-xs">
+                  <div>
+                    <dt className="text-muted-foreground">Última sesión</dt>
+                    <dd className="mt-0.5 text-foreground">{formatDateCL(p.ultima_sesion) || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Próxima cita</dt>
+                    <dd className="mt-0.5 text-foreground">{formatDateCL(p.proxima_cita, true) || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Consentimiento</dt>
+                    <dd className="mt-0.5"><ConsentimientoText estado={p.consentimiento_estado} /></dd>
+                  </div>
+                </dl>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          {/* ── Desktop: Table ── */}
-          <div className="hidden md:block rounded-2xl border border-border/70 bg-card shadow-card overflow-hidden">
+          {/* ── Escritorio: tabla ── */}
+          <div className="hidden overflow-hidden rounded-xl border border-border/70 bg-card md:block">
             <Table>
-              <TableHeader className="bg-muted/40 border-b border-border/70">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-11">
-                    Paciente
-                  </TableHead>
-                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground h-11">
-                    Última Actualización
-                  </TableHead>
-                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground h-11">
-                    Estado Clínico
-                  </TableHead>
-                  <TableHead className="text-right font-semibold text-xs uppercase tracking-wider text-muted-foreground pr-6 h-11">
-                    Acciones
-                  </TableHead>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="pl-4">Paciente</TableHead>
+                  <TableHead>Última sesión</TableHead>
+                  <TableHead>Próxima cita</TableHead>
+                  <TableHead>Consentimiento</TableHead>
+                  <TableHead>Alerta</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="w-12 pr-4"><span className="sr-only">Acciones</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((paciente) => (
+                {pageItems.map((p) => (
                   <TableRow
-                    key={paciente.id}
-                    className="group cursor-pointer transition-colors duration-150 hover:bg-muted/30 border-b border-border/40"
+                    key={p.id}
+                    className="cursor-pointer"
                     onClick={(e) => {
-                      if ((e.target as HTMLElement).closest(".action-menu")) return;
-                      router.push(`/dashboard/pacientes/${paciente.id}`);
+                      if ((e.target as HTMLElement).closest(".row-action, a")) return;
+                      openFicha(p);
                     }}
                   >
-                    <TableCell className="pl-6 py-3.5">
-                      <div className="flex items-center gap-3.5">
-                        <Avatar className={`h-10 w-10 rounded-xl border ${getAvatarColor(paciente.nombre_completo)}`}>
-                          <AvatarFallback className="font-semibold bg-transparent text-xs">
-                            {getInitials(paciente.nombre, paciente.apellido)}
+                    <TableCell className="pl-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9 shrink-0 rounded-lg border border-border/70">
+                          <AvatarFallback className="rounded-lg bg-muted text-xs font-semibold text-muted-foreground">
+                            {getInitials(p.nombre, p.apellido)}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="font-semibold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            {paciente.nombre_completo}
-                          </div>
-                          {paciente.activo === false && (
-                            <span className="text-[10px] text-muted-foreground font-medium">Inactivo</span>
-                          )}
+                        <div className="min-w-0">
+                          <Link href={`/dashboard/pacientes/${p.id}`} className="block truncate font-medium text-foreground hover:underline focus-visible:underline focus-visible:outline-none">
+                            {p.nombre_completo}
+                          </Link>
+                          <PacienteMeta paciente={p} />
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(paciente.updated_at)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getPatientStatus(paciente.estado).className}`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${getPatientStatus(paciente.estado).dotClass || "bg-emerald-500"} ${
-                            paciente.estado === "EN_SESION" || !paciente.estado ? "animate-pulse" : ""
-                          }`}
-                        />
-                        <span>{getPatientStatus(paciente.estado).label}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right pr-6 action-menu">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hidden lg:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dashboard/pacientes/${paciente.id}`);
-                          }}
-                        >
-                          <Eye className="h-3.5 w-3.5 text-primary" />
-                          <span>Ficha</span>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                            >
-                              <span className="sr-only">Abrir menú</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-elevated">
-                            <DropdownMenuGroup>
-                              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                                Acciones
-                              </DropdownMenuLabel>
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/pacientes/${paciente.id}`);
-                                }}
-                              >
-                                <Eye className="mr-2 h-4 w-4 text-primary" />
-                                Ver ficha
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/pacientes/${paciente.id}?editar=1`);
-                                }}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Editar paciente
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
-                                <Activity className="mr-2 h-4 w-4" />
-                                <span>Cambiar Estado</span>
-                                {updatingStatusId === paciente.id && (
-                                  <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" />
-                                )}
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent className="w-64 rounded-xl shadow-elevated">
-                                <DropdownMenuRadioGroup
-                                  value={paciente.estado || "EN_SESION"}
-                                  onValueChange={(estado) => handleChangeEstado(paciente, estado)}
-                                >
-                                  {PATIENT_STATUS_OPTIONS.map((status) => (
-                                    <DropdownMenuRadioItem
-                                      key={status.value}
-                                      value={status.value}
-                                      className="cursor-pointer py-2"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <span className="flex flex-col">
-                                        <span className="text-sm font-medium">{status.label}</span>
-                                        <span className="text-xs text-muted-foreground">{status.description}</span>
-                                      </span>
-                                    </DropdownMenuRadioItem>
-                                  ))}
-                                </DropdownMenuRadioGroup>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              className="cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPacienteToDelete(paciente);
-                                setDeletePacienteError("");
-                              }}
-                            >
-                              <Trash className="mr-2 h-4 w-4" />
-                              Eliminar paciente
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                    <TableCell className="text-sm text-muted-foreground">{formatDateCL(p.ultima_sesion) || "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDateCL(p.proxima_cita, true) || "—"}</TableCell>
+                    <TableCell><ConsentimientoText estado={p.consentimiento_estado} /></TableCell>
+                    <TableCell><AlertChips paciente={p} /></TableCell>
+                    <TableCell><StatusBadge estado={p.estado} /></TableCell>
+                    <TableCell className="row-action pr-4 text-right">
+                      <PatientActionsMenu {...menuProps(p)} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+
+          {/* ── Paginación ── */}
+          <div className="flex flex-col items-center justify-between gap-2 text-sm text-muted-foreground sm:flex-row">
+            <p>
+              {filtered.length === 1
+                ? "1 paciente"
+                : `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} de ${filtered.length} pacientes`}
+            </p>
+            {totalPages > 1 && (
+              <nav className="flex items-center gap-2" aria-label="Paginación">
+                <Button variant="outline" size="sm" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1} className="gap-1">
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <span aria-live="polite">Página {currentPage} de {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage(currentPage + 1)} disabled={currentPage === totalPages} className="gap-1">
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </nav>
+            )}
+          </div>
         </>
       )}
+
+      {/* ── Alta rápida ── */}
+      <Sheet open={showForm} onOpenChange={(open) => { if (!saving) setShowForm(open); }}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Nuevo paciente</SheetTitle>
+            <SheetDescription>Completa lo esencial ahora; el resto puedes agregarlo después en la ficha.</SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleCreate} className="flex flex-1 flex-col gap-4">
+            {formError && (
+              <Alert variant="destructive">
+                <AlertTriangle />
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="np-nombre">Nombre *</Label>
+                <Input id="np-nombre" required autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Sofía" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="np-apellido">Apellido *</Label>
+                <Input id="np-apellido" required value={apellido} onChange={(e) => setApellido(e.target.value)} placeholder="Ej. Martínez" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="np-rut">RUT</Label>
+              <Input
+                id="np-rut"
+                value={rut}
+                onChange={(e) => setRut(e.target.value)}
+                onBlur={() => rut.trim() && setRut(formatRut(rut))}
+                placeholder="12.345.678-9"
+                aria-invalid={Boolean(rut.trim()) && !isValidRut(rut) && rut.replace(/[^0-9kK]/g, "").length >= 8}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="np-motivo">Motivo de consulta</Label>
+              <Textarea id="np-motivo" rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: manejo de estrés laboral, duelo..." />
+            </div>
+
+            <details className="group rounded-lg border border-border/70">
+              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-foreground marker:text-muted-foreground">
+                Más datos (opcional)
+              </summary>
+              <div className="grid grid-cols-2 gap-3 border-t border-border/70 p-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="np-fecha">Fecha de nacimiento</Label>
+                  <Input id="np-fecha" type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="np-edad">Edad</Label>
+                  <Input id="np-edad" type="number" min={0} max={120} value={edad} onChange={(e) => setEdad(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="np-sexo">Sexo</Label>
+                  <NativeSelect id="np-sexo" value={sexo} onChange={(e) => setSexo(e.target.value)}>
+                    <option value="N">Prefiero no decir</option>
+                    <option value="M">Masculino</option>
+                    <option value="F">Femenino</option>
+                    <option value="O">Otro</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="np-ocupacion">Ocupación</Label>
+                  <Input id="np-ocupacion" value={ocupacion} onChange={(e) => setOcupacion(e.target.value)} placeholder="Ej: Docente" />
+                </div>
+                <div className="col-span-2 space-y-1.5">
+                  <Label htmlFor="np-email">Correo de contacto</Label>
+                  <Input id="np-email" type="email" value={emailContacto} onChange={(e) => setEmailContacto(e.target.value)} placeholder="paciente@correo.com" />
+                </div>
+                <div className="col-span-2 space-y-1.5">
+                  <Label htmlFor="np-whatsapp">WhatsApp</Label>
+                  <Input id="np-whatsapp" type="tel" value={telefonoWhatsapp} onChange={(e) => setTelefonoWhatsapp(e.target.value)} placeholder="+56 9 1234 5678" />
+                </div>
+              </div>
+            </details>
+
+            <SheetFooter className="mt-auto pt-2">
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving || !nombre.trim() || !apellido.trim()} className="gap-2">
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {saving ? "Guardando..." : "Guardar paciente"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
       <ConfirmDialog
         open={Boolean(pacienteToDelete)}
         title="Eliminar paciente"
