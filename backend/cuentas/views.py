@@ -1,9 +1,12 @@
+from django.http import FileResponse
+from django.utils import timezone
 from django_ratelimit.decorators import ratelimit
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from .exportacion import exportar_cuenta
 from .serializers import PerfilPsicologoSerializer
 from .services import (
     eliminar_cuenta,
@@ -69,3 +72,15 @@ def eliminar_cuenta_view(request):
         )
     eliminar_cuenta(user)
     return Response({"detail": "Tu cuenta y todos tus datos fueron eliminados."})
+
+
+@ratelimit(key="user", rate="10/h", method="GET", block=True)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def exportar_cuenta_view(request):
+    return FileResponse(
+        exportar_cuenta(request.user),
+        as_attachment=True,
+        filename=f"psiconex-exportacion-{timezone.localdate():%Y-%m-%d}.zip",
+        content_type="application/zip",
+    )

@@ -1,13 +1,16 @@
 from django.db.models import OuterRef, Subquery
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from agenda.models import AgendaCita
+from cuentas.exportacion import carpeta_paciente, exportar_paciente
 from sesiones.audio import borrar_carpeta_paciente
 from sesiones.models import Sesion
 
@@ -76,6 +79,16 @@ class PacienteViewSet(viewsets.ModelViewSet):
                 ),
             )
         return qs
+
+    @action(detail=True, methods=["get"])
+    def exportar(self, request, pk=None):
+        paciente = self.get_object()
+        return FileResponse(
+            exportar_paciente(paciente),
+            as_attachment=True,
+            filename=f"psiconex-{carpeta_paciente(paciente)}.zip",
+            content_type="application/zip",
+        )
 
     def perform_create(self, serializer):
         serializer.save(psicologo=self.request.user)

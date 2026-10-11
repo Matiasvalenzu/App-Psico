@@ -342,3 +342,67 @@ class EliminarCuentaTests(TestCase):
         response = self.client.post("/api/cuenta/eliminar/", {"confirmacion": "ELIMINAR"})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(get_user_model().objects.filter(pk=self.user.pk).exists())
+
+
+class ExportacionTests(TestCase):
+    def setUp(self):
+        from chat.models import InformeIA
+        from pacientes.models import Paciente
+        from sesiones.models import Sesion, TranscripcionSegmento
+
+        self.user = get_user_model().objects.create_user(username="exporta", password="x")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.paciente = Paciente.objects.create(psicologo=self.user, nombre="Ana", apellido="Rojas")
+        sesion = Sesion.objects.create(paciente=self.paciente, psicologo=self.user)
+        TranscripcionSegmento.objects.create(
+            sesion=sesion, orden=1, inicio_segundo=0, fin_segundo=2,
+            hablante="PACIENTE", texto="Hola, vengo por ansiedad.", embedding=[0.1] * 1024,
+        )
+        InformeIA.objects.create(
+            paciente=self.paciente, psicologo=self.user, contenido="**Resumen** clínico"
+        )
+
+    def _zip(self, response):
+        import io
+        import zipfile
+
+        self.assertEqual(response.status_code, 200)
+        return zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content)))
+
+    def test_exportar_cuenta_incluye_json_y_pdfs(self):
+        import json
+
+        zf = self._zip(self.client.get("/api/cuenta/exportar/"))
+        nombres = zf.namelist()
+        carpeta = f"pacientes/rojas-ana-{self.paciente.id}"
+        self.assertIn("cuenta.json", nombres)
+        self.assertIn(f"{carpeta}/datos.json", nombres)
+        self.assertTrue(any(n.startswith(f"{carpeta}/sesiones/") and n.endswith(".pdf") for n in nombres))
+        self.assertTrue(any(n.startswith(f"{carpeta}/informes/") for n in nombres))
+        datos = json.loads(zf.read(f"{carpeta}/datos.json"))
+        segmento = datos["sesiones"][0]["segmentos"][0]
+        self.assertEqual(segmento["texto"], "Hola, vengo por ansiedad.")
+        self.assertNotIn("embedding", segmento)
+        self.assertTrue(zf.read(nombres[-1]).startswith(b"%PDF"))
+
+    def test_exportar_paciente_solo_del_propio_profesional(self):
+        zf = self._zip(self.client.get(f"/api/pacientes/{self.paciente.id}/exportar/"))
+        self.assertIn(f"rojas-ana-{self.paciente.id}/datos.json", zf.namelist())
+
+        otro = get_user_model().objects.create_user(username="otro-exp", password="x")
+        self.client.force_authenticate(user=otro)
+        response = self.client.get(f"/api/pacientes/{self.paciente.id}/exportar/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_pdf_de_sesion_sigue_funcionando(self):
+        sesion = self.paciente.sesiones.first()
+        response = self.client.get(f"/api/sesiones/{sesion.id}/exportar_pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF"))
+
+    def test_pdf_de_informe_sigue_funcionando(self):
+        informe = self.paciente.informes_ia.first()
+        response = self.client.get(f"/api/chat/informes/{informe.id}/exportar_pdf/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF"))
