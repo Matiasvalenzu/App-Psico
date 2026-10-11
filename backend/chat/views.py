@@ -10,6 +10,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from cuentas.acceso import registrar_acceso
+from cuentas.models import RegistroAcceso
 from pacientes.models import Paciente
 from sesiones.embeddings import cosine_similarity, generate_text_embedding
 from sesiones.models import Sesion, TranscripcionSegmento
@@ -74,6 +76,12 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         else:
             conversacion.save(update_fields=["updated_at"])
 
+        registrar_acceso(
+            request,
+            RegistroAcceso.Accion.CHAT_IA,
+            conversacion.paciente,
+            f"Conversación #{conversacion.id}",
+        )
         contexto_sesiones, fuentes = self._buscar_contexto(conversacion.paciente, contenido)
         contexto_paciente = self._contexto_paciente(conversacion.paciente)
         contexto = "\n\n".join(
@@ -326,6 +334,9 @@ class InformeIAViewSet(viewsets.ModelViewSet):
 
     def exportar_pdf(self, request, pk=None):
         informe = self.get_object()
+        registrar_acceso(
+            request, RegistroAcceso.Accion.EXPORTAR, informe.paciente, f"Informe #{informe.id} (PDF)"
+        )
         return FileResponse(
             BytesIO(pdf_informe(informe)),
             as_attachment=True,

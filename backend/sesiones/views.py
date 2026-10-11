@@ -15,6 +15,9 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from cuentas.acceso import registrar_acceso
+from cuentas.models import RegistroAcceso
+
 from .audio import borrar_archivos_audio
 from .documentos import (
     DocumentTextExtractionError,
@@ -52,7 +55,17 @@ class SesionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(paciente_id=paciente_id)
         return qs
 
+    def retrieve(self, request, *args, **kwargs):
+        sesion = self.get_object()
+        registrar_acceso(
+            request, RegistroAcceso.Accion.VER_SESION, sesion.paciente, f"Sesión #{sesion.id}"
+        )
+        return Response(self.get_serializer(sesion).data)
+
     def perform_destroy(self, instance):
+        registrar_acceso(
+            self.request, RegistroAcceso.Accion.ELIMINAR, instance.paciente, f"Sesión #{instance.id}"
+        )
         borrar_archivos_audio(instance)
         instance.delete()
 
@@ -531,6 +544,9 @@ class SesionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def exportar_pdf(self, request, pk=None):
         sesion = self.get_object()
+        registrar_acceso(
+            request, RegistroAcceso.Accion.EXPORTAR, sesion.paciente, f"Sesión #{sesion.id} (PDF)"
+        )
         filename = f"sesion-{sesion.id}.pdf"
         return FileResponse(BytesIO(pdf_sesion(sesion)), as_attachment=True, filename=filename)
 
@@ -539,6 +555,9 @@ class SesionViewSet(viewsets.ModelViewSet):
         from docx import Document
 
         sesion = self.get_object()
+        registrar_acceso(
+            request, RegistroAcceso.Accion.EXPORTAR, sesion.paciente, f"Sesión #{sesion.id} (Word)"
+        )
         document = Document()
         title = (
             "Documento externo cargado"

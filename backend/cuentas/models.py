@@ -95,3 +95,40 @@ class RegistroConsumoIA(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.servicio}: {self.tokens_total} tokens"
+
+
+class RegistroAcceso(models.Model):
+    """Bitácora de accesos del profesional a datos clínicos, visible para él mismo."""
+
+    class Accion(models.TextChoices):
+        VER_FICHA = "VER_FICHA", "Abrió la ficha del paciente"
+        VER_SESION = "VER_SESION", "Abrió una sesión"
+        CHAT_IA = "CHAT_IA", "Consultó el chat IA"
+        OBSERVACION_IA = "OBSERVACION_IA", "Generó una observación IA de un test"
+        EXPORTAR = "EXPORTAR", "Exportó datos"
+        ELIMINAR = "ELIMINAR", "Eliminó datos"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="registros_acceso",
+    )
+    paciente = models.ForeignKey(
+        "pacientes.Paciente",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    accion = models.CharField(max_length=20, choices=Accion.choices)
+    objeto = models.CharField(max_length=120, blank=True, default="")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Registro de acceso"
+        verbose_name_plural = "Registros de acceso"
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        return f"{self.usuario} - {self.accion} - {self.objeto}"

@@ -10,6 +10,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from cuentas.acceso import registrar_acceso
+from cuentas.models import RegistroAcceso
+
 from .catalog import ELLIS_SLUG, get_test
 from .models import EvaluacionAsignada, ResultadoEvaluacion
 from .serializers import (
@@ -147,6 +150,12 @@ class ObservacionIAView(APIView):
             return Response(
                 {"error": "La observación IA ya fue generada."}, status=status.HTTP_409_CONFLICT
             )
+        registrar_acceso(
+            request,
+            RegistroAcceso.Accion.OBSERVACION_IA,
+            resultado.asignacion.paciente,
+            f"Test #{resultado.asignacion_id}",
+        )
         resultado = generate_observation_for_result(resultado)
         return Response({"estado_ia": resultado.estado_ia, "error_ia": resultado.error_ia})
 

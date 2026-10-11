@@ -6,7 +6,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from .acceso import registrar_acceso
 from .exportacion import exportar_cuenta
+from .models import RegistroAcceso
 from .serializers import PerfilPsicologoSerializer
 from .services import (
     eliminar_cuenta,
@@ -78,9 +80,31 @@ def eliminar_cuenta_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def exportar_cuenta_view(request):
+    registrar_acceso(request, RegistroAcceso.Accion.EXPORTAR, objeto="Cuenta completa (ZIP)")
     return FileResponse(
         exportar_cuenta(request.user),
         as_attachment=True,
         filename=f"psiconex-exportacion-{timezone.localdate():%Y-%m-%d}.zip",
         content_type="application/zip",
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def actividad_view(request):
+    registros = request.user.registros_acceso.select_related("paciente")[:200]
+    return Response(
+        [
+            {
+                "id": r.id,
+                "fecha": r.fecha,
+                "accion": r.accion,
+                "accion_display": r.get_accion_display(),
+                "paciente": r.paciente.nombre_completo if r.paciente else None,
+                "paciente_id": r.paciente_id,
+                "objeto": r.objeto,
+                "ip": r.ip,
+            }
+            for r in registros
+        ]
     )

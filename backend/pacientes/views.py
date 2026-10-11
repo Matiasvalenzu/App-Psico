@@ -10,6 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from agenda.models import AgendaCita
+from cuentas.acceso import registrar_acceso
+from cuentas.models import RegistroAcceso
 from cuentas.exportacion import carpeta_paciente, exportar_paciente
 from sesiones.audio import borrar_carpeta_paciente
 from sesiones.models import Sesion
@@ -80,9 +82,15 @@ class PacienteViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    def retrieve(self, request, *args, **kwargs):
+        paciente = self.get_object()
+        registrar_acceso(request, RegistroAcceso.Accion.VER_FICHA, paciente, "Ficha")
+        return Response(self.get_serializer(paciente).data)
+
     @action(detail=True, methods=["get"])
     def exportar(self, request, pk=None):
         paciente = self.get_object()
+        registrar_acceso(request, RegistroAcceso.Accion.EXPORTAR, paciente, "Ficha completa (ZIP)")
         return FileResponse(
             exportar_paciente(paciente),
             as_attachment=True,
@@ -95,6 +103,9 @@ class PacienteViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         paciente_id = instance.pk
+        registrar_acceso(
+            self.request, RegistroAcceso.Accion.ELIMINAR, objeto=f"Paciente #{paciente_id}"
+        )
         instance.delete()
         borrar_carpeta_paciente(paciente_id)
 

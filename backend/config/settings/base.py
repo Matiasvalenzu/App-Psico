@@ -172,6 +172,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "sesiones.tasks.purgar_audios_vencidos",
         "schedule": crontab(hour=4, minute=10),
     },
+    "purgar-registros-acceso": {
+        "task": "cuentas.tasks.purgar_registros_acceso",
+        "schedule": crontab(hour=4, minute=20, day_of_week=0),
+    },
 }
 
 # Audio storage

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    actividad_view,
     eliminar_cuenta_view,
     exportar_cuenta_view,
     profile_detail,
@@ -17,4 +18,5 @@ urlpatterns = [
     ),
     path("eliminar/", eliminar_cuenta_view, name="cuenta-eliminar"),
     path("exportar/", exportar_cuenta_view, name="cuenta-exportar"),
+    path("actividad/", actividad_view, name="cuenta-actividad"),
 ]

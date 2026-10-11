@@ -406,3 +406,56 @@ class ExportacionTests(TestCase):
         response = self.client.get(f"/api/chat/informes/{informe.id}/exportar_pdf/")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF"))
+
+
+class RegistroAccesoTests(TestCase):
+    def setUp(self):
+        from pacientes.models import Paciente
+
+        self.user = get_user_model().objects.create_user(username="audita", password="x")
+        self.otro = get_user_model().objects.create_user(username="ajeno", password="x")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.paciente = Paciente.objects.create(psicologo=self.user, nombre="Ana", apellido="Rojas")
+
+    def test_ver_ficha_registra_una_vez_en_la_ventana(self):
+        from .models import RegistroAcceso
+
+        self.assertEqual(self.client.get(f"/api/pacientes/{self.paciente.id}/").status_code, 200)
+        self.client.get(f"/api/pacientes/{self.paciente.id}/")
+        registros = RegistroAcceso.objects.filter(usuario=self.user)
+        self.assertEqual(registros.count(), 1)
+        self.assertEqual(registros[0].accion, RegistroAcceso.Accion.VER_FICHA)
+        self.assertEqual(registros[0].paciente, self.paciente)
+
+    def test_eliminar_paciente_conserva_el_registro(self):
+        from .models import RegistroAcceso
+
+        self.assertEqual(self.client.delete(f"/api/pacientes/{self.paciente.id}/").status_code, 204)
+        registro = RegistroAcceso.objects.get(usuario=self.user)
+        self.assertEqual(registro.accion, RegistroAcceso.Accion.ELIMINAR)
+        self.assertIsNone(registro.paciente)
+
+    def test_actividad_solo_muestra_lo_propio(self):
+        from .models import RegistroAcceso
+
+        RegistroAcceso.objects.create(usuario=self.otro, accion=RegistroAcceso.Accion.EXPORTAR)
+        self.client.get(f"/api/pacientes/{self.paciente.id}/")
+        data = self.client.get("/api/cuenta/actividad/").json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["paciente"], "Ana Rojas")
+        self.assertEqual(data[0]["accion"], "VER_FICHA")
+
+    def test_purga_registros_de_mas_de_un_anio(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from .models import RegistroAcceso
+        from .tasks import purgar_registros_acceso
+
+        viejo = RegistroAcceso.objects.create(usuario=self.user, accion=RegistroAcceso.Accion.EXPORTAR)
+        RegistroAcceso.objects.filter(pk=viejo.pk).update(fecha=timezone.now() - timedelta(days=400))
+        RegistroAcceso.objects.create(usuario=self.user, accion=RegistroAcceso.Accion.EXPORTAR)
+        self.assertEqual(purgar_registros_acceso(), 1)
+        self.assertEqual(RegistroAcceso.objects.count(), 1)
