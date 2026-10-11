@@ -39,6 +39,8 @@ export interface Paciente {
   consentimiento_estado?: string | null;
   consentimiento_id?: number | null;
   consentimiento_fecha_firma?: string | null;
+  consentimiento_vigente?: boolean;
+  consentimiento_papel_fecha?: string | null;
   created_at: string;
 }
 

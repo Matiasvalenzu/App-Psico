@@ -17,6 +17,7 @@ import {
   Video,
   VideoOff,
 } from "lucide-react";
+import AvisoConsentimiento from "@/components/pacientes/AvisoConsentimiento";
 import { apiFetch } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -39,6 +40,7 @@ interface PacienteFicha {
   diagnostico_sospechado?: string;
   medicacion_actual?: string;
   riesgo_suicida?: boolean;
+  consentimiento_vigente?: boolean;
 }
 
 interface SesionPrevia {
@@ -313,6 +315,12 @@ export default function SalaPsicologoPage() {
           <p className="text-xs text-slate-400">
             Al entrar comenzará la grabación del audio en dos pistas separadas (tu voz y la del paciente).
           </p>
+          {paciente && paciente.consentimiento_vigente === false && (
+            <AvisoConsentimiento
+              pacienteId={pacienteId}
+              mensaje="Puedes entrar igual, pero la sesión quedará registrada como procesada sin consentimiento."
+            />
+          )}
           {mediaError && (
             <div className="flex gap-2 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-200">
               <AlertCircle className="h-4 w-4 shrink-0" />

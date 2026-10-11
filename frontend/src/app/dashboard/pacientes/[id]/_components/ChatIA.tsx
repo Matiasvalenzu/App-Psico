@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import AvisoConsentimiento from "@/components/pacientes/AvisoConsentimiento";
 import {
   ArrowUp,
   Brain,
@@ -791,6 +792,13 @@ export default function ChatIA({
 
             {/* Chat Input */}
             <div className="border-t border-border/40 px-3 sm:px-5 py-2.5 sm:py-3">
+              {paciente.consentimiento_vigente === false && (
+                <AvisoConsentimiento
+                  pacienteId={paciente.id}
+                  mensaje="Las preguntas se envían a la IA sin el nombre del paciente."
+                  className="mb-2"
+                />
+              )}
               <form onSubmit={sendChatMessage} className="flex items-end gap-2">
                 <textarea
                   ref={textareaRef}

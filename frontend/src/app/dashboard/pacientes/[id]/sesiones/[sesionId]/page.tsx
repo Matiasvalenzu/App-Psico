@@ -11,6 +11,7 @@ import { useTutorial } from "@/context/TutorialContext";
 import SessionRecordingTips from "@/components/sesion/SessionRecordingTips";
 import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
 import RuedaCreenciasChart, { RuedaDimension } from "@/components/tests/RuedaCreenciasChart";
+import AvisoConsentimiento from "@/components/pacientes/AvisoConsentimiento";
 
 interface Sesion {
   id: number;
@@ -21,6 +22,8 @@ interface Sesion {
   duracion_segundos: number | null;
   audio_path: string;
   audio_eliminado_en: string | null;
+  procesada_sin_consentimiento: boolean;
+  paciente_consentimiento_vigente: boolean;
   origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
   plataforma_virtual?: string;
   url_reunion?: string;
@@ -561,6 +564,11 @@ export default function SesionDetailPage() {
                     Audio eliminado tras transcribir
                   </span>
                 )}
+                {sesion.procesada_sin_consentimiento && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 font-medium text-amber-800 text-[11px] sm:text-xs dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+                    Procesada sin consentimiento vigente
+                  </span>
+                )}
               </div>
 
               {isExternalDoc && (
@@ -693,6 +701,13 @@ export default function SesionDetailPage() {
       </div>
 
       {error && <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive font-medium">{error}</div>}
+
+      {!sesion.paciente_consentimiento_vigente && !sesion.segmentos?.length && !isExternalDoc && !isTest && (
+        <AvisoConsentimiento
+          pacienteId={sesion.paciente}
+          mensaje="Puedes grabar igual, pero la sesión quedará registrada como procesada sin consentimiento."
+        />
+      )}
 
       {/* Selector móvil de vista: Diálogo vs Notas */}
       <div className="flex lg:hidden rounded-xl bg-muted/60 p-1 border border-border/60 gap-1">

@@ -247,6 +247,7 @@ export default function PacienteDetailPage() {
             paciente={paciente}
             ultimaSesion={ultimaSesion}
             onConsent={() => setConsentOpen(true)}
+            onUpdated={loadData}
             onEdit={() => setEditOpen(true)}
           />
         </aside>

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.conf import settings
 from pacientes.models import Paciente
+from pacientes.services import consentimiento_vigente
 from .models import Sesion, SpeakerIdentificationResult, TranscripcionSegmento
 
 
@@ -50,6 +51,7 @@ class SesionSerializer(serializers.ModelSerializer):
     paciente_nombre = serializers.CharField(source="paciente.nombre_completo", read_only=True)
     psicologo_username = serializers.CharField(source="psicologo.username", read_only=True)
     resultado_test = serializers.SerializerMethodField()
+    paciente_consentimiento_vigente = serializers.SerializerMethodField()
 
     class Meta:
         model = Sesion
@@ -65,6 +67,7 @@ class SesionSerializer(serializers.ModelSerializer):
             "audio_path",
             "audio_eliminado_en",
             "procesada_sin_consentimiento",
+            "paciente_consentimiento_vigente",
             "origen",
             "plataforma_virtual",
             "url_reunion",
@@ -104,6 +107,9 @@ class SesionSerializer(serializers.ModelSerializer):
         if request and paciente.psicologo_id != request.user.id:
             raise serializers.ValidationError("Paciente no encontrado.")
         return paciente
+
+    def get_paciente_consentimiento_vigente(self, obj):
+        return consentimiento_vigente(obj.paciente)
 
     def get_resultado_test(self, obj):
         if obj.origen != Sesion.Origen.TEST_PSICOLOGICO:
