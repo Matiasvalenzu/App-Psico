@@ -11,6 +11,8 @@ import {
   ClipboardList,
   Clock,
   LogOut,
+  Moon,
+  Sun,
   Mic,
   UserCog,
   UserPlus,
@@ -22,7 +24,7 @@ import {
   Video,
 } from "lucide-react";
 import Image from "next/image";
-import ThemeToggle from "@/components/ThemeToggle";
+import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import BottomNav from "@/components/layout/bottom-nav";
 import MoreDrawer from "@/components/layout/more-drawer";
@@ -33,6 +35,13 @@ import PersistentRecordingBar from "@/components/recording/PersistentRecordingBa
 import { TutorialProvider, useTutorial } from "@/context/TutorialContext";
 import TutorialModal from "@/components/tutorial/TutorialModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Inter solo en el dashboard (la landing conserva su tipografía)
 const inter = Inter({ subsets: ["latin"], display: "swap" });
@@ -157,6 +166,8 @@ function DashboardInner({
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [suscripcionEstado, setSuscripcionEstado] = useState<string | null>(null);
   const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
+  const [usuario, setUsuario] = useState<{ nombre: string; email: string } | null>(null);
+  const { theme, toggle: toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -180,6 +191,10 @@ function DashboardInner({
         const isSuper = user.is_superuser === true;
         setIsAdmin(isAdm);
         setIsSuperuser(isSuper);
+        setUsuario({
+          nombre: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username,
+          email: user.email || "",
+        });
         setSuscripcionEstado(user.suscripcion_estado || null);
         setDiasRestantes(
           typeof user.dias_restantes_prueba === "number"
@@ -341,15 +356,6 @@ function DashboardInner({
                 {getSectionTitle()}
               </span>
             </div>
-            {suscripcionEstado === "trial" && diasRestantes !== null && (
-              <Link
-                href="/dashboard/suscripcion"
-                className="flex md:hidden items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="whitespace-nowrap">{diasRestantes}d</span>
-              </Link>
-            )}
             <button
               type="button"
               onClick={() => openTutorial(0)}
@@ -361,18 +367,15 @@ function DashboardInner({
             </button>
           </div>
 
-          {/* Desktop: trial badge + tutorial + theme toggle + logout */}
-          <div className="hidden md:flex items-center gap-3.5">
+          {/* Prueba (todas las resoluciones) + tutorial y menú de usuario (desktop) */}
+          <div className="flex items-center gap-2 md:gap-3">
             {suscripcionEstado === "trial" && diasRestantes !== null && (
               <Link
                 href="/dashboard/suscripcion"
-                className="inline-flex items-center gap-2 rounded-full border border-amber-500/25 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-500/15 transition-all dark:text-amber-300 dark:border-amber-500/30"
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/15 md:gap-2 md:px-3.5 md:py-1 dark:text-amber-300"
                 title="Ver detalles de tu suscripción"
               >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                </span>
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
                 <span className="whitespace-nowrap lg:hidden">{diasRestantes}d</span>
                 <span className="hidden whitespace-nowrap lg:inline">
                   Prueba activa: <strong className="font-bold">{diasRestantes}</strong>{" "}
@@ -383,27 +386,54 @@ function DashboardInner({
             <button
               type="button"
               onClick={() => openTutorial(0)}
-              className="group inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:border-primary/40 active:scale-95 cursor-pointer"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-accent hover:border-primary/40"
               title="Ver video tutorial de Psiconex (11 min)"
             >
-              <PlayCircle className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />
+              <PlayCircle className="h-4 w-4 text-primary" />
               <span className="hidden lg:inline">Tutorial</span>
             </button>
-            <div className="h-4 w-px bg-border/80" />
-            <ThemeToggle />
-            <div className="h-4 w-px bg-border/80" />
-            <button
-              onClick={() => {
-                localStorage.clear();
-                router.replace("/login");
-              }}
-              className="group flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
-              title="Salir"
-              aria-label="Salir"
-            >
-              <LogOut className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-              <span className="hidden lg:inline">Salir</span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="hidden md:flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Menú de usuario"
+              >
+                {(usuario?.nombre || "?").charAt(0).toUpperCase()}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {usuario && (
+                  <>
+                    <div className="px-2 py-1.5">
+                      <p className="truncate text-sm font-medium">{usuario.nombre}</p>
+                      {usuario.email && <p className="truncate text-xs text-muted-foreground">{usuario.email}</p>}
+                    </div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={() => router.push("/dashboard/configuracion/perfil")}>
+                  <Settings />
+                  Mi perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/dashboard/suscripcion")}>
+                  <CreditCard />
+                  Mi suscripción
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleTheme}>
+                  {theme === "dark" ? <Sun /> : <Moon />}
+                  {theme === "dark" ? "Modo claro" : "Modo oscuro"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    localStorage.clear();
+                    router.replace("/login");
+                  }}
+                >
+                  <LogOut />
+                  Salir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
