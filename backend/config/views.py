@@ -39,6 +39,9 @@ def current_user(request):
     suscripcion_estado = "trial"
     fin_prueba = None
     dias_restantes_prueba = None
+    solo_lectura = False
+    fecha_purga = None
+    dias_para_purga = None
 
     if hasattr(request.user, "suscripcion"):
         suscripcion = request.user.suscripcion
@@ -48,6 +51,11 @@ def current_user(request):
         if fin_prueba and suscripcion.estado == "trial":
             delta = fin_prueba - timezone.now()
             dias_restantes_prueba = max(0, delta.days + (1 if delta.seconds > 0 else 0))
+        exento = request.user.is_staff or request.user.is_superuser
+        solo_lectura = not exento and not suscripcion.puede_escribir
+        if solo_lectura:
+            fecha_purga = suscripcion.fecha_purga
+            dias_para_purga = suscripcion.dias_para_purga
 
     tutorial_visto = False
     if hasattr(request.user, "perfil_psicologo"):
@@ -65,6 +73,9 @@ def current_user(request):
             "suscripcion_estado": suscripcion_estado,
             "fin_prueba": fin_prueba,
             "dias_restantes_prueba": dias_restantes_prueba,
+            "solo_lectura": solo_lectura,
+            "fecha_purga": fecha_purga,
+            "dias_para_purga": dias_para_purga,
             "tutorial_visto": tutorial_visto,
             "tiene_password": request.user.has_usable_password(),
         }
