@@ -1,3337 +1,369 @@
 "use client";
 
-import { createPortal } from "react-dom";
-
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Calendar, FileText, LayoutList, RefreshCw, SearchX, Sparkles, WifiOff } from "lucide-react";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
-import { formatDate, formatDateCL, formatTime, formatDuration } from "@/lib/utils";
-import ConfirmDialog from "@/components/ConfirmDialog";
 import { RemoteSessionModal } from "@/components/sesion/RemoteSessionModal";
 import { ModalCrearSesionVirtual } from "@/components/sesion/ModalCrearSesionVirtual";
 import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
 import ConsentimientoInformadoModal from "@/components/pacientes/ConsentimientoInformadoModal";
-import {
-  ArrowLeft,
-  ArrowUp,
-  Brain,
-  Calendar,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronUp,
-  ClipboardList,
-  Copy,
-  Clock,
-  Download,
-  ExternalLink,
-  FileSignature,
-  FileText,
-  Loader2,
-  MessageCircle,
-  MoreHorizontal,
-  Pencil,
-  Play,
-  Plus,
-  Save,
-  Send,
-  Sparkles,
-  Trash2,
-  Upload,
-  Video,
-  X,
-  PlayCircle,
-} from "lucide-react";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTutorial } from "@/context/TutorialContext";
+import AlertaClinica from "./_components/AlertaClinica";
+import ChatIA from "./_components/ChatIA";
+import DeleteSesionDialog from "./_components/DeleteSesionDialog";
+import DocumentosExternos from "./_components/DocumentosExternos";
+import EditPacienteDialog from "./_components/EditPacienteDialog";
+import InformesIA from "./_components/InformesIA";
+import PacienteHeader from "./_components/PacienteHeader";
+import PacienteLateral from "./_components/PacienteLateral";
+import PacienteResumen from "./_components/PacienteResumen";
+import SesionesLista from "./_components/SesionesLista";
+import TestDialog, { type TestMode } from "./_components/TestDialog";
+import { fetchAllPages, tieneRiesgo, type InformeIA, type Paciente, type Sesion } from "./_components/utils";
 
-// Elementos ocultos por ahora; se conservan por si se vuelven a habilitar
-const MOSTRAR_ESTADO_PACIENTE = false;
-const MOSTRAR_PLANTILLA_CONSENTIMIENTO = false;
+// Elemento oculto por ahora; se conserva por si se vuelve a habilitar
 const MOSTRAR_SESION_REMOTA = false;
 
-interface Paciente {
-  id: number;
-  nombre: string;
-  apellido: string;
-  nombre_completo: string;
-  fecha_nacimiento: string | null;
-  rut: string;
-  edad: number | null;
-  sexo: string;
-  ocupacion_laboral: string;
-  motivo_consulta: string;
-  telefono_whatsapp: string;
-  email_contacto: string;
-  nacionalidad: string;
-  religion: string;
-  direccion: string;
-  comuna: string;
-  prevision: string;
-  es_menor_edad: boolean;
-  nombre_tutor: string;
-  telefono_tutor: string;
-  contacto_emergencia_nombre: string;
-  contacto_emergencia_telefono: string;
-  origen_consulta: string;
-  derivacion_interconsulta: string;
-  diagnostico_sospechado: string;
-  medicacion_actual: string;
-  riesgo_suicida: boolean;
-  ideacion_suicida_nivel: number | null;
-  frecuencia_atencion: string;
-  objetivos_intervencion: string;
-  notas_privadas: string;
-  estado: string;
-  activo: boolean;
-  consentimiento_estado?: string | null;
-  consentimiento_id?: number | null;
-  consentimiento_fecha_firma?: string | null;
-  created_at: string;
-}
+const TABS = ["resumen", "sesiones", "documentos", "asistente"] as const;
+type Tab = (typeof TABS)[number];
 
-interface Sesion {
-  id: number;
-  numero_sesion: number | null;
-  fecha_hora_inicio: string;
-  duracion_segundos: number | null;
-  origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
-  documento_nombre_original: string;
-  estado: string;
-}
-
-interface SegmentoDocumento {
-  id: number;
-  orden: number;
-  texto: string;
-}
-
-interface DocumentoExternoDetalle extends Sesion {
-  segmentos: SegmentoDocumento[];
-}
-
-interface ChatMensaje {
-  id: number;
-  rol: "USER" | "ASSISTANT";
-  contenido: string;
-  fuentes_json: Array<{
-    segmento_id: number;
-    sesion_id: number;
-    fecha: string;
-    origen: string;
-    documento_nombre_original: string;
-    hablante: string;
-    texto: string;
-  }>;
-}
-
-interface ChatConversacion {
-  id: number;
-  paciente: number;
-  titulo: string;
-  mensajes_count?: number;
-  mensajes?: ChatMensaje[];
-  created_at: string;
-  updated_at: string;
-}
-
-interface InformeIA {
-  id: number;
-  paciente: number;
-  titulo: string;
-  tipo: string;
-  contenido: string;
-  created_at: string;
-}
-
-const CHAT_SUGGESTED_PROMPTS = [
-  "Elabora un informe clínico breve del proceso terapéutico de este paciente.",
-  "Genera un resumen clínico con temas trabajados, indicadores relevantes y límites de la información disponible.",
-  "Analiza el caso y sugiere objetivos pendientes para las próximas sesiones.",
-  "Prepara la próxima sesión considerando avances, alertas o riesgos y focos de intervención.",
-];
-
-interface TestSendResult {
-  id: number;
-  public_url: string;
-  token?: string;
-  email_enviado: boolean;
-  email_error: string;
-  email_configurado: boolean;
-  fecha_expiracion: string;
-}
-
-interface CatalogTestItem {
-  slug: string;
-  name: string;
-  short_name?: string;
-  duration_minutes: number;
-  description: string;
-  tipo_evaluacion?: string;
-}
-
-function getDateTimeInputValue(date = new Date()) {
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return localDate.toISOString().slice(0, 16);
-}
-
-function getApiErrorMessage(data: unknown, fallback: string) {
-  if (!data || typeof data !== "object") return fallback;
-  const entries = Object.values(data as Record<string, unknown>);
-  const first = entries[0];
-  if (Array.isArray(first) && typeof first[0] === "string") return first[0];
-  if (typeof first === "string") return first;
-  return fallback;
-}
-
-function deduplicateSources(
-  sources: Array<{ sesion_id: number; fecha: string; origen: string; documento_nombre_original: string; hablante: string; texto: string }>
-) {
-  const seen = new Map<number, (typeof sources)[0]>();
-  for (const src of sources) {
-    if (!seen.has(src.sesion_id)) {
-      seen.set(src.sesion_id, src);
-    }
-  }
-  return Array.from(seen.values());
-}
-
-function formatChatOption(conversation: ChatConversacion) {
-  const title = conversation.titulo || "Nueva conversación";
-  const count = conversation.mensajes_count ?? 0;
-  return `${title} (${count} mens.)`;
-}
-
-function formatRelativeTime(dateString: string) {
-  const now = Date.now();
-  const then = new Date(dateString).getTime();
-  const diff = Math.floor((now - then) / 1000);
-  if (diff < 60) return "ahora";
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
-  return `hace ${Math.floor(diff / 86400)} d`;
-}
-
-function calcularEdad(fecha: string): number | null {
-  if (!fecha) return null;
-  const hoy = new Date();
-  const nac = new Date(fecha);
-  let edad = hoy.getFullYear() - nac.getFullYear();
-  const mes = hoy.getMonth() - nac.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) {
-    edad--;
-  }
-  return edad >= 0 ? edad : null;
-}
-
-function getSexoLabel(sexo: string) {
-  const map: Record<string, string> = {
-    M: "Masculino",
-    F: "Femenino",
-    O: "Otro",
-    N: "Prefiero no decir",
-  };
-  return map[sexo] || sexo;
-}
-
-function formatDateInputValue(dateStr: string | null) {
-  if (!dateStr) return "";
-  return dateStr.split("T")[0];
-}
-
-function getStatusBadge(status: string) {
-  if (status === "COMPLETADO") {
-    return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300";
-  }
-  if (status === "PROCESANDO") {
-    return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
-  }
-  return "bg-muted text-muted-foreground";
-}
-
-function getPacienteEstadoLabel(status?: string | null) {
-  const map: Record<string, string> = {
-    EN_SESION: "Activo",
-    ALTA: "Alta",
-    ABANDONO: "Abandono",
-    PAUSADO: "Pausado",
-    DERIVADO: "Derivado",
-  };
-  if (!status) return "Activo";
-  return map[status] || status;
-}
-
-function getStatusLabel(status: string) {
-  if (status === "COMPLETADO") return "Completado";
-  if (status === "PROCESANDO") return "Procesando";
-  if (status === "PENDIENTE") return "Pendiente";
-  if (status === "ERROR") return "Error";
-  return status;
-}
-
-function DetailItem({
-  label,
-  value,
-  icon: Icon,
-  action,
-}: {
-  label: string;
-  value: string | number | null | undefined;
-  icon?: React.ElementType;
-  action?: React.ReactNode;
-}) {
-  if (value === null || value === undefined || value === "") return null;
+function FichaSkeleton() {
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-3.5 transition-colors hover:bg-muted/40 min-w-0">
-      <div className="flex items-center justify-between gap-1 min-w-0">
-        <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
-          {label}
-        </span>
-        {Icon && <Icon className="h-3.5 w-3.5 text-primary/60 shrink-0" />}
+    <div className="space-y-6" aria-busy="true" aria-label="Cargando ficha del paciente">
+      <Skeleton className="h-5 w-48" />
+      <div className="flex items-center gap-4 rounded-2xl border border-border/80 bg-card p-6">
+        <Skeleton className="h-16 w-16 rounded-2xl" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-7 w-64 max-w-full" />
+          <Skeleton className="h-4 w-48 max-w-full" />
+        </div>
       </div>
-      <div className="mt-1.5 flex items-center justify-between gap-2 min-w-0">
-        <p className="text-xs sm:text-sm font-medium text-foreground tracking-tight break-words min-w-0">{value}</p>
-        {action && <div className="shrink-0">{action}</div>}
+      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full rounded-2xl" />
+          <Skeleton className="h-40 w-full rounded-2xl" />
+        </div>
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     </div>
   );
 }
 
-function getInformeTipoLabel(tipo: string) {
-  const map: Record<string, string> = {
-    RESUMEN_CLINICO: "Resumen clínico",
-    EVOLUCION: "Evolución",
-    PROXIMA_SESION: "Próxima sesión",
-    OTRO: "Otro",
-  };
-  return map[tipo] || tipo;
-}
-
-function safeFilename(value: string) {
-  return (value || "informe-ia")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "informe-ia";
-}
-
-function cleanMarkdownEmphasis(text: string) {
-  return (text || "")
-    .replace(/\*\*([^*]+)\*\*/g, (_, value: string) => value.trim().toUpperCase())
-    .replace(/^#{1,6}\s*/gm, "")
-    .replace(/\*\*/g, "")
-    .trim();
-}
-
-// ------------ CHAT IA + PAGE ------------
-
-function ClientPortal({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
-      {children}
-    </div>,
-    document.body
-  );
-}
-
 export default function PacienteDetailPage() {
   const params = useParams();
+  const id = params.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const id = params.id as string;
   const { openTutorial } = useTutorial();
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [sesiones, setSesiones] = useState<Sesion[]>([]);
   const [informes, setInformes] = useState<InformeIA[]>([]);
-  const [savingInformeId, setSavingInformeId] = useState<number | null>(null);
-  const [selectedInforme, setSelectedInforme] = useState<InformeIA | null>(null);
-  const [informeToDelete, setInformeToDelete] = useState<InformeIA | null>(null);
-  const [deletingInformeId, setDeletingInformeId] = useState<number | null>(null);
-  const [downloadingInforme, setDownloadingInforme] = useState<string | null>(null);
-  const [informeSuccess, setInformeSuccess] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<"notfound" | "network" | null>(null);
+  const [creatingSession, setCreatingSession] = useState(false);
 
-  // Chat state
-  const [chatConversations, setChatConversations] = useState<ChatConversacion[]>([]);
-  const [chatId, setChatId] = useState<number | null>(null);
-  const [chatTitle, setChatTitle] = useState("");
-  const [messages, setMessages] = useState<ChatMensaje[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatError, setChatError] = useState("");
-  const [loadingChat, setLoadingChat] = useState(false);
-  const [creatingChat, setCreatingChat] = useState(false);
-  const [savingChatTitle, setSavingChatTitle] = useState(false);
-  const [sendingChat, setSendingChat] = useState(false);
-  const [iaTyping, setIaTyping] = useState(false);
-  const [showChatControls, setShowChatControls] = useState(false);
-  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
-  const [chatToDelete, setChatToDelete] = useState<ChatConversacion | null>(null);
-  const [deletingChat, setDeletingChat] = useState(false);
-  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
-  const [editingConversationId, setEditingConversationId] = useState<number | null>(null);
-  const [editingConversationTitle, setEditingConversationTitle] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
+  const [testMode, setTestMode] = useState<TestMode>("start");
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [sesionToDelete, setSesionToDelete] = useState<Sesion | null>(null);
 
-  // Remote session modal
   const [remoteModalOpen, setRemoteModalOpen] = useState(false);
   const [psiconexModalOpen, setPsiconexModalOpen] = useState(false);
   const [assistantModalOpen, setAssistantModalOpen] = useState(false);
   const [activeRemoteSession, setActiveRemoteSession] = useState<{ id: number; url_reunion?: string } | null>(null);
 
-  // Document modal
-  const [documentModalOpen, setDocumentModalOpen] = useState(false);
-  const [documentDateTime, setDocumentDateTime] = useState(getDateTimeInputValue());
-  const [documentFile, setDocumentFile] = useState<File | null>(null);
-  const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [documentError, setDocumentError] = useState("");
-  const [selectedDocument, setSelectedDocument] = useState<DocumentoExternoDetalle | null>(null);
-  const [openingDocumentId, setOpeningDocumentId] = useState<number | null>(null);
-  const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
-
-  // Psychological test modal
-  const [testModalOpen, setTestModalOpen] = useState(false);
-  const [testModalMode, setTestModalMode] = useState<"start" | "send">("start");
-  const [selectedTestSlug, setSelectedTestSlug] = useState<string>("rueda-vida");
-  const [consentModalOpen, setConsentModalOpen] = useState(false);
-  const [catalogTests, setCatalogTests] = useState<CatalogTestItem[]>([
-    {
-      slug: "rueda-vida",
-      name: "Rueda de la Vida",
-      short_name: "Rueda de la Vida",
-      duration_minutes: 2,
-      description: "10 áreas vitales (Salud, Dinero, Trabajo, Amor...) evaluadas del 1 al 10 con gráfico de radar.",
-      tipo_evaluacion: "rueda_polar",
-    },
-    {
-      slug: "creencias-ellis",
-      name: "Test de Creencias Ellis",
-      short_name: "Ellis 100",
-      duration_minutes: 20,
-      description: "100 preguntas dicotómicas (De acuerdo / No de acuerdo).",
-    },
-  ]);
-  const [sendingTest, setSendingTest] = useState(false);
-  const [testSendError, setTestSendError] = useState("");
-  const [testSendResult, setTestSendResult] = useState<TestSendResult | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
-
-  // Delete session confirmation
-  const [sessionToDelete, setSessionToDelete] = useState<Sesion | null>(null);
-  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
-  const [deleteSessionError, setDeleteSessionError] = useState("");
-
-  // Edit modal
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editNombre, setEditNombre] = useState("");
-  const [editApellido, setEditApellido] = useState("");
-  const [editFechaNacimiento, setEditFechaNacimiento] = useState("");
-  const [editRut, setEditRut] = useState("");
-  const [editEdad, setEditEdad] = useState("");
-  const [editSexo, setEditSexo] = useState("N");
-  const [editOcupacion, setEditOcupacion] = useState("");
-  const [editMotivo, setEditMotivo] = useState("");
-  const [editTelefonoWhatsapp, setEditTelefonoWhatsapp] = useState("");
-  const [editEmailContacto, setEditEmailContacto] = useState("");
-  const [editNacionalidad, setEditNacionalidad] = useState("");
-  const [editReligion, setEditReligion] = useState("");
-  const [editDireccion, setEditDireccion] = useState("");
-  const [editComuna, setEditComuna] = useState("");
-  const [editPrevision, setEditPrevision] = useState("");
-  const [editEsMenorEdad, setEditEsMenorEdad] = useState(false);
-  const [editNombreTutor, setEditNombreTutor] = useState("");
-  const [editTelefonoTutor, setEditTelefonoTutor] = useState("");
-  const [editContactoEmergenciaNombre, setEditContactoEmergenciaNombre] = useState("");
-  const [editContactoEmergenciaTelefono, setEditContactoEmergenciaTelefono] = useState("");
-  const [editOrigenConsulta, setEditOrigenConsulta] = useState("");
-  const [editDerivacionInterconsulta, setEditDerivacionInterconsulta] = useState("");
-  const [editDiagnosticoSospechado, setEditDiagnosticoSospechado] = useState("");
-  const [editMedicacionActual, setEditMedicacionActual] = useState("");
-  const [editRiesgoSuicida, setEditRiesgoSuicida] = useState(false);
-  const [editIdeacionSuicidaNivel, setEditIdeacionSuicidaNivel] = useState("");
-  const [editFrecuenciaAtencion, setEditFrecuenciaAtencion] = useState("");
-  const [editObjetivosIntervencion, setEditObjetivosIntervencion] = useState("");
-  const [editNotas, setEditNotas] = useState("");
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [editError, setEditError] = useState("");
-
-  const [loading, setLoading] = useState(true);
-
-  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editQueryHandledRef = useRef(false);
 
-  useEffect(() => {
-    loadData();
-    if (typeof window !== "undefined" && window.innerWidth >= 768) {
-      setIsChatSidebarOpen(true);
+  const tabParam = searchParams.get("tab");
+  const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "resumen";
+
+  const loadData = useCallback(async () => {
+    try {
+      const pacRes = await apiFetch(`/pacientes/${id}/`);
+      if (pacRes.status === 404) {
+        setLoadError("notfound");
+        return;
+      }
+      if (!pacRes.ok) throw new Error(`HTTP ${pacRes.status}`);
+      const [pacData, sesData, informesData] = await Promise.all([
+        pacRes.json(),
+        fetchAllPages<Sesion>(`/sesiones/?paciente=${id}`),
+        fetchAllPages<InformeIA>(`/chat/informes/?paciente=${id}`),
+      ]);
+      setPaciente(pacData);
+      setSesiones(sesData);
+      setInformes(informesData);
+      setLoadError(null);
+    } catch (err) {
+      console.error(err);
+      setLoadError("network");
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
-    async function loadTestCatalog() {
-      try {
-        const res = await apiFetch("/evaluaciones/catalogo/");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setCatalogTests(data);
-          }
-        }
-      } catch {
-        // preserve defaults
-      }
-    }
-    loadTestCatalog();
-  }, []);
-
-  useEffect(() => {
-    const calc = calcularEdad(editFechaNacimiento);
-    if (calc !== null) setEditEdad(calc.toString());
-  }, [editFechaNacimiento]);
-
-  useEffect(() => {
-    if (chatScrollContainerRef.current) {
-      chatScrollContainerRef.current.scrollTo({
-        top: chatScrollContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [messages, iaTyping]);
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (!paciente || editQueryHandledRef.current || searchParams.get("editar") !== "1") return;
     editQueryHandledRef.current = true;
-    openEditModal();
+    setEditOpen(true);
     router.replace(`/dashboard/pacientes/${id}`);
   }, [paciente, searchParams, router, id]);
 
-  async function loadData() {
-    try {
-      const [pacRes, sesRes, informesRes] = await Promise.all([
-        apiFetch(`/pacientes/${id}/`),
-        apiFetch(`/sesiones/?paciente=${id}`),
-        apiFetch(`/chat/informes/?paciente=${id}`),
-      ]);
-      const pacData = await pacRes.json();
-      const sesData = await sesRes.json();
-      const informesData = await informesRes.json();
-      setPaciente(pacData);
-      setSesiones(sesData.results || sesData);
-      setInformes(informesData.results || informesData);
-      await loadChatConversations();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadInformes() {
-    try {
-      const res = await apiFetch(`/chat/informes/?paciente=${id}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setInformes(data.results || data);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  // ---------- Chat logic ----------
-
-  function getChatTitle(conversation: ChatConversacion | null) {
-    if (!conversation) return "Nueva conversación";
-    return conversation.titulo || "Nueva conversación";
-  }
-
-  async function loadChatConversations(preferredChatId?: number) {
-    setLoadingChat(true);
-    setChatError("");
-    try {
-      const listRes = await apiFetch(`/chat/?paciente=${id}`);
-      const listData = await listRes.json();
-      const conversations: ChatConversacion[] = listData.results || listData;
-      setChatConversations(conversations);
-
-      if (!conversations.length) {
-        setChatId(null);
-        setChatTitle("");
-        setMessages([]);
-        return;
-      }
-
-      const selected =
-        conversations.find((c) => c.id === preferredChatId) ||
-        conversations.find((c) => c.id === chatId) ||
-        conversations[0];
-
-      await loadChatConversation(selected.id, conversations);
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudieron cargar las conversaciones IA.");
-    } finally {
-      setLoadingChat(false);
-    }
-  }
-
-  async function loadChatConversation(
-    conversationId: number,
-    knownConversations = chatConversations
-  ) {
-    setLoadingChat(true);
-    setChatError("");
-    try {
-      const detailRes = await apiFetch(`/chat/${conversationId}/`);
-      if (!detailRes.ok) {
-        setChatError("No se pudo cargar la conversación seleccionada.");
-        return;
-      }
-      const detailData: ChatConversacion = await detailRes.json();
-      setChatId(detailData.id);
-      setChatTitle(getChatTitle(detailData));
-      setMessages(detailData.mensajes || []);
-      setChatConversations((prev) => {
-        const base = knownConversations.length ? knownConversations : prev;
-        return base.map((c) =>
-          c.id === detailData.id
-            ? {
-                ...c,
-                titulo: detailData.titulo,
-                updated_at: detailData.updated_at,
-                mensajes_count: detailData.mensajes?.length ?? c.mensajes_count,
-              }
-            : c
-        );
-      });
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudo cargar la conversación seleccionada.");
-    } finally {
-      setLoadingChat(false);
-    }
-  }
-
-  async function createChatConversation() {
-    setCreatingChat(true);
-    setChatError("");
-    try {
-      const res = await apiFetch("/chat/", {
-        method: "POST",
-        body: JSON.stringify({ paciente: parseInt(id), titulo: "" }),
-      });
-      if (!res.ok) {
-        setChatError("No se pudo crear una nueva conversación.");
-        return null;
-      }
-      const data: ChatConversacion = await res.json();
-      await loadChatConversations(data.id);
-      return data.id;
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudo crear una nueva conversación.");
-      return null;
-    } finally {
-      setCreatingChat(false);
-    }
-  }
-
-  async function ensureChatConversation() {
-    if (chatId) return chatId;
-    return createChatConversation();
-  }
-
-  async function saveChatTitle() {
-    if (!chatId) return;
-    setSavingChatTitle(true);
-    setChatError("");
-    try {
-      const res = await apiFetch(`/chat/${chatId}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ titulo: chatTitle.trim() || "Nueva conversación" }),
-      });
-      if (!res.ok) {
-        setChatError("No se pudo guardar el nombre de la conversación.");
-        return;
-      }
-      const data: ChatConversacion = await res.json();
-      setChatTitle(getChatTitle(data));
-      await loadChatConversations(data.id);
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudo guardar el nombre de la conversación.");
-    } finally {
-      setSavingChatTitle(false);
-    }
-  }
-
-  async function saveMessageAsInforme(message: ChatMensaje) {
-    setSavingInformeId(message.id);
-    setChatError("");
-    setInformeSuccess("");
-    try {
-      const res = await apiFetch("/chat/informes/", {
-        method: "POST",
-        body: JSON.stringify({
-          paciente: parseInt(id),
-          mensaje_origen: message.id,
-          tipo: "RESUMEN_CLINICO",
-          titulo: chatTitle && chatTitle !== "Nueva conversación" ? chatTitle : "Resumen clínico IA",
-        }),
-      });
-      if (!res.ok) {
-        setChatError("No se pudo guardar la respuesta como informe.");
-        return;
-      }
-      await loadInformes();
-      setInformeSuccess("Informe IA guardado correctamente.");
-      setTimeout(() => setInformeSuccess(""), 3000);
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudo guardar la respuesta como informe.");
-    } finally {
-      setSavingInformeId(null);
-    }
-  }
-
-  async function downloadInforme(informe: InformeIA, format: "pdf" | "docx") {
-    const key = `${informe.id}-${format}`;
-    setDownloadingInforme(key);
-    setChatError("");
-    try {
-      const endpoint = format === "pdf" ? "exportar_pdf" : "exportar_docx";
-      const res = await apiFetch(`/chat/informes/${informe.id}/${endpoint}/`);
-      if (!res.ok) {
-        setChatError(`No se pudo descargar el informe en ${format.toUpperCase()}.`);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${safeFilename(informe.titulo || getInformeTipoLabel(informe.tipo))}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      setChatError(`No se pudo descargar el informe en ${format.toUpperCase()}.`);
-    } finally {
-      setDownloadingInforme(null);
-    }
-  }
-
-  async function deleteInforme() {
-    if (!informeToDelete) return;
-    setDeletingInformeId(informeToDelete.id);
-    setChatError("");
-    try {
-      const res = await apiFetch(`/chat/informes/${informeToDelete.id}/`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        setChatError("No se pudo eliminar el informe IA.");
-        return;
-      }
-      setInformes((prev) => prev.filter((informe) => informe.id !== informeToDelete.id));
-      if (selectedInforme?.id === informeToDelete.id) setSelectedInforme(null);
-      setInformeToDelete(null);
-      setInformeSuccess("Informe IA eliminado correctamente.");
-      setTimeout(() => setInformeSuccess(""), 3000);
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudo eliminar el informe IA.");
-    } finally {
-      setDeletingInformeId(null);
-    }
-  }
-
-  async function deleteChatConversation() {
-    if (!chatToDelete) return;
-    setDeletingChat(true);
-    setChatError("");
-    try {
-      const res = await apiFetch(`/chat/${chatToDelete.id}/`, { method: "DELETE" });
-      if (!res.ok) {
-        setChatError("No se pudo eliminar la conversación IA.");
-        return;
-      }
-      setChatToDelete(null);
-      setChatId(null);
-      setChatTitle("");
-      setMessages([]);
-      await loadChatConversations();
-    } catch (err) {
-      console.error(err);
-      setChatError("No se pudo eliminar la conversación IA.");
-    } finally {
-      setDeletingChat(false);
-    }
-  }
-
-  function toggleSources(messageId: number) {
-    setExpandedSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
+  function changeTab(value: unknown) {
+    const next = value as Tab;
+    router.replace(next === "resumen" ? `/dashboard/pacientes/${id}` : `/dashboard/pacientes/${id}?tab=${next}`, {
+      scroll: false,
     });
   }
-
-  function selectSuggestedChatPrompt(prompt: string) {
-    setChatInput(prompt);
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return;
-      textareaRef.current.focus();
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height =
-        Math.min(textareaRef.current.scrollHeight, 120) + "px";
-    });
-  }
-
-  async function sendChatMessage(e: React.FormEvent) {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const content = chatInput.trim();
-    setChatInput("");
-    setSendingChat(true);
-    setIaTyping(true);
-
-    const tempId = Date.now();
-    setMessages((prev) => [
-      ...prev,
-      { id: tempId, rol: "USER", contenido: content, fuentes_json: [] },
-    ]);
-
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-
-    try {
-      const conversationId = await ensureChatConversation();
-      if (!conversationId) {
-        setIaTyping(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now() + 1,
-            rol: "ASSISTANT",
-            contenido: "No se pudo crear una conversación para enviar el mensaje.",
-            fuentes_json: [],
-          },
-        ]);
-        return;
-      }
-      const res = await apiFetch(`/chat/${conversationId}/enviar_mensaje/`, {
-        method: "POST",
-        body: JSON.stringify({ contenido: content }),
-      });
-      const assistantMessage = await res.json();
-      setMessages((prev) => {
-        const filtered = prev.filter((m) => m.id !== tempId);
-        const realUser = assistantMessage.id
-          ? { id: tempId, rol: "USER" as const, contenido: content, fuentes_json: [] }
-          : null;
-        return [...(realUser ? [...filtered, realUser] : filtered), assistantMessage];
-      });
-      await loadChatConversations(conversationId);
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          rol: "ASSISTANT",
-          contenido: "No se pudo consultar el asistente IA.",
-          fuentes_json: [],
-        },
-      ]);
-    } finally {
-      setSendingChat(false);
-      setIaTyping(false);
-    }
-  }
-
-  function handleTextareaChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setChatInput(e.target.value);
-    const el = e.target;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendChatMessage(e as unknown as React.FormEvent);
-    }
-  }
-
-  // ---------- Remote sessions ----------
-
-  function openVirtualModal() {
-    setRemoteModalOpen(true);
-  }
-
-  // ---------- Sessions & Documents ----------
 
   async function handleNewSession() {
+    setCreatingSession(true);
     try {
       const res = await apiFetch("/sesiones/", {
         method: "POST",
         body: JSON.stringify({ paciente: parseInt(id) }),
       });
-      if (res.ok) {
-        const sesion = await res.json();
-        router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  function openTestModal(mode: "start" | "send" = "start") {
-    setTestModalMode(mode);
-    setTestSendError("");
-    setTestSendResult(null);
-    setCopySuccess(false);
-    setTestModalOpen(true);
-  }
-
-  async function handleExecuteTest(mode: "start" | "send") {
-    if (!paciente) return;
-    setTestSendError("");
-    setTestSendResult(null);
-    setCopySuccess(false);
-    if (mode === "send" && !paciente.email_contacto) {
-      setTestSendError("El paciente no tiene correo registrado. Edita la ficha antes de enviar el test.");
-      return;
-    }
-    setSendingTest(true);
-    try {
-      const res = await apiFetch("/evaluaciones/asignaciones/", {
-        method: "POST",
-        body: JSON.stringify({
-          paciente: paciente.id,
-          test_slug: selectedTestSlug,
-          enviar_email: mode === "send",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setTestSendError(getApiErrorMessage(data, "No se pudo generar el test."));
-        return;
-      }
-      setTestSendResult(data);
-      if (mode === "start" && data.public_url) {
-        window.open(data.public_url, "_blank");
-      }
-    } catch (err) {
-      console.error(err);
-      setTestSendError("No se pudo generar el test.");
-    } finally {
-      setSendingTest(false);
-    }
-  }
-
-  async function copyGeneratedTestLink() {
-    if (!testSendResult?.public_url) return;
-    try {
-      await navigator.clipboard.writeText(testSendResult.public_url);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2500);
-    } catch {
-      setTestSendError("No se pudo copiar el enlace automáticamente.");
-    }
-  }
-
-  async function handleDeleteSession() {
-    if (!sessionToDelete) return;
-    const isExternalDocument = sessionToDelete.origen === "DOCUMENTO_EXTERNO";
-    const isTestSession = sessionToDelete.origen === "TEST_PSICOLOGICO";
-    const targetLabel = isExternalDocument ? "el documento" : isTestSession ? "el test" : "la sesión";
-    setDeletingSessionId(sessionToDelete.id);
-    setDeleteSessionError("");
-    try {
-      const res = await apiFetch(`/sesiones/${sessionToDelete.id}/`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        setDeleteSessionError(`No se pudo eliminar ${targetLabel}. Inténtalo nuevamente.`);
-        return;
-      }
-      setSesiones((prev) => prev.filter((sesion) => sesion.id !== sessionToDelete.id));
-      if (selectedDocument?.id === sessionToDelete.id) setSelectedDocument(null);
-      setSessionToDelete(null);
-    } catch (err) {
-      console.error(err);
-      setDeleteSessionError(`No se pudo eliminar ${targetLabel}. Inténtalo nuevamente.`);
-    } finally {
-      setDeletingSessionId(null);
-    }
-  }
-
-  function openDocumentModal() {
-    setDocumentDateTime(getDateTimeInputValue());
-    setDocumentFile(null);
-    setDocumentError("");
-    setDocumentModalOpen(true);
-  }
-
-  async function handleDocumentUpload(e: React.FormEvent) {
-    e.preventDefault();
-    setDocumentError("");
-    if (!documentFile) {
-      setDocumentError("Selecciona un archivo TXT, DOCX o PDF.");
-      return;
-    }
-    if (!documentDateTime) {
-      setDocumentError("Selecciona fecha y hora para el documento.");
-      return;
-    }
-    setUploadingDocument(true);
-    try {
-      const formData = new FormData();
-      formData.append("paciente", id);
-      formData.append("fecha_hora_inicio", new Date(documentDateTime).toISOString());
-      formData.append("archivo", documentFile);
-      const res = await apiFetch("/sesiones/upload_documento/", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        let message = "No se pudo cargar el documento.";
-        try {
-          message = getApiErrorMessage(await res.json(), message);
-        } catch {}
-        setDocumentError(message);
-        return;
-      }
-      setDocumentModalOpen(false);
-      setDocumentFile(null);
-      await loadData();
-    } catch (err) {
-      console.error(err);
-      setDocumentError("No se pudo cargar el documento.");
-    } finally {
-      setUploadingDocument(false);
-    }
-  }
-
-  async function openExternalDocument(documento: Sesion) {
-    setOpeningDocumentId(documento.id);
-    setDocumentError("");
-    try {
-      const res = await apiFetch(`/sesiones/${documento.id}/`);
-      if (!res.ok) {
-        setDocumentError("No se pudo abrir el documento externo.");
-        return;
-      }
-      const data = await res.json();
-      setSelectedDocument(data);
-    } catch (err) {
-      console.error(err);
-      setDocumentError("No se pudo abrir el documento externo.");
-    } finally {
-      setOpeningDocumentId(null);
-    }
-  }
-
-  async function downloadExternalDocument(documento: Sesion, format: "pdf" | "docx") {
-    const key = `${documento.id}-${format}`;
-    setDownloadingDocument(key);
-    setDocumentError("");
-    try {
-      const endpoint = format === "pdf" ? "exportar_pdf" : "exportar_docx";
-      const res = await apiFetch(`/sesiones/${documento.id}/${endpoint}/`);
-      if (!res.ok) {
-        setDocumentError(`No se pudo descargar el documento en ${format.toUpperCase()}.`);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const base = documento.documento_nombre_original || `documento-${documento.id}`;
-      a.download = `${safeFilename(base.replace(/\.[^.]+$/, ""))}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      setDocumentError(`No se pudo descargar el documento en ${format.toUpperCase()}.`);
-    } finally {
-      setDownloadingDocument(null);
-    }
-  }
-
-  function openEditModal() {
-    if (!paciente) return;
-    setEditNombre(paciente.nombre);
-    setEditApellido(paciente.apellido);
-    setEditFechaNacimiento(formatDateInputValue(paciente.fecha_nacimiento));
-    setEditRut(paciente.rut || "");
-    setEditEdad(paciente.edad?.toString() || "");
-    setEditSexo(paciente.sexo || "N");
-    setEditOcupacion(paciente.ocupacion_laboral || "");
-    setEditMotivo(paciente.motivo_consulta || "");
-    setEditTelefonoWhatsapp(paciente.telefono_whatsapp || "");
-    setEditEmailContacto(paciente.email_contacto || "");
-    setEditNacionalidad(paciente.nacionalidad || "");
-    setEditReligion(paciente.religion || "");
-    setEditDireccion(paciente.direccion || "");
-    setEditComuna(paciente.comuna || "");
-    setEditPrevision(paciente.prevision || "");
-    setEditEsMenorEdad(Boolean(paciente.es_menor_edad));
-    setEditNombreTutor(paciente.nombre_tutor || "");
-    setEditTelefonoTutor(paciente.telefono_tutor || "");
-    setEditContactoEmergenciaNombre(paciente.contacto_emergencia_nombre || "");
-    setEditContactoEmergenciaTelefono(paciente.contacto_emergencia_telefono || "");
-    setEditOrigenConsulta(paciente.origen_consulta || "");
-    setEditDerivacionInterconsulta(paciente.derivacion_interconsulta || "");
-    setEditDiagnosticoSospechado(paciente.diagnostico_sospechado || "");
-    setEditMedicacionActual(paciente.medicacion_actual || "");
-    setEditRiesgoSuicida(Boolean(paciente.riesgo_suicida));
-    setEditIdeacionSuicidaNivel(paciente.ideacion_suicida_nivel?.toString() || "");
-    setEditFrecuenciaAtencion(paciente.frecuencia_atencion || "");
-    setEditObjetivosIntervencion(paciente.objetivos_intervencion || "");
-    setEditNotas(paciente.notas_privadas || "");
-    setEditError("");
-    setEditModalOpen(true);
-  }
-
-  async function handleEdit(e: React.FormEvent) {
-    e.preventDefault();
-    setEditError("");
-    setSavingEdit(true);
-    try {
-      const res = await apiFetch(`/pacientes/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          nombre: editNombre,
-          apellido: editApellido,
-          fecha_nacimiento: editFechaNacimiento || null,
-          rut: editRut,
-          edad: editEdad ? parseInt(editEdad) : null,
-          sexo: editSexo,
-          ocupacion_laboral: editOcupacion,
-          motivo_consulta: editMotivo,
-          telefono_whatsapp: editTelefonoWhatsapp,
-          email_contacto: editEmailContacto,
-          nacionalidad: editNacionalidad,
-          religion: editReligion,
-          direccion: editDireccion,
-          comuna: editComuna,
-          prevision: editPrevision,
-          es_menor_edad: editEsMenorEdad,
-          nombre_tutor: editNombreTutor,
-          telefono_tutor: editTelefonoTutor,
-          contacto_emergencia_nombre: editContactoEmergenciaNombre,
-          contacto_emergencia_telefono: editContactoEmergenciaTelefono,
-          origen_consulta: editOrigenConsulta,
-          derivacion_interconsulta: editDerivacionInterconsulta,
-          diagnostico_sospechado: editDiagnosticoSospechado,
-          medicacion_actual: editMedicacionActual,
-          riesgo_suicida: editRiesgoSuicida,
-          ideacion_suicida_nivel: editIdeacionSuicidaNivel ? parseInt(editIdeacionSuicidaNivel) : null,
-          frecuencia_atencion: editFrecuenciaAtencion,
-          objetivos_intervencion: editObjetivosIntervencion,
-          notas_privadas: editNotas,
-        }),
-      });
       if (!res.ok) throw new Error();
-      const updated = await res.json();
-      setPaciente(updated);
-      setEditModalOpen(false);
-    } catch {
-      setEditError("No se pudieron guardar los cambios.");
-    } finally {
-      setSavingEdit(false);
+      const sesion = await res.json();
+      router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("No se pudo crear la sesión. Inténtalo nuevamente.");
+      setCreatingSession(false);
     }
   }
 
-  if (loading) {
+  function openTest(mode: TestMode) {
+    setTestMode(mode);
+    setTestOpen(true);
+  }
+
+  if (loading) return <FichaSkeleton />;
+
+  if (loadError || !paciente) {
+    const notFound = loadError === "notfound";
     return (
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Cargando...
+      <div className="mx-auto flex max-w-md flex-col items-center py-20 text-center">
+        {notFound ? (
+          <SearchX className="mb-4 h-10 w-10 text-muted-foreground/60" />
+        ) : (
+          <WifiOff className="mb-4 h-10 w-10 text-muted-foreground/60" />
+        )}
+        <h1 className="text-lg font-semibold">{notFound ? "Paciente no encontrado" : "No se pudo cargar la ficha"}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {notFound
+            ? "El paciente no existe o no tienes acceso a su ficha."
+            : "Revisa tu conexión e inténtalo de nuevo."}
+        </p>
+        <div className="mt-6 flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard">
+              <ArrowLeft />
+              Volver a pacientes
+            </Link>
+          </Button>
+          {!notFound && (
+            <Button
+              onClick={() => {
+                setLoading(true);
+                loadData();
+              }}
+            >
+              <RefreshCw />
+              Reintentar
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
 
-  if (!paciente) {
-    return <p className="text-destructive">Paciente no encontrado</p>;
-  }
-
-  const hasExpedienteData = Boolean(
-    paciente.rut ||
-      paciente.edad ||
-      (paciente.sexo && paciente.sexo !== "N") ||
-      paciente.fecha_nacimiento ||
-      paciente.ocupacion_laboral ||
-      paciente.nacionalidad ||
-      paciente.religion ||
-      paciente.prevision
+  const documentosExternos = sesiones.filter((s) => s.origen === "DOCUMENTO_EXTERNO");
+  const sesionesClinicas = sesiones.filter((s) => s.origen !== "DOCUMENTO_EXTERNO");
+  const ultimaSesion = sesionesClinicas.reduce<Sesion | null>(
+    (acc, s) => (!acc || s.fecha_hora_inicio > acc.fecha_hora_inicio ? s : acc),
+    null
   );
-  const hasContactData = Boolean(
-    paciente.telefono_whatsapp ||
-      paciente.email_contacto ||
-      paciente.direccion ||
-      paciente.comuna ||
-      paciente.nacionalidad ||
-      paciente.religion ||
-      paciente.prevision
-  );
-  const hasClinicalData = Boolean(
-    paciente.diagnostico_sospechado ||
-      paciente.medicacion_actual ||
-      paciente.frecuencia_atencion ||
-      paciente.derivacion_interconsulta ||
-      paciente.origen_consulta
-  );
-  const hasRiskData = Boolean(
-    paciente.riesgo_suicida ||
-      paciente.ideacion_suicida_nivel ||
-      paciente.contacto_emergencia_nombre ||
-      paciente.contacto_emergencia_telefono ||
-      paciente.es_menor_edad ||
-      paciente.nombre_tutor ||
-      paciente.telefono_tutor
-  );
-  const documentosExternos = sesiones.filter(
-    (sesion) => sesion.origen === "DOCUMENTO_EXTERNO"
-  );
-  const sesionesClinicas = sesiones.filter(
-    (sesion) => sesion.origen !== "DOCUMENTO_EXTERNO"
-  );
-  const deleteTargetIsDocument = sessionToDelete?.origen === "DOCUMENTO_EXTERNO";
-  const deleteTargetIsTest = sessionToDelete?.origen === "TEST_PSICOLOGICO";
-  const deleteTargetLabel = deleteTargetIsDocument ? "documento externo" : deleteTargetIsTest ? "test psicológico" : "sesión";
+  const riesgo = tieneRiesgo(paciente);
 
   return (
     <div className="space-y-6">
-      {/* Back navigation & Status bar */}
-      <div className="sticky top-14 md:top-16 z-10 -mx-4 -mt-4 mb-5 sm:mb-6 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-background/85 backdrop-blur-md border-b border-border/60 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border/80 bg-card px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:border-primary/40 active:scale-95 shrink-0"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="hidden sm:inline">Volver a Pacientes</span>
-            <span className="sm:hidden">Volver</span>
-          </button>
-          <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-            <span>/</span>
-            <span className="font-semibold text-foreground tracking-tight truncate max-w-[200px] lg:max-w-[260px]">
-              {paciente.nombre_completo}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => openTutorial(3)}
-            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs"
-            title="Ver video tutorial sobre Ficha Clínica y Asistente IA (Módulo 3 y 5)"
-          >
-            <PlayCircle className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Tutorial de Ficha y Sesiones IA</span>
-            <span className="hidden xs:inline md:hidden">Tutorial</span>
-          </button>
-          {MOSTRAR_ESTADO_PACIENTE && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="truncate max-w-[90px] sm:max-w-none">{getPacienteEstadoLabel(paciente.estado)}</span>
-            </span>
-          )}
+      <div className="sticky top-14 z-[5] -mx-4 -mt-4 flex min-h-11 items-center justify-between gap-3 border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:top-16 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8">
+        <Breadcrumb
+          className="min-w-0"
+          items={[{ label: "Pacientes", href: "/dashboard" }, { label: paciente.nombre_completo }]}
+        />
+        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          {paciente.edad ? <span className="hidden sm:inline">{paciente.edad} años</span> : null}
+          {riesgo && <Badge variant="destructive">Riesgo</Badge>}
         </div>
       </div>
 
-      {/* Bloque 1: Tarjeta Principal de Identidad & Acciones Rápidas */}
-      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 md:p-7 shadow-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-5">
-          <div className="flex items-start sm:items-center gap-3.5 sm:gap-5 min-w-0">
-            <div className="flex h-13 w-13 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg sm:text-xl md:text-2xl font-bold text-primary border border-primary/20 shadow-xs">
-              {paciente.nombre.charAt(0).toUpperCase()}
-              {paciente.apellido.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-foreground break-words">
-                  {paciente.nombre_completo}
-                </h1>
-                {paciente.activo === false && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
-                    Inactivo
-                  </span>
-                )}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-muted-foreground">
-                {paciente.rut && (
-                  <span className="inline-flex items-center font-mono font-medium text-foreground/80 bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-[11px] sm:text-xs">
-                    {paciente.rut}
-                  </span>
-                )}
-                {paciente.edad && (
-                  <span className="bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-foreground/80 font-medium text-[11px] sm:text-xs">
-                    {paciente.edad} años
-                  </span>
-                )}
-                {paciente.sexo && paciente.sexo !== "N" && (
-                  <span className="bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-foreground/80 font-medium text-[11px] sm:text-xs">
-                    {getSexoLabel(paciente.sexo)}
-                  </span>
-                )}
-                {paciente.ocupacion_laboral && (
-                  <span className="bg-muted/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-border/70 text-foreground/80 font-medium text-[11px] sm:text-xs truncate max-w-[180px] sm:max-w-none">
-                    {paciente.ocupacion_laboral}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+      <PacienteHeader
+        paciente={paciente}
+        creatingSession={creatingSession}
+        onNewPresencial={handleNewSession}
+        onNewVirtual={() => setPsiconexModalOpen(true)}
+        onTest={openTest}
+        onEdit={() => setEditOpen(true)}
+        onTutorial={() => openTutorial(3)}
+      />
 
-          {/* Botones de Acción Rápida: Grid 2 cols en teléfono móvil, flex wrap en desktop */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto self-stretch sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
-            {paciente.telefono_whatsapp && (
-              <a
-                href={`https://wa.me/${paciente.telefono_whatsapp.replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50/70 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-subtle dark:bg-emerald-950/40 dark:text-emerald-300 w-full sm:w-auto"
-              >
-                <MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>WhatsApp</span>
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => openTestModal("start")}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer w-full sm:w-auto"
-            >
-              <Play className="h-3.5 w-3.5 fill-current shrink-0" />
-              <span>Comenzar test</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openTestModal("send")}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary shadow-xs transition-all hover:bg-primary/20 hover:shadow-subtle active:scale-95 cursor-pointer w-full sm:w-auto"
-            >
-              <Send className="h-3.5 w-3.5 shrink-0" />
-              <span>Enviar test</span>
-            </button>
-            {paciente.consentimiento_estado === "FIRMADO" ? (
-              <button
-                type="button"
-                onClick={() => setConsentModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-emerald-950/40 dark:text-emerald-300 w-full sm:w-auto"
-                title="Consentimiento firmado digitalmente por el paciente"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>Consentimiento firmado ✓</span>
-              </button>
-            ) : paciente.consentimiento_estado === "ENVIADO" ? (
-              <button
-                type="button"
-                onClick={() => setConsentModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-800 shadow-xs transition-all hover:bg-amber-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-amber-950/40 dark:text-amber-300 w-full sm:w-auto"
-                title="Consentimiento enviado por correo, pendiente de firma"
-              >
-                <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>Consentimiento pendiente ⏳</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConsentModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/80 px-3 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 hover:shadow-subtle active:scale-95 cursor-pointer dark:bg-violet-950/40 dark:text-violet-300 w-full sm:w-auto"
-                title="Generar Consentimiento Informado editable con datos del paciente (Ley 19.628)"
-              >
-                <FileSignature className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
-                <span>Consentimiento</span>
-              </button>
-            )}
-            <button
-              onClick={openEditModal}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent hover:shadow-subtle w-full sm:w-auto ${
-                paciente.telefono_whatsapp ? "col-span-1" : "col-span-2 sm:col-span-1"
-              }`}
-            >
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span>Editar</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <AlertaClinica paciente={paciente} />
 
-      {/* Banner / Resumen de Consentimiento Informado */}
-      <div
-        className={`rounded-2xl border p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 ${
-          paciente.consentimiento_estado === "FIRMADO"
-            ? "border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-900/40"
-            : paciente.consentimiento_estado === "ENVIADO"
-            ? "border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-900/40"
-            : "border-border/80 bg-card"
-        }`}
-      >
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-              paciente.consentimiento_estado === "FIRMADO"
-                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
-                : paciente.consentimiento_estado === "ENVIADO"
-                ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"
-                : "bg-violet-500/10 text-violet-600 dark:text-violet-400"
-            }`}
-          >
-            <FileSignature className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-bold text-foreground">Consentimiento Informado (Ley 19.628)</h3>
-              {paciente.consentimiento_estado === "FIRMADO" ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold px-2 py-0.5 border border-emerald-300 dark:border-emerald-800">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                  Firmado digitalmente
-                </span>
-              ) : paciente.consentimiento_estado === "ENVIADO" ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-[10px] font-bold px-2 py-0.5 border border-amber-300 dark:border-amber-800">
-                  <Clock className="h-3 w-3 text-amber-600" />
-                  Enviado por correo (Pendiente)
-                </span>
-              ) : (
-                <span className="rounded-full bg-muted text-muted-foreground text-[10px] font-medium px-2 py-0.5 border border-border">
-                  No generado
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {paciente.consentimiento_estado === "FIRMADO"
-                ? `El paciente completó la firma electrónica de consentimiento${
-                    paciente.consentimiento_fecha_firma
-                      ? ` el ${formatDateCL(paciente.consentimiento_fecha_firma)}`
-                      : ""
-                  }. El documento se encuentra debidamente custodiado.`
-                : paciente.consentimiento_estado === "ENVIADO"
-                ? "Documento enviado por correo electrónico; esperando que el paciente acceda al enlace y firme."
-                : "Planilla redactada con los datos del paciente lista para revisión, envío por correo y firma digital."}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-          <button
-            type="button"
-            onClick={() => setConsentModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-accent cursor-pointer"
-          >
-            <FileSignature className="h-3.5 w-3.5 text-primary" />
-            <span>
-              {paciente.consentimiento_estado === "FIRMADO" ? "Ver consentimiento firmado" : "Gestionar consentimiento"}
-            </span>
-          </button>
-        </div>
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <aside className="lg:sticky lg:top-32 lg:order-last" aria-label="Resumen del paciente">
+          <PacienteLateral
+            paciente={paciente}
+            ultimaSesion={ultimaSesion}
+            onConsent={() => setConsentOpen(true)}
+            onEdit={() => setEditOpen(true)}
+          />
+        </aside>
 
-      {/* Bloque 2: Expediente y Datos Demográficos */}
-      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm">
-        <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-border/60 pb-2.5 sm:pb-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Expediente y Datos Personales
-          </h2>
-        </div>
-        {hasExpedienteData ? (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-4">
-            <DetailItem label="RUT" value={paciente.rut} />
-            <DetailItem label="Edad" value={paciente.edad ? `${paciente.edad} años` : null} />
-            <DetailItem label="Sexo" value={paciente.sexo !== "N" ? getSexoLabel(paciente.sexo) : null} />
-            <DetailItem label="Fecha de nacimiento" value={paciente.fecha_nacimiento ? formatDate(paciente.fecha_nacimiento) : null} />
-            <DetailItem label="Ocupación" value={paciente.ocupacion_laboral} />
-            <DetailItem label="Nacionalidad" value={paciente.nacionalidad} />
-            <DetailItem label="Religión" value={paciente.religion} />
-            <DetailItem label="Previsión de Salud" value={paciente.prevision} />
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">
-            <p>Aún no hay datos personales registrados.</p>
-            <p className="mt-1">Usa <span className="font-semibold text-foreground">Editar</span> para completar el expediente.</p>
-          </div>
-        )}
-      </div>
+        <Tabs value={tab} onValueChange={changeTab} className="min-w-0">
+          <TabsList aria-label="Secciones de la ficha">
+            <TabsTrigger value="resumen" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <LayoutList className="hidden sm:block" />
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger value="sesiones" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <Calendar className="hidden sm:block" />
+              Sesiones
+              <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">{sesionesClinicas.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="documentos" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <FileText className="hidden sm:block" />
+              Documentos
+              <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">
+                {documentosExternos.length + informes.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="asistente" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <Sparkles className="hidden sm:block" />
+              <span className="sm:hidden">IA</span>
+              <span className="hidden sm:inline">Asistente IA</span>
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Bloque 3: Motivo de consulta y Objetivos Terapéuticos */}
-      {(paciente.motivo_consulta || paciente.objetivos_intervencion) && (
-        <div className="grid gap-3.5 sm:gap-4 md:grid-cols-2">
-          {paciente.motivo_consulta && (
-            <div className="rounded-2xl border border-primary/25 bg-primary/[0.02] p-4 sm:p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="mb-2.5 sm:mb-3 flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
-                  <ClipboardList className="h-4 w-4" />
-                  <span>Motivo de consulta</span>
-                </div>
-                <p className="text-xs sm:text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-                  {paciente.motivo_consulta}
-                </p>
-              </div>
-            </div>
-          )}
-          {paciente.objetivos_intervencion && (
-            <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="mb-2.5 sm:mb-3 flex items-center gap-2 text-muted-foreground font-semibold text-xs uppercase tracking-wider">
-                  <Brain className="h-4 w-4 text-primary/70" />
-                  <span>Objetivos de intervención</span>
-                </div>
-                <p className="text-xs sm:text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-                  {paciente.objetivos_intervencion}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+          <TabsContent value="resumen">
+            <PacienteResumen paciente={paciente} onEdit={() => setEditOpen(true)} />
+          </TabsContent>
 
-      {/* Bloque 4: Contacto y Ubicación */}
-      {hasContactData && (
-        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm">
-          <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-border/60 pb-2.5 sm:pb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Contacto y Ubicación
-            </h2>
-          </div>
-          <div className="grid gap-2.5 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <DetailItem
-              label="WhatsApp"
-              value={paciente.telefono_whatsapp}
-              action={
-                paciente.telefono_whatsapp ? (
-                  <a
-                    href={`https://wa.me/${paciente.telefono_whatsapp.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-semibold text-emerald-600 hover:underline inline-flex items-center gap-1"
-                  >
-                    <span>Abrir chat</span>
-                  </a>
-                ) : undefined
-              }
+          <TabsContent value="sesiones">
+            <SesionesLista
+              pacienteId={id}
+              sesiones={sesionesClinicas}
+              creatingSession={creatingSession}
+              showRemote={MOSTRAR_SESION_REMOTA}
+              onNewPresencial={handleNewSession}
+              onNewVirtual={() => setPsiconexModalOpen(true)}
+              onNewRemote={() => setRemoteModalOpen(true)}
+              onDelete={setSesionToDelete}
             />
-            <DetailItem
-              label="Correo electrónico"
-              value={paciente.email_contacto}
-              action={
-                paciente.email_contacto ? (
-                  <a
-                    href={`mailto:${paciente.email_contacto}`}
-                    className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
-                  >
-                    <span>Escribir</span>
-                  </a>
-                ) : undefined
-              }
+          </TabsContent>
+
+          <TabsContent value="documentos" className="space-y-4">
+            <DocumentosExternos
+              pacienteId={id}
+              documentos={documentosExternos}
+              onUploaded={loadData}
+              onDelete={setSesionToDelete}
             />
-            <DetailItem label="Dirección" value={paciente.direccion} />
-            <DetailItem label="Comuna" value={paciente.comuna} />
-          </div>
-        </div>
-      )}
+            <InformesIA
+              informes={informes}
+              onDeleted={(informeId) => setInformes((prev) => prev.filter((i) => i.id !== informeId))}
+            />
+          </TabsContent>
 
-      {/* Bloque 5: Información Clínica Ampliada */}
-      {hasClinicalData && (
-        <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-sm">
-          <div className="mb-3 sm:mb-4 flex items-center justify-between border-b border-border/60 pb-2.5 sm:pb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Información Clínica Complementaria
-            </h2>
-          </div>
-          <div className="grid gap-2.5 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <DetailItem label="Frecuencia de atención" value={paciente.frecuencia_atencion} />
-            <DetailItem label="Origen de consulta" value={paciente.origen_consulta} />
-            <DetailItem label="Diagnóstico sospechado" value={paciente.diagnostico_sospechado} />
-            <DetailItem label="Medicación actual" value={paciente.medicacion_actual} />
-            <DetailItem label="Derivación / Interconsulta" value={paciente.derivacion_interconsulta} />
-          </div>
-        </div>
-      )}
+          <TabsContent value="asistente" keepMounted className="data-[hidden]:hidden">
+            <ChatIA pacienteId={id} paciente={paciente} onInformeSaved={loadData} />
+          </TabsContent>
+        </Tabs>
+      </div>
 
-      {/* Bloque 6: Alertas Clínicas, Riesgo y Tutor */}
-      {hasRiskData && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-50/30 p-4 sm:p-6 shadow-sm dark:bg-amber-950/20 dark:border-amber-900/50">
-          <div className="mb-3 sm:mb-4 flex items-center gap-2 border-b border-amber-500/20 pb-2.5 sm:pb-3 text-amber-800 dark:text-amber-300">
-            <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider">
-              Alertas Clínicas, Red de Emergencia y Tutor
-            </h2>
-          </div>
-          <div className="grid gap-2.5 sm:gap-3.5 grid-cols-2 lg:grid-cols-4">
-            <DetailItem label="Riesgo suicida" value={paciente.riesgo_suicida ? "Sí" : ""} />
-            <DetailItem label="Ideación suicida" value={paciente.ideacion_suicida_nivel} />
-            <DetailItem label="Contacto emergencia" value={paciente.contacto_emergencia_nombre} />
-            <DetailItem label="Tel. emergencia" value={paciente.contacto_emergencia_telefono} />
-            <DetailItem label="Menor de edad" value={paciente.es_menor_edad ? "Sí" : ""} />
-            <DetailItem label="Nombre Tutor" value={paciente.nombre_tutor} />
-            <DetailItem label="Teléfono Tutor" value={paciente.telefono_tutor} />
-          </div>
-        </div>
-      )}
+      <DeleteSesionDialog
+        sesion={sesionToDelete}
+        onClose={() => setSesionToDelete(null)}
+        onDeleted={(sesionId) => setSesiones((prev) => prev.filter((s) => s.id !== sesionId))}
+      />
 
-      {/* Test modal: Comenzar test en sesión o Enviar por correo */}
-      {testModalOpen && (
-        <ClientPortal>
-          <div className="w-full max-w-xl rounded-xl border border-border/60 bg-card p-4 sm:p-6 shadow-elevated max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="flex items-center gap-2 text-lg font-semibold">
-                    {testModalMode === "start" ? (
-                      <Play className="h-5 w-5 text-primary fill-primary/20" />
-                    ) : (
-                      <Send className="h-5 w-5 text-emerald-600" />
-                    )}
-                    <span>
-                      {testModalMode === "start"
-                        ? "Comenzar Test en Sesión"
-                        : "Enviar Test al Paciente"}
-                    </span>
-                  </h3>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      testModalMode === "start"
-                        ? "bg-primary/10 text-primary border border-primary/20"
-                        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
-                    }`}
-                  >
-                    {testModalMode === "start" ? "En vivo (Box / Remoto)" : "Por correo"}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {testModalMode === "start"
-                    ? `Aplica el test en tiempo real junto a ${paciente.nombre_completo}. Al completarlo, los gráficos y análisis se guardarán de inmediato en su ficha.`
-                    : `Se generará un enlace personal para ${paciente.nombre_completo} con vencimiento de 7 días y uso único.`}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTestModalOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <EditPacienteDialog
+        open={editOpen}
+        paciente={paciente}
+        onOpenChange={setEditOpen}
+        onSaved={(updated) => {
+          setPaciente(updated);
+          toast.success("Ficha actualizada.");
+        }}
+      />
 
-            {/* Modal Mode Selector Tabs */}
-            <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-muted/60 p-1 border border-border/60">
-              <button
-                type="button"
-                onClick={() => {
-                  setTestModalMode("start");
-                  setTestSendError("");
-                }}
-                className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
-                  testModalMode === "start"
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Play className="h-3.5 w-3.5 fill-current" />
-                <span>Comenzar en sesión</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTestModalMode("send");
-                  setTestSendError("");
-                }}
-                className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer ${
-                  testModalMode === "send"
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>Enviar por correo</span>
-              </button>
-            </div>
+      <TestDialog open={testOpen} initialMode={testMode} paciente={paciente} onOpenChange={setTestOpen} />
 
-            <div className="mt-4 space-y-4">
-              {/* Instrument Selection */}
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Selecciona el instrumento
-                </label>
-                <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
-                  {catalogTests.map((t) => {
-                    const isSelected = selectedTestSlug === t.slug;
-                    const isRueda = t.slug === "rueda-vida" || t.slug === "rueda-creencias";
-                    return (
-                      <button
-                        key={t.slug}
-                        type="button"
-                        onClick={() => setSelectedTestSlug(t.slug)}
-                        className={`rounded-xl border p-3.5 text-left transition-all cursor-pointer ${
-                          isSelected
-                            ? isRueda
-                              ? "border-cyan-500 bg-cyan-500/10 text-foreground ring-2 ring-cyan-500/20"
-                              : "border-primary bg-primary/10 text-foreground ring-2 ring-primary/20"
-                            : "border-border/70 bg-card hover:border-primary/40"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold">{t.name}</span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                              isRueda
-                                ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {isRueda ? "Nuevo · 3-5 min" : t.duration_minutes ? `${t.duration_minutes} min` : "Estándar"}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                          {t.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+      <ConsentimientoInformadoModal
+        isOpen={consentOpen}
+        onClose={() => setConsentOpen(false)}
+        paciente={paciente}
+        onSavedToFicha={() => {
+          loadData();
+        }}
+      />
 
-              {/* Mode Start description */}
-              {testModalMode === "start" && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground">💡 ¿Cómo funciona en sesión?</span>
-                  <p className="mt-1">
-                    Al pulsar <span className="font-medium text-foreground">Comenzar test ahora</span> se generará la sesión y se abrirá el instrumento en una nueva pestaña (o en esta ventana). Podrás proyectarlo en el box presencial o compartir solo esa pestaña en Google Meet / Zoom con el paciente sin exponer sus notas clínicas privadas.
-                  </p>
-                </div>
-              )}
+      <RemoteSessionModal
+        open={remoteModalOpen}
+        onClose={() => setRemoteModalOpen(false)}
+        paciente={paciente}
+        onSessionCreated={async () => {
+          await loadData();
+        }}
+        onStartAssistant={(sesion, meetUrl) => {
+          setActiveRemoteSession({ id: sesion.id, url_reunion: meetUrl });
+          setAssistantModalOpen(true);
+          loadData();
+        }}
+      />
 
-              {/* Mode Send description */}
-              {testModalMode === "send" && (
-                <>
-                  <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                    <p className="font-medium">Correo destino</p>
-                    <p className="mt-1 text-muted-foreground">
-                      {paciente.email_contacto || "Sin correo registrado"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                    <p className="font-medium">Mensaje estándar</p>
-                    <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                      Hola {paciente.nombre}, tu psicólogo/a te solicita completar el {selectedTestSlug === "rueda-creencias" ? "instrumento Rueda de Creencias Limitantes" : "Test de Creencias Ellis"} como parte de tu proceso. El enlace es personal, vence en 7 días y no requiere iniciar sesión.
-                    </p>
-                  </div>
-                  {!paciente.email_contacto && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
-                      Para enviar el test por correo debes registrar un correo de contacto en la ficha del paciente.
-                    </div>
-                  )}
-                </>
-              )}
+      <ModalCrearSesionVirtual
+        open={psiconexModalOpen}
+        onClose={() => setPsiconexModalOpen(false)}
+        paciente={paciente}
+        onSessionCreated={() => {
+          loadData();
+        }}
+      />
 
-              {/* Result display */}
-              {testSendResult && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  <p className="font-semibold">
-                    {testModalMode === "start"
-                      ? "¡Evaluación lista para comenzar!"
-                      : testSendResult.email_enviado
-                      ? "Correo enviado correctamente."
-                      : "Enlace generado. El correo queda pendiente hasta configurar SMTP."}
-                  </p>
-                  {testSendResult.email_error && testModalMode === "send" && (
-                    <p className="mt-1 text-xs">{testSendResult.email_error}</p>
-                  )}
-
-                  {testModalMode === "start" ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => window.open(testSendResult.public_url, "_blank")}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 cursor-pointer"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        <span>Abrir en nueva pestaña</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(testSendResult.public_url)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-accent cursor-pointer"
-                      >
-                        <span>Abrir en esta ventana</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={copyGeneratedTestLink}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent cursor-pointer"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                        <span>{copySuccess ? "Copiado" : "Copiar enlace"}</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <input
-                        readOnly
-                        value={testSendResult.public_url}
-                        className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-background dark:text-emerald-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={copyGeneratedTestLink}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 cursor-pointer"
-                      >
-                        <Copy className="h-4 w-4" />
-                        {copySuccess ? "Copiado" : "Copiar"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {testSendError && (
-                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                  {testSendError}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setTestModalOpen(false)}
-                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent cursor-pointer"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => handleExecuteTest(testModalMode)}
-                disabled={sendingTest || (testModalMode === "send" && !paciente.email_contacto)}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-subtle transition-all disabled:opacity-50 cursor-pointer ${
-                  testModalMode === "start"
-                    ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                    : "bg-emerald-600 hover:bg-emerald-700"
-                }`}
-              >
-                {sendingTest && <Loader2 className="h-4 w-4 animate-spin" />}
-                {sendingTest
-                  ? "Iniciando..."
-                  : testModalMode === "start"
-                  ? "Comenzar test ahora"
-                  : "Generar y enviar"}
-              </button>
-            </div>
-          </div>
-        </ClientPortal>
-      )}
-
-      {/* Edit modal */}
-      {editModalOpen && (
-        <ClientPortal>
-          <form
-            onSubmit={handleEdit}
-            className="w-full max-w-3xl rounded-xl border border-border/60 bg-card p-4 sm:p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">Editar datos del paciente</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Actualiza la información básica del paciente.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditModalOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mt-5 space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">Nombre</span>
-                  <input
-                    value={editNombre}
-                    onChange={(e) => setEditNombre(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    required
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">Apellido</span>
-                  <input
-                    value={editApellido}
-                    onChange={(e) => setEditApellido(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    required
-                  />
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">RUT</span>
-                  <input
-                    value={editRut}
-                    onChange={(e) => setEditRut(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    placeholder="Ej: 12.345.678-9"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">Edad</span>
-                  <input
-                    type="number"
-                    value={editEdad}
-                    readOnly
-                    className="w-full rounded-lg border border-input bg-muted px-3 py-2.5 text-sm text-muted-foreground"
-                    min={0}
-                    max={150}
-                  />
-                  <span className="block text-xs text-muted-foreground">Se calcula desde la fecha de nacimiento</span>
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">Fecha de nacimiento</span>
-                  <input
-                    type="date"
-                    value={editFechaNacimiento}
-                    onChange={(e) => setEditFechaNacimiento(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">Sexo</span>
-                  <select
-                    value={editSexo}
-                    onChange={(e) => setEditSexo(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                  >
-                    <option value="N">Prefiero no decir</option>
-                    <option value="M">Masculino</option>
-                    <option value="F">Femenino</option>
-                    <option value="O">Otro</option>
-                  </select>
-                </label>
-              </div>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Ocupación laboral</span>
-                <input
-                  value={editOcupacion}
-                  onChange={(e) => setEditOcupacion(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                  placeholder="Ej: Ingeniero, Docente, Estudiante..."
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Motivo de consulta</span>
-                <input
-                  value={editMotivo}
-                  onChange={(e) => setEditMotivo(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                />
-              </label>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Objetivos y proceso terapéutico
-                </p>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">Objetivos de intervención</span>
-                  <textarea
-                    value={editObjetivosIntervencion}
-                    onChange={(e) => setEditObjetivosIntervencion(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
-                    rows={4}
-                    placeholder="Objetivos iniciales, focos de trabajo y metas del proceso..."
-                  />
-                </label>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Contacto y datos administrativos
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">WhatsApp</span>
-                    <input
-                      value={editTelefonoWhatsapp}
-                      onChange={(e) => setEditTelefonoWhatsapp(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Correo de contacto</span>
-                    <input
-                      type="email"
-                      value={editEmailContacto}
-                      onChange={(e) => setEditEmailContacto(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Nacionalidad</span>
-                    <input
-                      value={editNacionalidad}
-                      onChange={(e) => setEditNacionalidad(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Religión</span>
-                    <input
-                      value={editReligion}
-                      onChange={(e) => setEditReligion(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Dirección</span>
-                    <input
-                      value={editDireccion}
-                      onChange={(e) => setEditDireccion(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Comuna</span>
-                    <input
-                      value={editComuna}
-                      onChange={(e) => setEditComuna(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Previsión</span>
-                    <input
-                      value={editPrevision}
-                      onChange={(e) => setEditPrevision(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Origen de consulta</span>
-                    <input
-                      value={editOrigenConsulta}
-                      onChange={(e) => setEditOrigenConsulta(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                      placeholder="Instagram, referido, CAF, boca a boca..."
-                    />
-                  </label>
-                </div>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Información clínica ampliada
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Frecuencia de atención</span>
-                    <input
-                      value={editFrecuenciaAtencion}
-                      onChange={(e) => setEditFrecuenciaAtencion(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                      placeholder="Semanal, quincenal, mensual, seguimiento..."
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Diagnóstico sospechado</span>
-                    <input
-                      value={editDiagnosticoSospechado}
-                      onChange={(e) => setEditDiagnosticoSospechado(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                </div>
-                <label className="mt-4 block space-y-2">
-                  <span className="text-sm font-medium">Medicación actual</span>
-                  <textarea
-                    value={editMedicacionActual}
-                    onChange={(e) => setEditMedicacionActual(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
-                    rows={2}
-                  />
-                </label>
-                <label className="mt-4 block space-y-2">
-                  <span className="text-sm font-medium">Derivación o interconsulta</span>
-                  <textarea
-                    value={editDerivacionInterconsulta}
-                    onChange={(e) => setEditDerivacionInterconsulta(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
-                    rows={2}
-                  />
-                </label>
-              </div>
-              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/20">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                  Riesgo, emergencia y responsable
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={editRiesgoSuicida}
-                      onChange={(e) => setEditRiesgoSuicida(e.target.checked)}
-                      className="h-4 w-4 rounded border-input"
-                    />
-                    Riesgo suicida activo o relevante
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={editEsMenorEdad}
-                      onChange={(e) => setEditEsMenorEdad(e.target.checked)}
-                      className="h-4 w-4 rounded border-input"
-                    />
-                    Menor de edad
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Nivel ideación suicida</span>
-                    <input
-                      type="number"
-                      value={editIdeacionSuicidaNivel}
-                      onChange={(e) => setEditIdeacionSuicidaNivel(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                      min={1}
-                      max={5}
-                      placeholder="1 a 5"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Contacto emergencia</span>
-                    <input
-                      value={editContactoEmergenciaNombre}
-                      onChange={(e) => setEditContactoEmergenciaNombre(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Tel. emergencia</span>
-                    <input
-                      value={editContactoEmergenciaTelefono}
-                      onChange={(e) => setEditContactoEmergenciaTelefono(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Tutor/responsable</span>
-                    <input
-                      value={editNombreTutor}
-                      onChange={(e) => setEditNombreTutor(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium">Tel. tutor</span>
-                    <input
-                      value={editTelefonoTutor}
-                      onChange={(e) => setEditTelefonoTutor(e.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                    />
-                  </label>
-                </div>
-              </div>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Notas privadas</span>
-                <textarea
-                  value={editNotas}
-                  onChange={(e) => setEditNotas(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm resize-y"
-                  rows={3}
-                />
-              </label>
-            </div>
-            {editError && (
-              <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {editError}
-              </div>
-            )}
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditModalOpen(false)}
-                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={savingEdit}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
-              >
-                {savingEdit && <Loader2 className="h-4 w-4 animate-spin" />}
-                {savingEdit ? "Guardando..." : "Guardar cambios"}
-              </button>
-            </div>
-          </form>
-        </ClientPortal>
-      )}
-
-      {paciente && (
-        <ConsentimientoInformadoModal
-          isOpen={consentModalOpen}
-          onClose={() => setConsentModalOpen(false)}
-          paciente={paciente}
-          onSavedToFicha={() => {
+      {activeRemoteSession && (
+        <RemoteAudioAssistantModal
+          open={assistantModalOpen}
+          onClose={() => {
+            setAssistantModalOpen(false);
+            setActiveRemoteSession(null);
+            loadData();
+          }}
+          sesionId={activeRemoteSession.id}
+          pacienteId={paciente.id}
+          pacienteNombre={paciente.nombre_completo}
+          meetUrl={activeRemoteSession.url_reunion}
+          onRecordingStarted={() => {
             loadData();
           }}
         />
       )}
-
-      {/* External documents */}
-      <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-base font-bold text-foreground">Documentos Externos</h2>
-              <span className="rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                {documentosExternos.length}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Archivos cargados como contexto del paciente, separados de las sesiones clínicas.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {MOSTRAR_PLANTILLA_CONSENTIMIENTO && (
-              <button
-                onClick={() => setConsentModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-50/60 px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-100 hover:border-violet-400 dark:bg-violet-950/30 dark:text-violet-300 cursor-pointer"
-                title="Generar Consentimiento Informado editable conforme a la Ley 19.628"
-              >
-                <FileSignature className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-                <span>Plantilla Consentimiento</span>
-              </button>
-            )}
-            <button
-              onClick={openDocumentModal}
-              className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-4 py-2 text-xs font-semibold shadow-xs transition-all hover:bg-accent hover:border-primary/40"
-            >
-              <Upload className="h-3.5 w-3.5 text-primary" />
-              <span>Cargar documento</span>
-            </button>
-          </div>
-        </div>
-        {documentError && (
-          <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-            {documentError}
-          </div>
-        )}
-        {documentosExternos.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">
-            Aún no hay documentos externos cargados para este paciente.
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-3">
-            {documentosExternos.map((documento) => (
-              <div
-                key={documento.id}
-                className="rounded-xl border border-border/70 bg-muted/20 p-4 transition-all hover:border-primary/30 hover:bg-muted/30"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-border/70 text-primary shrink-0">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-foreground">
-                        {documento.documento_nombre_original || `Documento ${documento.id}`}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatDate(documento.fecha_hora_inicio)} · {getStatusLabel(documento.estado)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openExternalDocument(documento)}
-                      disabled={openingDocumentId === documento.id}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-                    >
-                      {openingDocumentId === documento.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      <span>Abrir</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadExternalDocument(documento, "pdf")}
-                      disabled={downloadingDocument === `${documento.id}-pdf`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                    >
-                      {downloadingDocument === `${documento.id}-pdf` ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                      )}
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadExternalDocument(documento, "docx")}
-                      disabled={downloadingDocument === `${documento.id}-docx`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                    >
-                      {downloadingDocument === `${documento.id}-docx` ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                      )}
-                      <span>Word</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSessionToDelete(documento)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Eliminar</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {selectedDocument && (
-        <ClientPortal>
-          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-border/60 bg-card shadow-elevated">
-            <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Documento externo
-                </p>
-                <h3 className="mt-1 text-lg font-semibold">
-                  {selectedDocument.documento_nombre_original || `Documento ${selectedDocument.id}`}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Cargado el {formatDate(selectedDocument.fecha_hora_inicio)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedDocument(null)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              {selectedDocument.segmentos?.length ? (
-                <div className="space-y-5">
-                  {selectedDocument.segmentos.map((segmento) => (
-                    <div key={segmento.id}>
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Parte {segmento.orden}
-                      </p>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {segmento.texto}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Documento sin contenido extraído.</p>
-              )}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 p-5">
-              <button
-                type="button"
-                onClick={() => downloadExternalDocument(selectedDocument, "pdf")}
-                disabled={downloadingDocument === `${selectedDocument.id}-pdf`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
-              >
-                {downloadingDocument === `${selectedDocument.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Descargar PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadExternalDocument(selectedDocument, "docx")}
-                disabled={downloadingDocument === `${selectedDocument.id}-docx`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
-              >
-                {downloadingDocument === `${selectedDocument.id}-docx` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Descargar Word
-              </button>
-              <button
-                type="button"
-                onClick={() => setSessionToDelete(selectedDocument)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </ClientPortal>
-      )}
-
-      {/* Sessions header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h2 className="text-base sm:text-lg font-semibold tracking-tight">
-          Sesiones ({sesionesClinicas.length})
-        </h2>
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 w-full sm:w-auto">
-          {MOSTRAR_SESION_REMOTA && (
-            <button
-              onClick={openVirtualModal}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-50 px-3 py-2 text-xs sm:text-sm font-medium text-sky-700 shadow-subtle transition-all hover:bg-sky-100 hover:shadow-card dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50 w-full sm:w-auto"
-            >
-              <Video className="h-4 w-4 shrink-0" />
-              <span>Sesión remota</span>
-            </button>
-          )}
-          <button
-            onClick={() => setPsiconexModalOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-600 bg-sky-600 px-3 py-2 text-xs sm:text-sm font-medium text-white shadow-subtle transition-all hover:bg-sky-700 hover:shadow-card w-full sm:w-auto"
-          >
-            <Video className="h-4 w-4 shrink-0" />
-            <span>Sesión Virtual Psiconex</span>
-          </button>
-          <button
-            onClick={handleNewSession}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs sm:text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card w-full sm:w-auto"
-          >
-            <Play className="h-4 w-4 shrink-0" />
-            <span>Sesión presencial</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Remote session modal & audio assistant */}
-      {paciente && (
-        <>
-          <RemoteSessionModal
-            open={remoteModalOpen}
-            onClose={() => setRemoteModalOpen(false)}
-            paciente={paciente}
-            onSessionCreated={async () => {
-              await loadData();
-            }}
-            onStartAssistant={(sesion, meetUrl) => {
-              setActiveRemoteSession({ id: sesion.id, url_reunion: meetUrl });
-              setAssistantModalOpen(true);
-              loadData();
-            }}
-          />
-
-          <ModalCrearSesionVirtual
-            open={psiconexModalOpen}
-            onClose={() => setPsiconexModalOpen(false)}
-            paciente={paciente}
-            onSessionCreated={() => {
-              loadData();
-            }}
-          />
-
-          {activeRemoteSession && (
-            <RemoteAudioAssistantModal
-              open={assistantModalOpen}
-              onClose={() => {
-                setAssistantModalOpen(false);
-                setActiveRemoteSession(null);
-                loadData();
-              }}
-              sesionId={activeRemoteSession.id}
-              pacienteId={paciente.id}
-              pacienteNombre={paciente.nombre_completo}
-              meetUrl={activeRemoteSession.url_reunion}
-              onRecordingStarted={() => {
-                loadData();
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {/* Document modal */}
-      {documentModalOpen && (
-        <ClientPortal>
-          <form
-            onSubmit={handleDocumentUpload}
-            className="w-full max-w-lg rounded-xl border border-border/60 bg-card p-4 sm:p-6 shadow-elevated max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">Cargar documento externo</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Se guardará como documento externo, separado de las sesiones clínicas.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDocumentModalOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mt-5 space-y-4">
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">Fecha y hora</span>
-                <input
-                  type="datetime-local"
-                  value={documentDateTime}
-                  onChange={(event) => setDocumentDateTime(event.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </label>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">Archivo</span>
-                <input
-                  type="file"
-                  accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
-                />
-                <span className="block text-xs text-muted-foreground">
-                  Formatos permitidos: TXT, DOCX y PDF con texto seleccionable.
-                </span>
-              </label>
-            </div>
-            {documentError && (
-              <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {documentError}
-              </div>
-            )}
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDocumentModalOpen(false)}
-                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={uploadingDocument}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
-              >
-                {uploadingDocument && <Loader2 className="h-4 w-4 animate-spin" />}
-                {uploadingDocument ? "Cargando..." : "Cargar documento"}
-              </button>
-            </div>
-          </form>
-        </ClientPortal>
-      )}
-
-      <ConfirmDialog
-        open={!!sessionToDelete}
-        title={`Eliminar ${deleteTargetLabel}`}
-        description={
-          sessionToDelete
-            ? deleteTargetIsDocument
-              ? `Esta acción eliminará permanentemente el documento ${sessionToDelete.documento_nombre_original || `externo del ${formatDate(sessionToDelete.fecha_hora_inicio)}`}. No se puede deshacer.`
-              : deleteTargetIsTest
-                ? `Esta acción eliminará permanentemente el resultado del test ${sessionToDelete.documento_nombre_original || "psicológico"}. No se puede deshacer.`
-              : `Esta acción eliminará permanentemente la sesión del ${formatDate(sessionToDelete.fecha_hora_inicio)} a las ${formatTime(sessionToDelete.fecha_hora_inicio)}. No se puede deshacer.`
-            : ""
-        }
-        confirmLabel={`Eliminar ${deleteTargetLabel}`}
-        confirming={deletingSessionId === sessionToDelete?.id}
-        error={deleteSessionError}
-        onCancel={() => {
-          if (deletingSessionId) return;
-          setSessionToDelete(null);
-          setDeleteSessionError("");
-        }}
-        onConfirm={handleDeleteSession}
-      />
-
-      {/* Sessions list */}
-      {sesionesClinicas.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border/60 bg-card py-16 text-center shadow-subtle">
-          <Calendar className="mb-3 h-10 w-10 text-muted-foreground/50" />
-          <p className="text-sm font-medium">Sin sesiones clínicas registradas</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Presiona &ldquo;Sesión presencial&rdquo; o &ldquo;Sesión Virtual Psiconex&rdquo; para registrar la primera
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {sesionesClinicas.map((sesion) => {
-            const isExternalDocument = sesion.origen === "DOCUMENTO_EXTERNO";
-            const isRemote = sesion.origen === "VIRTUAL";
-            const isTest = sesion.origen === "TEST_PSICOLOGICO";
-            const sessionTitle = isExternalDocument
-              ? "Documento externo"
-              : isTest
-                ? sesion.documento_nombre_original || "Test psicológico"
-              : sesion.numero_sesion
-                ? `Sesión ${sesion.numero_sesion}`
-                : "Sesión";
-            return (
-              <div
-                key={sesion.id}
-                className="group flex flex-col sm:flex-row sm:items-center rounded-xl border border-border/60 bg-card text-left shadow-subtle transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card overflow-hidden"
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`)
-                  }
-                  className="flex min-w-0 flex-1 items-start sm:items-center gap-4 p-4 text-left w-full"
-                >
-                  <div
-                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
-                      isExternalDocument
-                        ? "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
-                        : isTest
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                        : isRemote
-                          ? "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300"
-                        : "bg-primary/10 text-primary"
-                    }`}
-                  >
-                    {isExternalDocument ? (
-                      <FileText className="h-5 w-5" />
-                    ) : isTest ? (
-                      <ClipboardList className="h-5 w-5" />
-                    ) : isRemote ? (
-                      <Video className="h-5 w-5" />
-                    ) : (
-                      <Calendar className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{sessionTitle}</p>
-                    <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span>{formatDate(sesion.fecha_hora_inicio)}</span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(sesion.fecha_hora_inicio)}
-                      </span>
-                      {isExternalDocument && (
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                          <FileText className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">
-                            {sesion.documento_nombre_original || "Documento externo"}
-                          </span>
-                        </span>
-                      )}
-                      {isTest && (
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                          <ClipboardList className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">Resultado de test</span>
-                        </span>
-                      )}
-                      {!isExternalDocument && sesion.duracion_segundos
-                        ? formatDuration(sesion.duracion_segundos)
-                        : null}
-                    </div>
-                  </div>
-                </button>
-                <div className="flex w-full sm:w-auto flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 border-t sm:border-t-0 border-border/40 bg-muted/10 sm:bg-transparent p-3 sm:p-4 sm:pl-0">
-                  <div className="flex gap-2">
-                    {isExternalDocument && (
-                      <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-                        Documento
-                      </span>
-                    )}
-                    {!isExternalDocument && (
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        isTest
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                          : isRemote
-                            ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-                            : "bg-primary/10 text-primary"
-                      }`}>
-                        {isTest ? "Test" : isRemote ? "Remota" : "Presencial"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadge(sesion.estado)}`}
-                    >
-                      {getStatusLabel(sesion.estado)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDeleteSessionError("");
-                        setSessionToDelete(sesion);
-                      }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground opacity-80 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      aria-label="Eliminar sesión"
-                      title="Eliminar sesión"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Saved AI reports */}
-      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-subtle">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Informes IA guardados
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Respuestas clínicas del asistente guardadas como documentos del paciente.
-            </p>
-          </div>
-          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-            {informes.length} informe{informes.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-        {informeSuccess && (
-          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-            {informeSuccess}
-          </div>
-        )}
-        {informes.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Aún no hay informes guardados. Guarda una respuesta del chat IA para conservarla como informe clínico.
-          </p>
-        ) : (
-          <div className="mt-4 grid gap-3">
-            {informes.map((informe) => (
-              <div key={informe.id} className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{informe.titulo || getInformeTipoLabel(informe.tipo)}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {getInformeTipoLabel(informe.tipo)} · {formatDate(informe.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedInforme(informe)}
-                      className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
-                    >
-                      Abrir
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadInforme(informe, "pdf")}
-                      disabled={downloadingInforme === `${informe.id}-pdf`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
-                    >
-                      {downloadingInforme === `${informe.id}-pdf` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                      PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadInforme(informe, "docx")}
-                      disabled={downloadingInforme === `${informe.id}-docx`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
-                    >
-                      {downloadingInforme === `${informe.id}-docx` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                      Word
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInformeToDelete(informe)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                  {cleanMarkdownEmphasis(informe.contenido)}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {selectedInforme && (
-        <ClientPortal>
-          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-border/60 bg-card shadow-elevated">
-            <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {getInformeTipoLabel(selectedInforme.tipo)}
-                </p>
-                <h3 className="mt-1 text-lg font-semibold">
-                  {selectedInforme.titulo || getInformeTipoLabel(selectedInforme.tipo)}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Generado el {formatDate(selectedInforme.created_at)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedInforme(null)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {cleanMarkdownEmphasis(selectedInforme.contenido)}
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 p-5">
-              <button
-                type="button"
-                onClick={() => downloadInforme(selectedInforme, "pdf")}
-                disabled={downloadingInforme === `${selectedInforme.id}-pdf`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
-              >
-                {downloadingInforme === `${selectedInforme.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Descargar PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadInforme(selectedInforme, "docx")}
-                disabled={downloadingInforme === `${selectedInforme.id}-docx`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
-              >
-                {downloadingInforme === `${selectedInforme.id}-docx` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Descargar Word
-              </button>
-              <button
-                type="button"
-                onClick={() => setInformeToDelete(selectedInforme)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </ClientPortal>
-      )}
-
-      <ConfirmDialog
-        open={!!informeToDelete}
-        title="Eliminar informe IA"
-        description={
-          informeToDelete
-            ? `Se eliminará permanentemente el informe "${informeToDelete.titulo || getInformeTipoLabel(informeToDelete.tipo)}".`
-            : ""
-        }
-        confirmLabel="Eliminar informe"
-        confirming={deletingInformeId === informeToDelete?.id}
-        error=""
-        onCancel={() => {
-          if (deletingInformeId) return;
-          setInformeToDelete(null);
-        }}
-        onConfirm={deleteInforme}
-      />
-
-      {/* Private notes */}
-      {paciente.notas_privadas && (
-        <div className="rounded-xl border border-border/60 bg-card p-5 shadow-subtle">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Notas privadas
-          </p>
-          <p className="mt-3 text-sm whitespace-pre-wrap leading-relaxed">
-            {paciente.notas_privadas}
-          </p>
-        </div>
-      )}
-
-      {/* ──────────────────────────────────────────────── */}
-      {/*  CHAT IA  –  ESTILO CHATGPT                     */}
-      {/* ──────────────────────────────────────────────── */}
-      <div className="relative rounded-2xl border border-border/60 bg-card chat-glow overflow-clip">
-        <div className="flex" style={{ minHeight: 540 }}>
-
-          {/* ── Chat Sidebar (Historial) ── */}
-          <div
-            className={`transition-all duration-300 overflow-hidden ${
-              isChatSidebarOpen
-                ? "absolute inset-0 z-30 bg-card flex flex-col md:relative md:inset-auto md:z-auto md:w-72 md:min-w-[288px] md:border-r md:border-border/60 md:bg-muted/20"
-                : "hidden md:flex md:w-0 md:min-w-0 md:border-r-0"
-            }`}
-          >
-            {/* Sidebar Header */}
-            <div className="flex items-center justify-between gap-2 px-4 py-3.5 border-b border-border/40">
-              <div className="flex items-center gap-2 min-w-0">
-                <Sparkles className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-sm font-semibold truncate">Conversaciones</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={createChatConversation}
-                  disabled={creatingChat}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 disabled:opacity-50"
-                  title="Nueva conversación"
-                >
-                  {creatingChat ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsChatSidebarOpen(false)}
-                  className="flex md:hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  title="Cerrar historial"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Conversation List */}
-            <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-              {chatConversations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center px-4">
-                  <MessageCircle className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                  <p className="text-xs text-muted-foreground">Sin conversaciones</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Crea una para empezar</p>
-                </div>
-              ) : (
-                chatConversations.map((conv) => {
-                  const isActive = conv.id === chatId;
-                  const isEditing = editingConversationId === conv.id;
-
-                  return (
-                    <div
-                      key={conv.id}
-                      className={`group relative flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-colors ${
-                        isActive
-                          ? "bg-primary/10 text-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      }`}
-                      onClick={() => {
-                        if (!isEditing) {
-                          loadChatConversation(conv.id);
-                          if (typeof window !== "undefined" && window.innerWidth < 768) {
-                            setIsChatSidebarOpen(false);
-                          }
-                        }
-                      }}
-                    >
-                      <MessageCircle className={`h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
-
-                      {isEditing ? (
-                        <input
-                          autoFocus
-                          value={editingConversationTitle}
-                          onChange={(e) => setEditingConversationTitle(e.target.value)}
-                          onKeyDown={async (e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              setChatTitle(editingConversationTitle);
-                              await saveChatTitle();
-                              setEditingConversationId(null);
-                            } else if (e.key === "Escape") {
-                              setEditingConversationId(null);
-                            }
-                          }}
-                          onBlur={() => setEditingConversationId(null)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-1 min-w-0 bg-background border border-input rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                      ) : (
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate font-medium text-sm leading-tight">
-                            {conv.titulo || "Nueva conversación"}
-                          </p>
-                          <p className="text-xs text-muted-foreground/60 mt-0.5">
-                            {formatRelativeTime(conv.updated_at)} · {conv.mensajes_count ?? 0} msgs
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Context actions (visible on hover or when active) */}
-                      {!isEditing && (
-                        <div className={`flex items-center gap-0.5 shrink-0 transition-opacity ${
-                          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                        }`}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingConversationId(conv.id);
-                              setEditingConversationTitle(conv.titulo || "");
-                              setChatTitle(conv.titulo || "");
-                            }}
-                            className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent"
-                            title="Renombrar"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setChatToDelete(conv);
-                            }}
-                            className="flex h-6 w-6 items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* ── Toggle Button (Chat Sidebar - solo desktop) ── */}
-          <div
-            className={`hidden md:flex relative items-start pt-3 z-10 transition-all duration-300 ${
-              isChatSidebarOpen ? "-mx-3.5" : "ml-4 -mr-3.5"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => setIsChatSidebarOpen(!isChatSidebarOpen)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:scale-110 transition-all"
-              title={isChatSidebarOpen ? "Ocultar historial" : "Mostrar historial"}
-            >
-              <ChevronLeft
-                className={`h-4 w-4 transition-transform duration-300 ${
-                  !isChatSidebarOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* ── Main Chat Area ── */}
-          <div className="flex flex-1 flex-col min-w-0">
-            {/* Chat Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
-              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-primary/10 shadow-glow shrink-0">
-                  <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <h2 className="text-sm sm:text-base font-semibold tracking-tight truncate">
-                      Chat IA del paciente
-                    </h2>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium text-primary shrink-0">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-soft" />
-                      IA
-                    </span>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
-                    {chatId
-                      ? chatConversations.find((c) => c.id === chatId)?.titulo || "Nueva conversación"
-                      : "Analiza sesiones y documentos con IA"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsChatSidebarOpen(true)}
-                  className="md:hidden inline-flex items-center gap-1 rounded-lg border border-border/80 bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground shadow-2xs hover:bg-accent active:scale-95"
-                  title="Ver conversaciones"
-                >
-                  <MessageCircle className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span>Historial</span>
-                </button>
-                {chatId && (
-                  <button
-                    type="button"
-                    onClick={() => setShowChatControls(!showChatControls)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 sm:px-2.5 py-1 text-xs font-medium shadow-subtle transition-all hover:bg-accent shrink-0"
-                  >
-                    {showChatControls ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                    <span className="hidden sm:inline">Controles</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Collapsible Controls */}
-            {showChatControls && chatId && (
-              <div className="flex items-center gap-3 border-b border-border/40 px-5 py-2.5 bg-muted/20 animate-fade-in-up">
-                <label className="flex-1 space-y-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Nombre de la conversación
-                  </span>
-                  <div className="flex gap-2">
-                    <input
-                      value={chatTitle}
-                      onChange={(event) => setChatTitle(event.target.value)}
-                      disabled={!chatId}
-                      className="flex-1 rounded-lg border border-input bg-background px-3 py-1.5 text-sm disabled:opacity-50"
-                      placeholder="Ej: Hipótesis inicial..."
-                    />
-                  </div>
-                </label>
-                <button
-                  type="button"
-                  onClick={saveChatTitle}
-                  disabled={!chatId || savingChatTitle}
-                  className="inline-flex items-center justify-center gap-1.5 self-end rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-subtle transition-all hover:bg-accent disabled:opacity-50"
-                >
-                  {savingChatTitle ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                  Guardar
-                </button>
-              </div>
-            )}
-
-            {chatError && (
-              <div className="mx-5 mt-3 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
-                {chatError}
-              </div>
-            )}
-
-            {/* Message Area */}
-            <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto space-y-4 p-5 transition-all">
-              {loadingChat ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Cargando conversación...
-                </div>
-              ) : !chatId ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                    <MessageCircle className="h-6 w-6 text-primary" />
-                  </div>
-                  <p className="text-sm font-medium">Crea una conversación para empezar</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    La IA analizará las sesiones y documentos de este paciente
-                  </p>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                    <Brain className="h-6 w-6 text-primary" />
-                  </div>
-                  <p className="text-sm font-medium">
-                    ¿En qué puedo ayudarte con {paciente.nombre_completo || `${paciente.nombre} ${paciente.apellido}`.trim()}?
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pregunta sobre patrones, temas recurrentes o cualquier aspecto clínico
-                  </p>
-                </div>
-              ) : (
-                messages.map((message, index) => {
-                  const isUser = message.rol === "USER";
-                  const sources = deduplicateSources(message.fuentes_json || []);
-                  const sourcesOpen = expandedSources.has(message.id);
-
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex gap-3 animate-fade-in-up ${
-                        isUser ? "flex-row-reverse" : ""
-                      }`}
-                    >
-                      {/* Avatar */}
-                      <div
-                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
-                          isUser
-                            ? "bg-primary/10 text-primary"
-                            : "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300"
-                        }`}
-                      >
-                        {isUser ? (
-                          <span className="text-xs font-bold">
-                            {paciente?.nombre.charAt(0).toUpperCase() || "P"}
-                          </span>
-                        ) : (
-                          <Sparkles className="h-4 w-4" />
-                        )}
-                      </div>
-
-                      {/* Bubble */}
-                      <div className={`max-w-[75%] space-y-1 ${isUser ? "items-end" : ""}`}>
-                        <div
-                          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                            isUser
-                              ? "rounded-tr-md bg-primary text-primary-foreground shadow-subtle"
-                              : "rounded-tl-md border border-border/60 bg-card text-foreground shadow-subtle"
-                          }`}
-                        >
-                          <p className="whitespace-pre-wrap">{cleanMarkdownEmphasis(message.contenido)}</p>
-                        </div>
-
-                        {!isUser && (
-                          <button
-                            type="button"
-                            onClick={() => saveMessageAsInforme(message)}
-                            disabled={savingInformeId === message.id}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-                          >
-                            {savingInformeId === message.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Save className="h-3 w-3" />
-                            )}
-                            Guardar como informe
-                          </button>
-                        )}
-
-                        {/* Timestamp */}
-                        <p
-                          className={`text-xs text-muted-foreground ${
-                            isUser ? "text-right" : "text-left"
-                          }`}
-                        >
-                          {message.id > 9999999 ? "ahora" : ""}
-                        </p>
-
-                        {/* Sources (AI only) */}
-                        {!isUser && sources.length > 0 && (
-                          <div className="mt-1">
-                            <button
-                              onClick={() => toggleSources(message.id)}
-                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                            >
-                              <FileText className="h-3 w-3" />
-                              Fuentes ({sources.length})
-                              {sourcesOpen ? (
-                                <ChevronUp className="h-3 w-3" />
-                              ) : (
-                                <ChevronDown className="h-3 w-3" />
-                              )}
-                            </button>
-                            {sourcesOpen && (
-                              <div className="mt-2 space-y-2 animate-fade-in-up">
-                                {sources.map((src, i) => (
-                                  <div
-                                    key={i}
-                                    className="rounded-lg border border-border/60 bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
-                                  >
-                                    <div className="flex items-center gap-2 font-medium text-foreground">
-                                      <FileText className="h-3 w-3 text-violet-500" />
-                                      {src.origen === "DOCUMENTO_EXTERNO"
-                                        ? src.documento_nombre_original || "Documento"
-                                        : `Sesión ${src.fecha}`}
-                                      {src.hablante && (
-                                        <span className="rounded bg-muted px-1 py-0.5 text-muted-foreground">
-                                          {src.hablante === "PSICOLOGO"
-                                            ? "Psicólogo"
-                                            : src.hablante === "PACIENTE"
-                                              ? "Paciente"
-                                              : src.hablante}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="mt-1 line-clamp-3">{src.texto}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-
-              {/* Typing indicator */}
-              {iaTyping && (
-                <div className="flex animate-fade-in-up items-start gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div className="flex items-center gap-1 rounded-2xl rounded-tl-md border border-border/60 bg-card px-4 py-3 shadow-subtle">
-                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
-                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
-                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-typing-dot" />
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Suggested Prompts */}
-            <div className="border-t border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
-              <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Preguntas sugeridas
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
-                {CHAT_SUGGESTED_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => selectSuggestedChatPrompt(prompt)}
-                    disabled={sendingChat || creatingChat}
-                    className="rounded-full border border-border/80 bg-card px-2.5 py-1 text-[11px] sm:text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50 text-left max-w-full truncate"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Chat Input */}
-            <div className="border-t border-border/40 px-3 sm:px-5 py-2.5 sm:py-3">
-              <form onSubmit={sendChatMessage} className="flex items-end gap-2">
-                <textarea
-                  ref={textareaRef}
-                  value={chatInput}
-                  onChange={handleTextareaChange}
-                  onKeyDown={handleKeyDown}
-                  rows={1}
-                  disabled={sendingChat || creatingChat}
-                  className="flex-1 min-w-0 resize-none rounded-xl border border-input bg-background px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm leading-relaxed transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
-                  placeholder={
-                    chatId
-                      ? `Pregunta sobre las sesiones de ${paciente.nombre_completo || `${paciente.nombre} ${paciente.apellido}`.trim()}...`
-                      : "Crea una conversación para empezar"
-                  }
-                />
-                <button
-                  type="submit"
-                  disabled={sendingChat || creatingChat || !chatInput.trim()}
-                  className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-subtle transition-all hover:bg-primary/90 hover:shadow-card disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {sendingChat ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
-                  )}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <ConfirmDialog
-        open={!!chatToDelete}
-        title="Eliminar conversación IA"
-        description={
-          chatToDelete
-            ? `Se eliminará permanentemente la conversación "${chatToDelete.titulo || "Nueva conversación"}" y todos sus mensajes.`
-            : ""
-        }
-        confirmLabel="Eliminar conversación"
-        confirming={deletingChat}
-        error=""
-        onCancel={() => {
-          if (deletingChat) return;
-          setChatToDelete(null);
-        }}
-        onConfirm={deleteChatConversation}
-      />
     </div>
   );
 }
