@@ -13,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from pacientes.models import Paciente
 from sesiones.embeddings import cosine_similarity, generate_text_embedding
 from sesiones.models import Sesion, TranscripcionSegmento
+from .seudonimo import seudonimizar
 from .models import ChatConversacion, ChatMensaje, InformeIA
 from .serializers import (
     ChatConversacionSerializer,
@@ -88,7 +89,9 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         contexto = "\n\n".join(
             parte for parte in [contexto_paciente, contexto_sesiones] if parte.strip()
         )
-        respuesta = self._consultar_deepseek(contenido, contexto, user=request.user)
+        # DeepSeek nunca recibe el nombre del paciente ni nombres de archivo.
+        pregunta = seudonimizar(contenido, conversacion.paciente)
+        respuesta = self._consultar_deepseek(pregunta, contexto, user=request.user)
 
         mensaje_asistente = ChatMensaje.objects.create(
             conversacion=conversacion,
@@ -154,18 +157,12 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
         for seg in diversified:
             fecha = seg.sesion.fecha_hora_inicio.strftime("%d/%m/%Y")
             if seg.sesion.origen == Sesion.Origen.DOCUMENTO_EXTERNO:
-                etiqueta = f"Documento externo {fecha}"
-                if seg.sesion.documento_nombre_original:
-                    etiqueta = f"{etiqueta} - {seg.sesion.documento_nombre_original}"
-                contexto.append(f"[{etiqueta}]: {seg.texto}")
+                contexto.append(f"[Documento externo {fecha}]: {seudonimizar(seg.texto, paciente)}")
             elif seg.sesion.origen == Sesion.Origen.TEST_PSICOLOGICO:
-                etiqueta = f"Test psicológico {fecha}"
-                if seg.sesion.documento_nombre_original:
-                    etiqueta = f"{etiqueta} - {seg.sesion.documento_nombre_original}"
-                contexto.append(f"[{etiqueta}]: {seg.texto}")
+                contexto.append(f"[Test psicológico {fecha}]: {seudonimizar(seg.texto, paciente)}")
             else:
                 contexto.append(
-                    f"[Sesión {fecha} - {seg.hablante}]: {seg.texto}"
+                    f"[Sesión {fecha} - {seg.hablante}]: {seudonimizar(seg.texto, paciente)}"
                 )
             fuentes.append(
                 {
@@ -183,16 +180,14 @@ class ChatConversacionViewSet(viewsets.ModelViewSet):
 
     def _contexto_paciente(self, paciente):
         campos = [
-            ("Nombre", paciente.nombre_completo),
             ("Edad", f"{paciente.edad} años" if paciente.edad else ""),
             ("Sexo", paciente.get_sexo_display() if paciente.sexo else ""),
-            ("Ocupación", paciente.ocupacion_laboral),
-            ("Motivo de consulta", paciente.motivo_consulta),
-            ("Objetivos de intervención", paciente.objetivos_intervencion),
+            ("Motivo de consulta", seudonimizar(paciente.motivo_consulta, paciente)),
+            ("Objetivos de intervención", seudonimizar(paciente.objetivos_intervencion, paciente)),
             ("Diagnóstico sospechado", paciente.diagnostico_sospechado),
             ("Medicación actual", paciente.medicacion_actual),
             ("Frecuencia de atención", paciente.frecuencia_atencion),
-            ("Derivación/interconsulta", paciente.derivacion_interconsulta),
+            ("Derivación/interconsulta", seudonimizar(paciente.derivacion_interconsulta, paciente)),
         ]
 
         if paciente.riesgo_suicida:
