@@ -270,3 +270,75 @@ class PasswordResetTests(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("Password123!Safe"))
 
+
+
+class EliminarCuentaTests(TestCase):
+    def setUp(self):
+        import tempfile
+
+        from django.test import override_settings as _override
+
+        self.audio_root = tempfile.mkdtemp()
+        override = _override(AUDIO_STORAGE_PATH=self.audio_root)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.user = get_user_model().objects.create_user(
+            username="borrar", email="borrar@example.com", password="Clave-segura-1"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _crear_datos(self):
+        import os
+
+        from pacientes.models import Paciente
+        from sesiones.audio import carpeta_audio_paciente
+
+        paciente = Paciente.objects.create(psicologo=self.user, nombre="Ana", apellido="Rojas")
+        carpeta = carpeta_audio_paciente(paciente.id)
+        os.makedirs(carpeta)
+        with open(os.path.join(carpeta, "1.webm"), "wb") as f:
+            f.write(b"audio")
+        return paciente, carpeta
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_elimina_bd_archivos_y_cancela_mp(self, mock_sdk):
+        import os
+
+        from pacientes.models import Paciente
+
+        self.user.suscripcion.mp_preapproval_id = "pre-123"
+        self.user.suscripcion.save()
+        paciente, carpeta = self._crear_datos()
+
+        response = self.client.post("/api/cuenta/eliminar/", {"password": "Clave-segura-1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(get_user_model().objects.filter(pk=self.user.pk).exists())
+        self.assertFalse(Paciente.objects.filter(pk=paciente.pk).exists())
+        self.assertFalse(os.path.exists(carpeta))
+        mock_sdk.return_value.preapproval.return_value.update.assert_called_once_with(
+            "pre-123", {"status": "cancelled"}
+        )
+
+    @patch("suscripciones.views._get_mp_sdk", side_effect=RuntimeError("MP caído"))
+    def test_fallo_de_mp_no_impide_eliminar(self, _mock_sdk):
+        self.user.suscripcion.mp_preapproval_id = "pre-123"
+        self.user.suscripcion.save()
+        response = self.client.post("/api/cuenta/eliminar/", {"password": "Clave-segura-1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(get_user_model().objects.filter(pk=self.user.pk).exists())
+
+    def test_contrasena_incorrecta_no_elimina(self):
+        response = self.client.post("/api/cuenta/eliminar/", {"password": "otra"})
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(get_user_model().objects.filter(pk=self.user.pk).exists())
+
+    def test_usuario_google_confirma_escribiendo_eliminar(self):
+        self.user.set_unusable_password()
+        self.user.save()
+        response = self.client.post("/api/cuenta/eliminar/", {"confirmacion": "borrar"})
+        self.assertEqual(response.status_code, 400)
+        response = self.client.post("/api/cuenta/eliminar/", {"confirmacion": "ELIMINAR"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(get_user_model().objects.filter(pk=self.user.pk).exists())

@@ -13,10 +13,10 @@ from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-import os
 import logging
 from django.db.models import Count, Sum
 from cuentas.models import RegistroConsumoIA
+from cuentas.services import eliminar_cuenta
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 from suscripciones.models import Suscripcion
@@ -350,30 +350,7 @@ def delete_user(request, user_id):
         return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
     username = user.username
-
-    # 1. Cancelar preapproval en Mercado Pago si tiene suscripción con débito recurrente
-    if hasattr(user, "suscripcion") and user.suscripcion.mp_preapproval_id:
-        try:
-            from suscripciones.views import _get_mp_sdk
-            sdk = _get_mp_sdk()
-            sdk.preapproval().update(user.suscripcion.mp_preapproval_id, {"status": "cancelled"})
-        except Exception as exc:
-            logger.warning(
-                "No se pudo cancelar preapproval en MP al borrar usuario %s: %s", username, exc
-            )
-
-    # 2. Limpieza de archivos físicos en disco (audios de sesiones)
-    sesiones_con_audio = Sesion.objects.filter(paciente__psicologo=user).exclude(audio_path="")
-    for ses in sesiones_con_audio:
-        if ses.audio_path and os.path.exists(ses.audio_path):
-            try:
-                os.remove(ses.audio_path)
-            except OSError:
-                pass
-
-    # 3. Borrado atómico de la cuenta y relaciones en cascada
-    with transaction.atomic():
-        user.delete()
+    eliminar_cuenta(user)
 
     return Response({
         "detail": f"El usuario {username} y todos sus datos fueron eliminados permanentemente."

@@ -321,3 +321,48 @@ def registrar_consumo_ia(
         import logging
         logging.getLogger(__name__).warning("Error al registrar consumo IA: %s", exc)
         return None
+
+
+def eliminar_cuenta(user):
+    """Elimina la cuenta y todos sus datos: BD (en cascada), audios y adjuntos.
+
+    Antes cancela el débito en Mercado Pago y revoca el acceso a Google Calendar.
+    Un fallo en esos servicios externos se registra pero no impide el borrado.
+    """
+    import logging
+
+    from agenda.google_calendar import _revoke_connection
+    from agenda.models import AgendaGoogleCalendarConnection
+    from pacientes.models import Paciente
+    from sesiones.audio import borrar_carpeta_paciente
+
+    logger = logging.getLogger(__name__)
+    username = user.username
+
+    suscripcion = getattr(user, "suscripcion", None)
+    if suscripcion and suscripcion.mp_preapproval_id:
+        try:
+            from suscripciones.views import _get_mp_sdk
+
+            _get_mp_sdk().preapproval().update(
+                suscripcion.mp_preapproval_id, {"status": "cancelled"}
+            )
+        except Exception as exc:
+            logger.warning(
+                "No se pudo cancelar preapproval en MP al borrar usuario %s: %s", username, exc
+            )
+
+    conexion = AgendaGoogleCalendarConnection.objects.filter(psicologo=user).first()
+    if conexion:
+        _revoke_connection(conexion)
+
+    paciente_ids = list(Paciente.objects.filter(psicologo=user).values_list("id", flat=True))
+    for feedback in user.feedbacks.exclude(archivo_adjunto=""):
+        feedback.archivo_adjunto.delete(save=False)
+
+    with transaction.atomic():
+        user.delete()
+
+    for paciente_id in paciente_ids:
+        borrar_carpeta_paciente(paciente_id)
+    logger.info("Cuenta %s eliminada con %s pacientes.", username, len(paciente_ids))

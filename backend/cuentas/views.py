@@ -6,6 +6,7 @@ from rest_framework.response import Response
 
 from .serializers import PerfilPsicologoSerializer
 from .services import (
+    eliminar_cuenta,
     get_or_create_profile,
     request_notification_email_change,
     verify_notification_email,
@@ -43,3 +44,28 @@ def verify_notification_email_view(request):
         )
     profile = verify_notification_email(request.user, code)
     return Response(PerfilPsicologoSerializer(profile).data)
+
+
+@ratelimit(key="user", rate="5/h", method="POST", block=True)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def eliminar_cuenta_view(request):
+    user = request.user
+    if user.is_superuser:
+        return Response(
+            {"detail": "Una cuenta de superusuario no se puede eliminar desde aquí."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if user.has_usable_password():
+        if not user.check_password(request.data.get("password", "")):
+            return Response(
+                {"password": ["La contraseña no es correcta."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    elif str(request.data.get("confirmacion", "")).strip() != "ELIMINAR":
+        return Response(
+            {"confirmacion": ["Escribe ELIMINAR para confirmar."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    eliminar_cuenta(user)
+    return Response({"detail": "Tu cuenta y todos tus datos fueron eliminados."})

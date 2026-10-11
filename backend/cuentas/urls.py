@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import profile_detail, verify_notification_email_view
+from .views import eliminar_cuenta_view, profile_detail, verify_notification_email_view
 
 
 urlpatterns = [
@@ -10,4 +10,5 @@ urlpatterns = [
         verify_notification_email_view,
         name="cuenta-verificar-email",
     ),
+    path("eliminar/", eliminar_cuenta_view, name="cuenta-eliminar"),
 ]
