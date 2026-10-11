@@ -5,7 +5,7 @@ Tu profesional tratante {{ psychologist_name }} te ha enviado el documento de Co
 Puedes revisarlo y firmarlo de forma digital en el siguiente enlace:
 {{ public_url }}
 
-Este documento formaliza el resguardo ético y legal de tu información de conformidad con la Ley N° 19.628 sobre Protección de la Vida Privada y la Ley N° 20.584 de Derechos y Deberes en Salud.
+El documento explica cómo se tratan tus datos, qué proveedores participan en el registro de las sesiones y cómo ejercer tus derechos o revocar el consentimiento, en el marco de la Ley N° 19.628 sobre Protección de la Vida Privada y la Ley N° 20.584 de Derechos y Deberes en Salud.
 
 Saludos,
 Equipo Psiconex

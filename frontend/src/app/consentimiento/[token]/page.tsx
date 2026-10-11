@@ -309,9 +309,8 @@ export default function PublicConsentimientoPage() {
                   Consentimiento informado registrado exitosamente
                 </h2>
                 <p className="mt-1 text-xs text-emerald-800 leading-relaxed">
-                  Tu firma electrónica ha sido autenticada y vinculada de forma segura a tu ficha clínica. El
-                  documento cuenta con pleno resguardo de confidencialidad conforme a la Ley N° 19.628 y Ley N°
-                  20.584.
+                  Tu firma electrónica quedó registrada en tu ficha clínica. Puedes solicitar una copia o revocar
+                  este consentimiento directamente a tu profesional tratante.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-emerald-700 font-medium">
                   <span>Firmante: {payload.firma_nombre || nombreFirmante}</span>
@@ -355,7 +354,7 @@ export default function PublicConsentimientoPage() {
               {payload.titulo}
             </h1>
             <p className="text-xs text-slate-500 mt-1 italic">
-              En conformidad a la Ley N° 19.628 sobre Protección de la Vida Privada y la Ley N° 20.584 de Derechos
+              En el marco de la Ley N° 19.628 sobre Protección de la Vida Privada y la Ley N° 20.584 de Derechos
               y Deberes en Salud
             </p>
           </div>
@@ -535,9 +534,9 @@ export default function PublicConsentimientoPage() {
                   />
                   <span className="text-xs text-slate-700 leading-relaxed font-medium">
                     Declaro haber leído detenidamente este Consentimiento Informado, he comprendido las condiciones
-                    del proceso terapéutico, los límites de la confidencialidad y las garantías de la Ley N° 19.628,
-                    y <strong>otorgo libre, previa e informadamente mi consentimiento</strong> para la atención
-                    psicológica y el registro asistido seguro de las sesiones.
+                    del proceso terapéutico, los límites de la confidencialidad y el tratamiento de mis datos
+                    personales descrito, y <strong>otorgo libre, previa e informadamente mi consentimiento</strong>{" "}
+                    para la atención psicológica y el registro asistido de las sesiones.
                   </span>
                 </label>
               </div>
@@ -553,7 +552,7 @@ export default function PublicConsentimientoPage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
                   <Lock className="h-3.5 w-3.5 text-slate-400" />
-                  <span>Transmisión cifrada mediante HTTPS (TLS) con custodia clínica</span>
+                  <span>Transmisión cifrada mediante HTTPS (TLS)</span>
                 </div>
 
                 <button
@@ -572,7 +571,8 @@ export default function PublicConsentimientoPage() {
         {/* Footer */}
         <footer className="mt-8 text-center text-xs text-slate-400 print:hidden">
           <p>© {new Date().getFullYear()} Psiconex • Plataforma Clínica Integral para Profesionales de la Salud Mental</p>
-          <p className="mt-1">Respaldo de consentimiento electrónico conforme a la Ley N° 19.628 y Ley N° 20.584 de Chile.</p>
+          {/* TODO(revisión legal): textos de esta página pendientes de revisión. */}
+          <p className="mt-1">Consentimiento electrónico emitido en el marco de la Ley N° 19.628 y la Ley N° 20.584 de Chile.</p>
         </footer>
       </div>
     </main>

@@ -248,15 +248,22 @@ export default function ConsentimientoInformadoModal({
 - Calidad: Padre / Madre / Representante legal acreditado`;
       }
 
+      // TODO(revisión legal): redacción de la cláusula 5, derechos y declaración pendientes de revisión.
       let grabacionSection = "";
       if (incluirGrabacion) {
         grabacionSection = `
 5. ASISTENCIA DIGITAL CLÍNICA Y REGISTRO DE AUDIO DE SESIONES (LEY N° 19.628)
-Con el objetivo de resguardar la rigurosidad del proceso terapéutico, optimizar la confección de notas clínicas y preparar adecuadamente cada intervención, el/la profesional tratante podrá apoyarse en la plataforma clínica digital Psiconex.
-En estricto cumplimiento de la Ley N° 19.628 sobre Protección de la Vida Privada y Tratamiento de Datos Personales, se establece y garantiza:
-a) Finalidad Exclusiva: El eventual registro de audio y/o transcripción digital se destina de manera única y exclusiva a fines de apoyo clínico, análisis terapéutico y resguardo de la ficha clínica del/de la profesional tratante.
-b) Cifrado y Confidencialidad: Todos los registros son tratados bajo estrictos protocolos de ciberseguridad, incluyendo la transmisión cifrada de la información mediante HTTPS (TLS). La información permanece bajo control del profesional tratante y jamás será vendida, transferida ni compartida con terceros ajenos al proceso terapéutico.
-c) Voluntariedad y Revocación: La autorización para la asistencia digital o registro de audio es enteramente voluntaria. El/la paciente podrá solicitar en cualquier momento la interrupción de la grabación durante una sesión o revocar este consentimiento cuando lo estime oportuno, sin que ello afecte la continuidad ni la calidad de la atención psicológica.`;
+Con el objetivo de resguardar la rigurosidad del proceso terapéutico y optimizar la confección de notas clínicas, el/la profesional tratante podrá apoyarse en la plataforma clínica digital Psiconex. Al respecto, se informa:
+a) Finalidad: El registro de audio y su transcripción se destinan exclusivamente a apoyo clínico, análisis terapéutico y resguardo de la ficha clínica del/de la profesional tratante.
+b) Eliminación del audio: El audio se utiliza solo para generar la transcripción escrita y se elimina una vez completada. Si el procesamiento falla, se conserva por un máximo de 7 días para reintentarlo y luego se elimina. La transcripción queda en la ficha clínica.
+c) Proveedores tecnológicos: Para prestar el servicio, Psiconex utiliza proveedores que operan fuera de Chile y que reciben solo la información necesaria para su función:
+- Deepgram (Estados Unidos): convierte el audio en texto y distingue las voces. Se le solicita no utilizar el audio para mejorar sus modelos.
+- DeepSeek (China): solo cuando el/la profesional lo solicita, analiza fragmentos de texto de las sesiones como apoyo clínico. Recibe el texto sin el nombre del/de la paciente.
+- Google Calendar (Estados Unidos, opcional): si el/la profesional sincroniza su agenda, recibe el nombre del/de la paciente y la fecha y hora de las citas.
+- Servicios de alojamiento y de envío de correos electrónicos necesarios para operar la plataforma.
+La información no se vende ni se utiliza con fines publicitarios.
+d) Seguridad: La información se transmite cifrada (HTTPS/TLS), el acceso a la ficha está restringido al/a la profesional tratante y la plataforma registra los accesos a la información clínica.
+e) Voluntariedad y revocación: La autorización para la asistencia digital o registro de audio es enteramente voluntaria. El/la paciente podrá solicitar en cualquier momento la interrupción de la grabación durante una sesión o revocar este consentimiento, sin que ello afecte la continuidad ni la calidad de la atención psicológica. La revocación no afecta los registros realizados con anterioridad, cuya eliminación podrá solicitar al/a la profesional tratante, sin perjuicio de los deberes legales de conservación de la ficha clínica.`;
       }
 
       let acuerdosSection = "";
@@ -304,11 +311,11 @@ ${numDerechos}. DERECHOS DEL/DE LA PACIENTE (LEY N° 20.584 Y LEY N° 19.628)
 El/la paciente (o su tutor legal) tiene derecho a:
 - Recibir información clara, suficiente y comprensible acerca de su estado de salud, evolución y propuestas de tratamiento.
 - Realizar todas las preguntas que considere pertinentes antes, durante y después del proceso.
-- Ejercer los derechos de información, actualización o rectificación sobre sus datos personales sensibles conforme a la Ley N° 19.628.
+- Ejercer los derechos de acceso, rectificación, cancelación u oposición sobre sus datos personales sensibles conforme a la Ley N° 19.628, solicitándolo al/a la profesional tratante.
 - Suspender o dar por finalizado voluntariamente el tratamiento en cualquier momento si así lo decide.
 
 ${numDeclaracion}. DECLARACIÓN Y CONSENTIMIENTO
-"Declaro que he leído el presente documento (o que me ha sido explicado detalladamente por el/la profesional tratante). He contado con el tiempo y la instancia para plantear preguntas y aclarar todas mis inquietudes. Comprendo la naturaleza del tratamiento, los límites de la confidencialidad, las garantías de privacidad de mis datos personales y, de conformidad con lo expuesto, otorgo de manera libre e informada mi consentimiento para la atención psicológica y el registro asistido seguro de las sesiones clínicas."
+"Declaro que he leído el presente documento (o que me ha sido explicado detalladamente por el/la profesional tratante). He contado con el tiempo y la instancia para plantear preguntas y aclarar todas mis inquietudes. Comprendo la naturaleza del tratamiento, los límites de la confidencialidad, el tratamiento de mis datos personales aquí descrito y, de conformidad con lo expuesto, otorgo de manera libre e informada mi consentimiento para la atención psicológica y el registro asistido de las sesiones clínicas."
 
 
 _________________________________________             _________________________________________
