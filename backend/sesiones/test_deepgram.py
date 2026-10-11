@@ -69,7 +69,7 @@ class DeepgramDiarizationTests(SimpleTestCase):
                 "language": "es",
                 "diarize": "true",
                 "utterances": "true",
-                "punctuate": "true",
+                "mip_opt_out": "true",
             },
         )
         self.assertEqual(kwargs["timeout"], 5)

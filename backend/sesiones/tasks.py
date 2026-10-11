@@ -265,7 +265,8 @@ def _run_deepgram_diarization(audio_path):
         "language": settings.DEEPGRAM_LANGUAGE,
         "diarize": "true",
         "utterances": "true",
-        "punctuate": "true",
+        # Excluye el audio del programa de mejora de modelos de Deepgram.
+        "mip_opt_out": "true",
     }
 
     logger.info("Enviando audio a Deepgram para diarización.")
