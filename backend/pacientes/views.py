@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.db.models import OuterRef, Subquery
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -27,6 +29,7 @@ from .serializers import (
 )
 from .services import (
     build_public_consentimiento_url,
+    consentimiento_vigente,
     find_consentimiento_by_token,
     generate_token,
     hash_token,
@@ -96,6 +99,30 @@ class PacienteViewSet(viewsets.ModelViewSet):
             as_attachment=True,
             filename=f"psiconex-{carpeta_paciente(paciente)}.zip",
             content_type="application/zip",
+        )
+
+    @action(detail=True, methods=["post", "delete"], url_path="consentimiento/papel")
+    def consentimiento_papel(self, request, pk=None):
+        """Declara (o retira) un consentimiento firmado fuera de Psiconex."""
+        paciente = self.get_object()
+        if request.method == "DELETE":
+            paciente.consentimiento_papel_fecha = None
+        else:
+            fecha = request.data.get("fecha")
+            try:
+                paciente.consentimiento_papel_fecha = (
+                    date.fromisoformat(fecha) if fecha else timezone.localdate()
+                )
+            except (TypeError, ValueError):
+                return Response({"fecha": ["Fecha inválida (AAAA-MM-DD)."]}, status=400)
+            if paciente.consentimiento_papel_fecha > timezone.localdate():
+                return Response({"fecha": ["La fecha no puede ser futura."]}, status=400)
+        paciente.save(update_fields=["consentimiento_papel_fecha", "updated_at"])
+        return Response(
+            {
+                "consentimiento_papel_fecha": paciente.consentimiento_papel_fecha,
+                "consentimiento_vigente": consentimiento_vigente(paciente),
+            }
         )
 
     def perform_create(self, serializer):

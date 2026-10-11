@@ -2,12 +2,17 @@ from rest_framework import serializers
 
 from .documentos import TIPO_RUT, formatear_documento, normalizar_documento
 from .models import Paciente, ConsentimientoInformado
+from .services import consentimiento_vigente
 
 
 class PacienteSerializer(serializers.ModelSerializer):
     consentimiento_estado = serializers.SerializerMethodField()
     consentimiento_id = serializers.SerializerMethodField()
     consentimiento_fecha_firma = serializers.SerializerMethodField()
+    consentimiento_vigente = serializers.SerializerMethodField()
+
+    def get_consentimiento_vigente(self, obj):
+        return consentimiento_vigente(obj)
 
     def get_consentimiento_estado(self, obj):
         latest = obj.consentimientos.first()
@@ -63,6 +68,8 @@ class PacienteSerializer(serializers.ModelSerializer):
             "consentimiento_estado",
             "consentimiento_id",
             "consentimiento_fecha_firma",
+            "consentimiento_vigente",
+            "consentimiento_papel_fecha",
             "created_at",
             "updated_at",
         ]
@@ -73,6 +80,8 @@ class PacienteSerializer(serializers.ModelSerializer):
             "consentimiento_estado",
             "consentimiento_id",
             "consentimiento_fecha_firma",
+            "consentimiento_vigente",
+            "consentimiento_papel_fecha",
             "created_at",
             "updated_at",
         ]

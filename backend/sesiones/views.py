@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from cuentas.acceso import registrar_acceso
 from cuentas.models import RegistroAcceso
+from pacientes.services import consentimiento_vigente
 
 from .audio import borrar_archivos_audio
 from .documentos import (
@@ -111,6 +112,7 @@ class SesionViewSet(viewsets.ModelViewSet):
         sesion.estado = Sesion.Estado.PROCESANDO
         if sesion.psicologo_id is None:
             sesion.psicologo = request.user
+        sesion.procesada_sin_consentimiento = not consentimiento_vigente(sesion.paciente)
         sesion.save()
 
         # Disparamos la tarea de procesamiento en segundo plano
@@ -157,6 +159,9 @@ class SesionViewSet(viewsets.ModelViewSet):
                 estado=Sesion.Estado.COMPLETADO,
                 documento_nombre_original=getattr(archivo, "name", ""),
                 documento_mime_type=getattr(archivo, "content_type", ""),
+                procesada_sin_consentimiento=not consentimiento_vigente(
+                    serializer.validated_data["paciente"]
+                ),
             )
 
             for index, segmento_texto in enumerate(segmentos_texto, start=1):
@@ -385,7 +390,10 @@ class SesionViewSet(viewsets.ModelViewSet):
                     for chunk in archivo.chunks():
                         destination.write(chunk)
 
-        update_fields = ["estado_videollamada", "estado", "audio_path", "audio_eliminado_en", "updated_at"]
+        update_fields = [
+            "estado_videollamada", "estado", "audio_path", "audio_eliminado_en",
+            "procesada_sin_consentimiento", "updated_at",
+        ]
         notas = request.data.get("notas_sesion")
         if notas is not None:
             sesion.notas_sesion = notas
@@ -394,6 +402,7 @@ class SesionViewSet(viewsets.ModelViewSet):
         sesion.estado = Sesion.Estado.PROCESANDO
         sesion.audio_path = path_stereo or path_psi
         sesion.audio_eliminado_en = None
+        sesion.procesada_sin_consentimiento = not consentimiento_vigente(sesion.paciente)
         sesion.save(update_fields=update_fields)
 
         from .tasks import procesar_audio_dual_track
@@ -537,7 +546,11 @@ class SesionViewSet(viewsets.ModelViewSet):
             sesion.estado = Sesion.Estado.COMPLETADO
             sesion.duracion_segundos = int(duracion) + 5
             sesion.captions_buffer = []
-            sesion.save(update_fields=["estado", "duracion_segundos", "captions_buffer", "updated_at"])
+            sesion.procesada_sin_consentimiento = not consentimiento_vigente(sesion.paciente)
+            sesion.save(update_fields=[
+                "estado", "duracion_segundos", "captions_buffer",
+                "procesada_sin_consentimiento", "updated_at",
+            ])
 
         return Response(SesionSerializer(self.get_queryset().get(id=sesion.id)).data)
 

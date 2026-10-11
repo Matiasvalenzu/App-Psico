@@ -63,6 +63,8 @@ class Paciente(models.Model):
     frecuencia_atencion = models.CharField(max_length=80, blank=True, default="")
     objetivos_intervencion = models.TextField(blank=True, default="")
     notas_privadas = models.TextField(blank=True, default="")
+    # Consentimiento firmado fuera de Psiconex (papel u otro medio), declarado por el profesional.
+    consentimiento_papel_fecha = models.DateField(null=True, blank=True)
     estado = models.CharField(
         max_length=20,
         choices=Estado.choices,

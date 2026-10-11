@@ -44,6 +44,8 @@ class Sesion(models.Model):
     duracion_segundos = models.PositiveIntegerField(null=True, blank=True)
     audio_path = models.CharField(max_length=500, blank=True, default="")
     audio_eliminado_en = models.DateTimeField(null=True, blank=True)
+    # Se procesó (transcripción o documento) sin consentimiento vigente del paciente.
+    procesada_sin_consentimiento = models.BooleanField(default=False)
     origen = models.CharField(
         max_length=30, choices=Origen.choices, default=Origen.AUDIO
     )

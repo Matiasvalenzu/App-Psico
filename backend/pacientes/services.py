@@ -7,6 +7,13 @@ from notificaciones.services import send_branded_email
 from .models import ConsentimientoInformado
 
 
+def consentimiento_vigente(paciente):
+    """Hay consentimiento firmado en Psiconex o declarado en papel."""
+    return bool(paciente.consentimiento_papel_fecha) or paciente.consentimientos.filter(
+        estado=ConsentimientoInformado.Estado.FIRMADO
+    ).exists()
+
+
 def generate_token():
     return secrets.token_urlsafe(32)
 

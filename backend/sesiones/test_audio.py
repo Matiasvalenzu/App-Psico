@@ -77,6 +77,21 @@ class AudioEfimeroTests(TestCase):
         self.sesion.refresh_from_db()
         self.assertIsNone(self.sesion.audio_eliminado_en)
 
+    @patch("sesiones.tasks.procesar_audio_sesion.delay")
+    def test_upload_registra_si_no_hay_consentimiento(self, _delay):
+        def subir():
+            archivo = SimpleUploadedFile("a.webm", b"audio", content_type="audio/webm")
+            response = self.client.post(
+                f"/api/sesiones/{self.sesion.id}/upload_audio/", {"audio": archivo}, format="multipart"
+            )
+            self.assertEqual(response.status_code, 200, response.content)
+            return response.data["procesada_sin_consentimiento"]
+
+        self.assertTrue(subir())
+        self.paciente.consentimiento_papel_fecha = timezone.localdate()
+        self.paciente.save()
+        self.assertFalse(subir())
+
     def test_borrar_sesion_borra_todos_sus_audios(self):
         rutas = [self._escribir(f"{self.sesion.id}{s}") for s in (".webm", "_psicologo.webm", "_paciente.webm", "_split_paciente.wav")]
         otra = self._escribir("999999.webm")
