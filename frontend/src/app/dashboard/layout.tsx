@@ -19,6 +19,7 @@ import {
   Users,
   Settings,
   ShieldCheck,
+  Lock,
   CreditCard,
   MessageSquarePlus,
   PlayCircle,
@@ -167,6 +168,7 @@ function DashboardInner({
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [suscripcionEstado, setSuscripcionEstado] = useState<string | null>(null);
   const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
+  const [fechaPurga, setFechaPurga] = useState<string | null>(null);
   const [usuario, setUsuario] = useState<{ nombre: string; email: string } | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -203,13 +205,8 @@ function DashboardInner({
             : null
         );
 
-        // Si la suscripción expiró y no es admin, forzar navegación a /dashboard/suscripcion
-        if (!isAdm && !isSuper && user.suscripcion_activa === false) {
-          if (pathname !== "/dashboard/suscripcion") {
-            router.replace("/dashboard/suscripcion");
-            return;
-          }
-        }
+        // Suscripción inactiva: la cuenta queda en solo lectura (el backend bloquea escrituras)
+        setFechaPurga(user.solo_lectura ? user.fecha_purga || null : null);
 
         setReady(true);
       } catch {
@@ -442,6 +439,27 @@ function DashboardInner({
             </DropdownMenu>
           </div>
         </header>
+
+        {fechaPurga && (
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-800 dark:text-amber-200">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span>
+              <strong className="font-semibold">Solo lectura</strong> · tu suscripción no está activa. Tus datos se eliminarán el{" "}
+              <strong className="font-semibold">
+                {new Date(fechaPurga).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })}
+              </strong>
+              .
+            </span>
+            <span className="flex items-center gap-3 font-semibold">
+              <Link href="/dashboard/configuracion/privacidad" className="underline underline-offset-2 hover:no-underline">
+                Exportar mis datos
+              </Link>
+              <Link href="/dashboard/suscripcion" className="underline underline-offset-2 hover:no-underline">
+                Reactivar plan
+              </Link>
+            </span>
+          </div>
+        )}
 
         <main
           className={`mx-auto w-full flex-1 p-4 md:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 ${

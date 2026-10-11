@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 const localApiUrl =
   typeof window === "undefined"
     ? "http://localhost:8000/api"
@@ -94,6 +96,16 @@ export async function apiFetch(
     clearTokens();
     if (typeof window !== "undefined" && window.location.pathname !== "/login") {
       window.location.replace("/login");
+    }
+  }
+
+  if (res.status === 403 && typeof window !== "undefined") {
+    const data = await res.clone().json().catch(() => null);
+    if (data?.code === "subscription_inactive") {
+      toast.error("Tu cuenta está en solo lectura", {
+        id: "subscription_inactive",
+        description: "Reactiva tu plan para hacer cambios. Puedes ver y exportar tus datos.",
+      });
     }
   }
 
