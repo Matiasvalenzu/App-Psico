@@ -2,6 +2,7 @@
 
 import {
   ChevronDown,
+  Download,
   Loader2,
   MessageCircle,
   MoreHorizontal,
@@ -34,6 +35,7 @@ export default function PacienteHeader({
   onNewVirtual,
   onTest,
   onEdit,
+  onExport,
   onTutorial,
 }: {
   paciente: Paciente;
@@ -42,6 +44,7 @@ export default function PacienteHeader({
   onNewVirtual: () => void;
   onTest: (mode: TestMode) => void;
   onEdit: () => void;
+  onExport: () => void;
   onTutorial: () => void;
 }) {
   const meta = [
@@ -136,6 +139,10 @@ export default function PacienteHeader({
                 <DropdownMenuItem className="cursor-pointer" onClick={onEdit}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar ficha
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={onExport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar datos (ZIP)
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />

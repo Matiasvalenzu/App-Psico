@@ -10,6 +10,7 @@ import {
   UserCog,
   UserPlus,
   CreditCard,
+  ShieldCheck,
   X,
   MessageSquarePlus,
   PlayCircle,
@@ -160,6 +161,11 @@ export default function MoreDrawer({
               href="/dashboard/configuracion/perfil"
               icon={UserCog}
               label="Mi perfil"
+            />
+            <MenuItem
+              href="/dashboard/configuracion/privacidad"
+              icon={ShieldCheck}
+              label="Privacidad y datos"
             />
 
             {showAdminSection && (

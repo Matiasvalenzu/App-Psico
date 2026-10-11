@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users,
   Settings,
+  ShieldCheck,
   CreditCard,
   MessageSquarePlus,
   PlayCircle,
@@ -306,6 +307,7 @@ function DashboardInner({
           <NavGroup label="Cuenta" isCollapsed={isCollapsed}>
             <NavItem href="/dashboard/suscripcion" icon={CreditCard} label="Mi Suscripción" {...navProps} />
             <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" {...navProps} />
+            <NavItem href="/dashboard/configuracion/privacidad" icon={ShieldCheck} label="Privacidad y datos" {...navProps} />
             {isAdmin && (
               <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" {...navProps} />
             )}
@@ -412,6 +414,10 @@ function DashboardInner({
                 <DropdownMenuItem onClick={() => router.push("/dashboard/configuracion/perfil")}>
                   <Settings />
                   Mi perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/dashboard/configuracion/privacidad")}>
+                  <ShieldCheck />
+                  Privacidad y datos
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push("/dashboard/suscripcion")}>
                   <CreditCard />

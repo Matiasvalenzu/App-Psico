@@ -66,6 +66,7 @@ def current_user(request):
             "fin_prueba": fin_prueba,
             "dias_restantes_prueba": dias_restantes_prueba,
             "tutorial_visto": tutorial_visto,
+            "tiene_password": request.user.has_usable_password(),
         }
     )
 

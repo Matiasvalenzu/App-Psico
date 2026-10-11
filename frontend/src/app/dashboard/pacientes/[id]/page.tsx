@@ -131,6 +131,20 @@ export default function PacienteDetailPage() {
     });
   }
 
+  async function exportarPaciente() {
+    const res = await apiFetch(`/pacientes/${id}/exportar/`).catch(() => null);
+    if (!res?.ok) {
+      toast.error("No se pudo exportar la ficha.");
+      return;
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `psiconex-paciente-${id}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleNewSession() {
     setCreatingSession(true);
     try {
@@ -221,6 +235,7 @@ export default function PacienteDetailPage() {
         onNewVirtual={() => setPsiconexModalOpen(true)}
         onTest={openTest}
         onEdit={() => setEditOpen(true)}
+        onExport={exportarPaciente}
         onTutorial={() => openTutorial(3)}
       />
 
