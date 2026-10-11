@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { ArrowLeft, ChevronDown, ChevronUp, ClipboardList, Clock, Download, Edit3, ExternalLink, FileText, Loader2, MessageSquare, Mic, PlayCircle, Save, Search, Sparkles, Square, Trash2, User, UserCheck, Video, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, ClipboardList, Clock, Download, Edit3, ExternalLink, FileText, Loader2, MessageSquare, Mic, PlayCircle, Save, Search, ShieldCheck, Sparkles, Square, Trash2, User, UserCheck, Video, X } from "lucide-react";
 import { useAudioRecording } from "@/context/AudioRecordingContext";
 import { useTutorial } from "@/context/TutorialContext";
 import SessionRecordingTips from "@/components/sesion/SessionRecordingTips";
@@ -20,6 +20,7 @@ interface Sesion {
   fecha_hora_inicio: string;
   duracion_segundos: number | null;
   audio_path: string;
+  audio_eliminado_en: string | null;
   origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
   plataforma_virtual?: string;
   url_reunion?: string;
@@ -527,6 +528,15 @@ export default function SesionDetailPage() {
                   <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 font-medium text-primary text-[11px] sm:text-xs">
                     <MessageSquare className="h-3 w-3" />
                     {sesion.segmentos.length} intervenciones
+                  </span>
+                )}
+                {sesion.audio_eliminado_en && (
+                  <span
+                    title={`Eliminado el ${formatDate(sesion.audio_eliminado_en)}`}
+                    className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 font-medium text-emerald-700 text-[11px] sm:text-xs dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+                  >
+                    <ShieldCheck className="h-3 w-3" />
+                    Audio eliminado tras transcribir
                   </span>
                 )}
               </div>
