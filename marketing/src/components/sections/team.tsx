@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { motion } from "motion/react"
 import {
   Activity,
@@ -13,13 +14,47 @@ import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SectionHeading } from "@/components/sections/section-heading"
 
-/** TODO: URL pública de LinkedIn de Matías. Vacía = no se muestra el botón. */
+/** URL pública de LinkedIn de Matías. Vacía = no se muestra el botón. */
 export const FOUNDER_LINKEDIN_URL = ""
 
-/** Reemplazar por "/team/matias.jpg" cuando exista el archivo en public/team/. */
-export const FOUNDER_PHOTO_SRC = ""
-
 const CONTACT_EMAIL = "matias@datnexia.com"
+
+type TeamMember = {
+  name: string
+  role: string
+  bio: string
+  photo: string
+  email?: string
+}
+
+const TEAM: TeamMember[] = [
+  {
+    name: "Matías Valenzuela",
+    role: "Fundador · Director Ejecutivo",
+    bio: "Fundó Psiconex y la construye conversando con psicólogos y psiquiatras en Chile, para que la herramienta responda a cómo se trabaja en consulta. La IA apoya; el criterio clínico sigue siendo del profesional.",
+    photo: "/equipo-matias.jpg",
+    email: CONTACT_EMAIL,
+  },
+  {
+    name: "Camila Valenzuela",
+    role: "Fundadora · Directora de Administración y Finanzas",
+    bio: "Más de 10 años en gestión de proyectos, coordinación institucional y soluciones operativas y digitales, liderando equipos en el sector público y privado. En Psiconex cuida la administración y las finanzas del proyecto.",
+    photo: "/equipo-camila.jpg",
+  },
+  {
+    name: "María Camila Barraza",
+    role: "Directora de Comunicaciones y Marketing",
+    bio: "Publicista de la Universidad del Norte, con experiencia en marketing, gestión de clientes y coordinación de proyectos en multinacionales y consultoras. En Psiconex lidera campañas, web y redes sociales.",
+    photo: "/equipo-maria-camila.jpg",
+  },
+  {
+    name: "Paulo Valenzuela",
+    role: "Director de Tecnología y Desarrollo",
+    bio: "Más de 25 años en tecnologías de la información, liderando software, infraestructura crítica y sistemas de comunicación, incluida la implementación de una ficha clínica electrónica. En Psiconex lidera la tecnología.",
+    photo: "/equipo-paulo.jpg",
+  },
+]
+
 const FEEDBACK_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Quiero aportar a Psiconex")}`
 
 const SPECIALTIES: { icon: LucideIcon; title: string; body: string }[] = [
@@ -79,52 +114,69 @@ export function TeamSection() {
               <span className="gradient-primary-text">la herramienta</span>
             </span>
           }
-          description="Psiconex no es un producto anónimo. Hay alguien al otro lado, y una invitación abierta a quienes ejercen."
+          description="Psiconex lo construye un equipo pequeño, con una invitación abierta a quienes ejercen. La inteligencia artificial apoya al psicólogo; nunca lo reemplaza."
         />
 
-        <motion.article
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="card-premium mx-auto mt-16 grid max-w-4xl gap-8 rounded-2xl p-6 sm:p-8 md:grid-cols-[auto_1fr] md:items-center"
-        >
-          <FounderPortrait />
-          <div>
-            <h3 className="text-xl font-semibold tracking-tight text-foreground">
-              Matías Valenzuela
-            </h3>
-            <p className="mt-1 text-sm font-medium text-primary">
-              Fundador de Psiconex
-            </p>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              Creé Psiconex para devolverle tiempo al psicólogo: el de la
-              relación terapéutica, no el de reescribir la sesión. La
-              inteligencia artificial puede ordenar, transcribir y recordar
-              detalles. No reemplaza tu criterio clínico. Ese sigue siendo
-              tuyo, en cada consulta.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <a href={`mailto:${CONTACT_EMAIL}`}>
-                  <Mail aria-hidden="true" />
-                  matias@datnexia.com
-                </a>
-              </Button>
-              {FOUNDER_LINKEDIN_URL ? (
-                <Button asChild variant="ghost">
-                  <a
-                    href={FOUNDER_LINKEDIN_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    LinkedIn
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </motion.article>
+        <ul className="mx-auto mt-16 grid max-w-5xl gap-5 md:grid-cols-2">
+          {TEAM.map((member, i) => (
+            <motion.li
+              key={member.name}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{
+                duration: 0.5,
+                delay: (i % 2) * 0.08,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="card-premium flex flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-start"
+            >
+              <Image
+                src={member.photo}
+                alt={`Foto de ${member.name}`}
+                width={600}
+                height={600}
+                loading="lazy"
+                unoptimized
+                className="size-28 shrink-0 rounded-2xl object-cover ring-2 ring-primary/20 sm:size-32"
+              />
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                  {member.name}
+                </h3>
+                <p className="mt-1 text-sm font-medium text-primary">
+                  {member.role}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {member.bio}
+                </p>
+                {member.email || (member.name === "Matías Valenzuela" && FOUNDER_LINKEDIN_URL) ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {member.email ? (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={`mailto:${member.email}`}>
+                          <Mail aria-hidden="true" />
+                          {member.email}
+                        </a>
+                      </Button>
+                    ) : null}
+                    {member.name === "Matías Valenzuela" && FOUNDER_LINKEDIN_URL ? (
+                      <Button asChild variant="ghost" size="sm">
+                        <a
+                          href={FOUNDER_LINKEDIN_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          LinkedIn
+                        </a>
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </motion.li>
+          ))}
+        </ul>
 
         <div className="mt-20">
           <h3 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
@@ -182,26 +234,5 @@ export function TeamSection() {
         </ul>
       </div>
     </section>
-  )
-}
-
-function FounderPortrait() {
-  if (FOUNDER_PHOTO_SRC) {
-    return (
-      <img
-        src={FOUNDER_PHOTO_SRC}
-        alt="Retrato de Matías Valenzuela, fundador de Psiconex"
-        className="size-28 rounded-full object-cover ring-2 ring-primary/20 sm:size-32"
-      />
-    )
-  }
-
-  return (
-    <div
-      aria-hidden="true"
-      className="flex size-28 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-2xl font-semibold text-primary-foreground shadow-sm sm:size-32"
-    >
-      MV
-    </div>
   )
 }
