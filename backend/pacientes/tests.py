@@ -18,6 +18,7 @@ from .services import consentimiento_vigente
 User = get_user_model()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class ConsentimientoPapelTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="psi_cons", email="c@test.com", password="x")
