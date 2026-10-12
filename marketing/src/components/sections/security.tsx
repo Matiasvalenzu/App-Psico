@@ -4,7 +4,6 @@ import { motion } from "motion/react"
 import Link from "next/link"
 import { Lock, Server, Eye, FileKey, AudioLines, Download } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
-import { ProvidersTable } from "@/components/sections/providers-table"
 import { SITE } from "@/lib/config"
 
 const PILLARS = [
@@ -110,16 +109,6 @@ export function SecuritySection() {
               </motion.div>
             )
           })}
-        </div>
-
-        <div id="proveedores" className="mt-20 scroll-mt-24">
-          <h3 className="text-center text-2xl font-semibold tracking-tight text-foreground">Quién recibe qué</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-muted-foreground">
-            Estos son los servicios que intervienen cuando usas Psiconex. Cada proveedor trata los datos según sus propias condiciones.
-          </p>
-          <div className="mt-8">
-            <ProvidersTable />
-          </div>
         </div>
 
         <p className="mt-10 text-center text-sm text-muted-foreground">

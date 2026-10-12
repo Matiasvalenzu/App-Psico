@@ -152,7 +152,7 @@ SIMPLE_JWT = {
 
 # CORS
 CORS_ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:3000"
+    "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001"
 ).split(",")
 
 # Orígenes adicionales para la extensión Chrome (Meet y Zoom)

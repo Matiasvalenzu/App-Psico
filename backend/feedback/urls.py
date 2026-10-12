@@ -5,10 +5,12 @@ from .views import (
     FeedbackAdminListView,
     FeedbackAdminUpdateView,
     FeedbackAdminStatsView,
+    PublicAporteFeedbackView,
 )
 
 urlpatterns = [
     path("", FeedbackCreateView.as_view(), name="feedback_create"),
+    path("aportar/", PublicAporteFeedbackView.as_view(), name="feedback_aportar"),
     path("mis-reportes/", MisFeedbacksListView.as_view(), name="feedback_mis_reportes"),
     path("admin/list/", FeedbackAdminListView.as_view(), name="feedback_admin_list"),
     path("admin/<int:pk>/update/", FeedbackAdminUpdateView.as_view(), name="feedback_admin_update"),

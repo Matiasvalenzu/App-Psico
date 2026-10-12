@@ -74,3 +74,38 @@ class FeedbackTests(APITestCase):
         self.assertEqual(reporte.respuesta_admin, "Corregido en release 1.2")
         self.assertEqual(reporte.respondido_por, self.admin)
         self.assertIsNotNone(reporte.resuelto_at)
+
+    def test_public_aporte_exitoso(self):
+        from django.core import mail
+        payload = {
+            "nombre": "Dra. Camila Soto",
+            "email": "camila.soto@ejemplo.cl",
+            "especialidad": "Psicología clínica",
+            "comentario": "Me gustaría que la herramienta permita exportar resúmenes por paciente en formato Word.",
+        }
+        response = self.client.post("/api/feedback/aportar/", payload)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("ok"))
+        self.assertEqual(len(mail.outbox), 1)
+        email_sent = mail.outbox[0]
+        self.assertIn("matias@datnexia.com", email_sent.to)
+        self.assertIn("camila.soto@ejemplo.cl", email_sent.reply_to)
+        self.assertIn("Dra. Camila Soto", email_sent.subject)
+        self.assertIn("resúmenes por paciente", email_sent.body)
+
+    def test_public_aporte_validacion(self):
+        # Email inválido
+        res1 = self.client.post("/api/feedback/aportar/", {
+            "nombre": "Test",
+            "email": "sin-arroba",
+            "comentario": "Hola",
+        })
+        self.assertEqual(res1.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Comentario vacío
+        res2 = self.client.post("/api/feedback/aportar/", {
+            "nombre": "Test",
+            "email": "test@ejemplo.cl",
+            "comentario": "   ",
+        })
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)

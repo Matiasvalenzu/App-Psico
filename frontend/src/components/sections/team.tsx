@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "motion/react"
 import {
   Activity,
@@ -12,6 +13,7 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SectionHeading } from "@/components/sections/section-heading"
+import { AportarModal } from "@/components/sections/aportar-modal"
 
 /** TODO: URL pública de LinkedIn de Matías. Vacía = no se muestra el botón. */
 export const FOUNDER_LINKEDIN_URL = ""
@@ -64,6 +66,8 @@ const PRINCIPLES: { icon: LucideIcon; title: string; body: string }[] = [
 ]
 
 export function TeamSection() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
   return (
     <section
       id="equipo"
@@ -148,8 +152,8 @@ export function TeamSection() {
             ))}
           </ul>
           <div className="mt-8 flex justify-center">
-            <Button asChild size="lg">
-              <a href={FEEDBACK_MAILTO}>Quiero aportar</a>
+            <Button size="lg" onClick={() => setIsModalOpen(true)}>
+              Quiero aportar
             </Button>
           </div>
         </div>
@@ -180,6 +184,8 @@ export function TeamSection() {
             </motion.li>
           ))}
         </ul>
+
+        <AportarModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       </div>
     </section>
   )

@@ -1,8 +1,14 @@
+import logging
+from email.utils import formataddr, parseaddr
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.db.models import Count, Q
 from rest_framework import generics, permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from .models import FeedbackReport
 from .serializers import (
@@ -123,3 +129,88 @@ class FeedbackAdminStatsView(APIView):
             "mejoras": mejoras,
             "felicitaciones": felicitaciones,
         })
+
+
+class PublicAporteFeedbackView(APIView):
+    """
+    Endpoint público para recibir aportes y feedback de la comunidad clínica
+    desde la landing page (botón 'Quiero aportar').
+    Envía un correo a matias@datnexia.com con los datos recibidos.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        data = request.data
+        nombre = str(data.get("nombre", "")).strip()
+        email = str(data.get("email", "")).strip()
+        especialidad = str(data.get("especialidad", "")).strip()
+        comentario = str(data.get("comentario", "")).strip()
+
+        if not email or "@" not in email:
+            return Response(
+                {"error": "Por favor ingresa un correo electrónico válido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not comentario:
+            return Response(
+                {"error": "Por favor escribe tu comentario o aporte."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        destinatario = "matias@datnexia.com"
+        asunto = f"[Psiconex] Nuevo aporte de la comunidad: {nombre or email}"
+        if especialidad:
+            asunto += f" ({especialidad})"
+
+        cuerpo_texto = (
+            f"Se ha recibido un nuevo aporte desde la sección de comunidad clínica (landing):\n\n"
+            f"Nombre: {nombre or 'No indicado'}\n"
+            f"Correo: {email}\n"
+            f"Especialidad / Área: {especialidad or 'No indicada'}\n\n"
+            f"Comentario / Aporte:\n"
+            f"--------------------------------------------------\n"
+            f"{comentario}\n"
+            f"--------------------------------------------------\n"
+        )
+
+        cuerpo_html = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; padding: 20px;">
+          <h2 style="color: #6366f1; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 0;">Nuevo aporte a Psiconex</h2>
+          <p style="font-size: 15px; color: #475569;">Se ha recibido un nuevo mensaje desde el formulario <strong>Quiero aportar</strong> en la landing page:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: bold; width: 140px; color: #64748b;">Nombre:</td><td style="color: #0f172a;">{nombre or 'No indicado'}</td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: bold; color: #64748b;">Correo:</td><td><a href="mailto:{email}" style="color: #6366f1; text-decoration: underline;">{email}</a></td></tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px 0; font-weight: bold; color: #64748b;">Especialidad:</td><td style="color: #0f172a;">{especialidad or 'No indicada'}</td></tr>
+          </table>
+          <div style="background: #f8fafc; border-left: 4px solid #6366f1; padding: 16px 20px; border-radius: 6px; margin: 24px 0;">
+            <p style="margin: 0 0 8px; font-weight: bold; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">Comentario / Aporte:</p>
+            <p style="margin: 0; white-space: pre-wrap; font-size: 15px; line-height: 1.6; color: #1e293b;">{comentario}</p>
+          </div>
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+            Puedes responder directamente a este correo para escribirle a {nombre or email}.
+          </p>
+        </div>
+        """
+
+        try:
+            from_addr = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@datnexia.com")
+            from_name = getattr(settings, "EMAIL_FROM_NAME", "Psiconex")
+            from_header = formataddr((from_name, parseaddr(from_addr)[1] or from_addr))
+            msg = EmailMultiAlternatives(
+                subject=asunto,
+                body=cuerpo_texto,
+                from_email=from_header,
+                to=[destinatario],
+                reply_to=[email],
+            )
+            msg.attach_alternative(cuerpo_html, "text/html")
+            msg.send(fail_silently=False)
+            return Response({"ok": True, "mensaje": "Aporte enviado con éxito."})
+        except Exception as e:
+            logger.error("Error al enviar email de aporte público: %s", e)
+            return Response(
+                {"error": "No se pudo enviar el mensaje por correo. Por favor intenta más tarde o escribe directamente a matias@datnexia.com."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
