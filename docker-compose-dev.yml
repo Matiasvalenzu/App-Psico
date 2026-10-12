@@ -14,6 +14,9 @@ x-backend-env: &backend-env
   REDIS_URL: redis://redis:6379/0
   DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
   BHE_BACKEND: ${BHE_BACKEND:-fake}
+  BHE_AUTO_DISPONIBLE: ${BHE_AUTO_DISPONIBLE:-False}
+  BHE_RUT_AUTORIZADO: ${BHE_RUT_AUTORIZADO:-}
+  BHE_STORAGE_PATH: /data/bhe
   BHE_FAKE_ESCENARIO: ${BHE_FAKE_ESCENARIO:-exito}
   DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
   MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
@@ -102,6 +105,7 @@ services:
       - ./Informes:/app/informes:ro
       - audio_data:/data/audio
       - model_cache:/data/models
+      - bhe_data:/data/bhe
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
@@ -141,6 +145,28 @@ services:
     command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --queues=email
     volumes:
       - ./backend:/app
+    environment:
+      <<: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-bhe:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: psicologo-worker-bhe-dev
+    command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --prefetch-multiplier=1 --queues=bhe
+    # Solo este servicio lee .env.bhe (BHE_SII_CLAVE); en dev el emisor es el simulado.
+    env_file:
+      - path: .env.bhe
+        required: false
+    volumes:
+      - ./backend:/app
+      - bhe_data:/data/bhe
     environment:
       <<: *backend-env
     depends_on:
@@ -203,3 +229,4 @@ volumes:
   postgres_data:
   audio_data:
   model_cache:
+  bhe_data:

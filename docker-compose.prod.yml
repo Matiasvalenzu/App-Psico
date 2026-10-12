@@ -36,6 +36,10 @@ x-backend-env: &backend-env
   GOOGLE_CALENDAR_RETURN_URL: https://app.psiconex.cl
   GOOGLE_CALENDAR_NAME: ${GOOGLE_CALENDAR_NAME:-Agenda Psiconex}
   AUDIO_STORAGE_PATH: /data/audio
+  BHE_AUTO_DISPONIBLE: ${BHE_AUTO_DISPONIBLE:-False}
+  BHE_BACKEND: ${BHE_BACKEND:-}
+  BHE_RUT_AUTORIZADO: ${BHE_RUT_AUTORIZADO:-}
+  BHE_STORAGE_PATH: /data/bhe
   DOCUMENT_UPLOAD_MAX_BYTES: ${DOCUMENT_UPLOAD_MAX_BYTES:-10485760}
   WHISPER_MODEL: ${WHISPER_MODEL:-base}
   WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
@@ -117,6 +121,7 @@ services:
       - audio_data:/data/audio
       - model_cache:/data/models
       - static_data:/app/staticfiles
+      - bhe_data:/data/bhe
     depends_on:
       db:
         condition: service_healthy
@@ -151,6 +156,30 @@ services:
     command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --queues=email
     environment:
       <<: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Boletas en el SII. Fuera del `up -d` normal: se enciende a propósito con
+  # `--profile bhe` cuando el emisor real esté listo (sin BHE_BACKEND se caería en loop).
+  # .env.bhe (BHE_SII_CLAVE) va con permisos 600 y solo lo lee este servicio.
+  worker-bhe:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    profiles: ["bhe"]
+    restart: unless-stopped
+    command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --prefetch-multiplier=1 --queues=bhe
+    env_file:
+      - path: .env.bhe
+        required: false
+    environment:
+      <<: *backend-env
+    volumes:
+      - bhe_data:/data/bhe
     depends_on:
       db:
         condition: service_healthy
@@ -228,3 +257,4 @@ volumes:
   audio_data:
   model_cache:
   static_data:
+  bhe_data:

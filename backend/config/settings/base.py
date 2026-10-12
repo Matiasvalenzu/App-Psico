@@ -191,10 +191,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "sesiones.tasks.purgar_audios_vencidos",
         "schedule": crontab(hour=4, minute=10),
     },
-    "purgar-evidencias-bhe": {
-        "task": "facturacion.tasks.purgar_evidencias_bhe",
-        "schedule": crontab(hour=4, minute=40),
-    },
     "ciclo-suscripciones": {
         "task": "suscripciones.tasks.ciclo_suscripciones",
         "schedule": crontab(hour=9, minute=5),
@@ -202,10 +198,6 @@ CELERY_BEAT_SCHEDULE = {
     "purgar-registros-acceso": {
         "task": "cuentas.tasks.purgar_registros_acceso",
         "schedule": crontab(hour=4, minute=20, day_of_week=0),
-    },
-    "rescatar-emisiones-bhe": {
-        "task": "facturacion.tasks.rescatar_emisiones_bhe",
-        "schedule": 600.0,
     },
 }
 
@@ -279,6 +271,20 @@ BHE_STORAGE_PATH = os.environ.get("BHE_STORAGE_PATH", "/data/bhe")
 # Emisor de boletas: "fake" (simulado, solo desarrollo) o "playwright" (portal real). Vacío = ninguno.
 BHE_BACKEND = os.environ.get("BHE_BACKEND", "")
 BHE_FAKE_ESCENARIO = os.environ.get("BHE_FAKE_ESCENARIO", "exito")
+# Sin emisor no hay worker-bhe (en prod va con un perfil de compose): no se programan tareas
+# que se acumularían en la cola bhe.
+if BHE_BACKEND:
+    CELERY_BEAT_SCHEDULE.update({
+        "rescatar-emisiones-bhe": {
+            "task": "facturacion.tasks.rescatar_emisiones_bhe",
+            "schedule": 600.0,
+            "options": {"expires": 540},
+        },
+        "purgar-evidencias-bhe": {
+            "task": "facturacion.tasks.purgar_evidencias_bhe",
+            "schedule": crontab(hour=4, minute=40),
+        },
+    })
 # RUT de la cuenta que el psicólogo autoriza en el SII ("usuario autorizado").
 BHE_RUT_AUTORIZADO = os.environ.get("BHE_RUT_AUTORIZADO", "")
 # Clave de esa cuenta. Solo la usa el robot; se oculta en todos los logs (facturacion/logs.py).

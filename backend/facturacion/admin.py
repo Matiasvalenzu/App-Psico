@@ -98,6 +98,8 @@ class EmisionBHEAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         campos = [campo.name for campo in self.model._meta.fields if campo.name not in self.exclude]
+        if not request.user.is_superuser:
+            return ["enlace_resolver", *campos]
         return ["enlace_resolver", "archivos", *campos]
 
     @admin.display(description="Archivos")
@@ -139,7 +141,9 @@ class EmisionBHEAdmin(admin.ModelAdmin):
         return propias + super().get_urls()
 
     def archivo_view(self, request, emision_id, indice=None):
-        # Las capturas del portal muestran la sesión de la cuenta de Psiconex: solo staff (admin_view).
+        # El PDF y las capturas traen el RUT y los datos del paciente: solo superusuarios.
+        if not request.user.is_superuser:
+            raise PermissionDenied
         emision = get_object_or_404(EmisionBHE, pk=emision_id)
         if indice is None:
             ruta = emision.pdf.name

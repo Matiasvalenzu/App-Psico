@@ -5,8 +5,8 @@
 # fuera del VPS). Cron diario sugerido (crontab -e de root):
 #   17 3 * * * cd /srv/psiconex-docker/current && BACKUP_GPG_RECIPIENT=<clave> docker/scripts/backup.sh >> /var/log/psiconex-backup.log 2>&1
 #
-# - Incluye PostgreSQL y los adjuntos (MEDIA_ROOT). No incluye audio: se
-#   elimina tras transcribir.
+# - Incluye PostgreSQL, los adjuntos (MEDIA_ROOT) y los PDF y capturas de las
+#   boletas (/data/bhe). No incluye audio: se elimina tras transcribir.
 # - Todo se cifra con GPG en el mismo pipe: nada queda en claro en disco.
 # - Conserva BACKUP_RETENCION_DIAS (30 por defecto) días de backups.
 set -euo pipefail
@@ -32,6 +32,11 @@ echo "==> PostgreSQL"
 echo "==> Adjuntos"
 if "${COMPOSE[@]}" exec -T backend test -d /app/media; then
   "${COMPOSE[@]}" exec -T backend tar -cz -C /app media | cifrar "${DESTINO}/media.tar.gz.gpg"
+fi
+
+echo "==> Boletas"
+if "${COMPOSE[@]}" exec -T backend test -d /data/bhe; then
+  "${COMPOSE[@]}" exec -T backend tar -cz -C /data bhe | cifrar "${DESTINO}/bhe.tar.gz.gpg"
 fi
 
 echo "==> Rotación (${RETENCION_DIAS} días)"

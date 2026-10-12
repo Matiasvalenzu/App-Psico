@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
+from django.contrib.auth.models import Permission
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -140,7 +141,7 @@ class ArchivosTests(EntornoBHE, TestCase):
         self.assertEqual(self.client.get(url).status_code, 404)
         self.assertNotIn("evidencias", self.client.get(f"/api/facturacion/cobros/{self.cobro.pk}/emisiones/").data[0])
 
-    def test_staff_ve_archivos_en_el_admin(self):
+    def test_solo_superusuario_ve_archivos_en_el_admin(self):
         emision = self.emitida()
         self.agregar_evidencia(emision, "antes.png")
         superusuario = User.objects.create_superuser(username="root", email="root@psiconex.cl", password="x")
@@ -149,8 +150,6 @@ class ArchivosTests(EntornoBHE, TestCase):
         self.assertContains(cambio, "PDF de la boleta")
         self.assertContains(cambio, "Captura 1")
 
-        staff = User.objects.create_user(username="staff", email="staff@psiconex.cl", password="x", is_staff=True)
-        self.client.force_login(staff)
         captura = self.client.get(reverse("admin:facturacion_emisionbhe_evidencia", args=[emision.pk, 0]))
         self.assertEqual(captura.status_code, 200)
         self.assertEqual(b"".join(captura.streaming_content), b"png")
@@ -158,6 +157,19 @@ class ArchivosTests(EntornoBHE, TestCase):
         self.assertEqual(
             self.client.get(reverse("admin:facturacion_emisionbhe_evidencia", args=[emision.pk, 5])).status_code, 404
         )
+
+        staff = User.objects.create_user(username="staff", email="staff@psiconex.cl", password="x", is_staff=True)
+        staff.user_permissions.add(Permission.objects.get(codename="view_emisionbhe"))
+        self.client.force_login(staff)
+        cambio = self.client.get(reverse("admin:facturacion_emisionbhe_change", args=[emision.pk]))
+        self.assertEqual(cambio.status_code, 200)
+        self.assertNotContains(cambio, "PDF de la boleta")
+        self.assertNotContains(cambio, "Captura 1")
+        for url in (
+            reverse("admin:facturacion_emisionbhe_pdf", args=[emision.pk]),
+            reverse("admin:facturacion_emisionbhe_evidencia", args=[emision.pk, 0]),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 403)
 
         self.client.force_login(self.user)
         captura = self.client.get(reverse("admin:facturacion_emisionbhe_evidencia", args=[emision.pk, 0]))
