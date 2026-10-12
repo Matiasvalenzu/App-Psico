@@ -35,8 +35,10 @@ const PLANS: Plan[] = [
       "Chat IA independiente por paciente",
       "Agenda con Google Calendar",
       "Test de Creencias Ellis y Rueda de la Vida",
-      "Sesiones por Meet/Zoom",
+      "Registro de sesiones online (Meet y Zoom)",
       "Enlace privado para reserva de horas",
+      "Recordatorios por correo a tus pacientes",
+      "Exportación completa de tus datos",
     ],
   },
   {
@@ -51,7 +53,6 @@ const PLANS: Plan[] = [
       "Múltiples perfiles de voz",
       "Búsqueda inteligente en historial clínico",
       "Plantillas de informe personalizadas",
-      "Exportación masiva de datos",
       "Integraciones avanzadas",
     ],
   },
@@ -64,11 +65,8 @@ const PLANS: Plan[] = [
     comingSoon: true,
     features: [
       "Todo lo de Avanzado, más:",
-      "Multi-usuario con roles",
-      "Auditoría de accesos",
-      "Hosting dedicado en Chile",
-      "DPA firmado y onboarding",
-      "SLA 99.9% y soporte 24/7",
+      "Pensado para centros y equipos",
+      "Condiciones a medida (consúltanos)",
     ],
   },
 ]
@@ -236,7 +234,7 @@ export function PricingSection() {
           transition={{ delay: 0.6 }}
           className="mt-12 text-center text-xs text-muted-foreground"
         >
-          Precio real · Sin permanencia · Boleta/factura chilena
+          Sin permanencia · Cancela cuando quieras
         </motion.p>
       </div>
     </section>

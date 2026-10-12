@@ -9,21 +9,21 @@ const STEPS = [
     icon: Mic,
     eyebrow: "Paso 1",
     title: "Graba la sesión",
-    body: "Desde la web, una app de escritorio o tu llamada de Meet/Zoom. Sin instalar nada extra para tus pacientes.",
-    detail: "El audio se sube por una conexión segura (HTTPS). Calidad clínica desde 16 kHz.",
+    body: "Graba desde el navegador (también el audio de tu videollamada, compartiendo la pestaña o pantalla) o usa la extensión de Chrome para captar los subtítulos de Meet o Zoom.",
+    detail: "El audio se sube por una conexión cifrada (HTTPS).",
   },
   {
     icon: Sparkles,
     eyebrow: "Paso 2",
     title: "La IA hace el trabajo pesado",
-    body: "Transcribe con alta precisión clínica, separa e identifica las voces de cada participante, sintetiza los puntos clave y estructura la sesión para búsquedas inteligentes al instante.",
-    detail: "Tu sesión de 50 min se procesa en menos de 5 min.",
+    body: "Transcribe la sesión, separa las voces, ordena los puntos clave y deja el historial listo para consultarlo. Tú revisas y corriges.",
+    detail: "El audio se elimina en cuanto termina la transcripción.",
   },
   {
     icon: FileText,
     eyebrow: "Paso 3",
     title: "Recibes la ficha completa",
-    body: "Transcripción diarizada, resumen ejecutivo, evolución del paciente, items para próxima sesión y el informe listo para firmar.",
+    body: "Transcripción diarizada, resumen ejecutivo, evolución del paciente, items para próxima sesión y un borrador de informe que tú revisas y editas.",
     detail: "Todo editable. La IA propone, tú decides.",
   },
 ]
@@ -44,7 +44,7 @@ export function HowItWorksSection() {
               <span className="gradient-primary-text">sin tocar el teclado</span>
             </>
           }
-          description="Tres pasos. Lo que antes te tomaba media tarde, ahora ocurre mientras tomas un café."
+          description="Tres pasos, de la sesión al borrador que tú revisas."
         />
 
         <div className="relative mt-20">

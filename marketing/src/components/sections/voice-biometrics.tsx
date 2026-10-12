@@ -8,9 +8,9 @@ import { ROUTES } from "@/lib/config"
 
 const BENEFITS = [
   "Identifica al psicólogo y al paciente sin etiquetas manuales",
-  "Funciona aunque haya ruido de fondo o cambios de tono",
-  "Tu voz se entrena una vez con 30 segundos de muestra",
-  "Patrones biométricos guardados solo en tu cuenta y transmitidos cifrados (HTTPS)",
+  "Reconoce tu voz para no etiquetar a mano quién habla (el resultado depende de la calidad del audio)",
+  "Registras tu voz una vez con unas pocas muestras cortas",
+  "Tu perfil de voz queda asociado a tu cuenta. La conexión va cifrada (HTTPS).",
 ]
 
 export function VoiceBiometricsSection() {
@@ -122,9 +122,9 @@ export function VoiceBiometricsSection() {
               transition={{ duration: 0.6, delay: 0.18 }}
               className="mt-5 text-lg text-white/85"
             >
-              Otros transcriptores adivinan quién habla. Nosotros lo sabemos. Nuestra
-              tecnología biométrica aprende tu voz una vez y nunca te confunde
-              con tu paciente — ni siquiera cuando el audio es difícil.
+              Registras tu voz una vez y Psiconex la usa como referencia para
+              distinguir lo que dices tú de lo que dice tu paciente. Si algo
+              queda mal asignado, lo corriges en la transcripción.
             </motion.p>
 
             <ul className="mt-8 space-y-3">

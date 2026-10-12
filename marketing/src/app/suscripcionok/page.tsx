@@ -25,8 +25,10 @@ const INCLUDED_FEATURES = [
   "Chat IA independiente por paciente",
   "Agenda con Google Calendar",
   "Test de Creencias Ellis y Rueda de la Vida",
-  "Sesiones por Meet/Zoom",
+  "Registro de sesiones online (Meet y Zoom)",
   "Enlace privado para reserva de horas",
+  "Recordatorios por correo a tus pacientes",
+  "Exportación completa de tus datos",
 ]
 
 export default function SubscriptionSuccessPage() {
@@ -99,7 +101,7 @@ export default function SubscriptionSuccessPage() {
             <div className="mt-6 pt-5 border-t border-border/60 flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
               <span>
-                Los datos clínicos se transmiten cifrados mediante HTTPS y se resguardan con estrictos estándares de confidencialidad médica.
+                Los datos clínicos se transmiten cifrados mediante HTTPS y los más sensibles se guardan cifrados.
               </span>
             </div>
           </div>

@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: "%s · Psiconex",
   },
   description:
-    "Psiconex transcribe, diariza y resume tus sesiones de psicología. Informes clínicos en un minuto, no en una hora.",
+    "Psiconex transcribe, separa las voces y ordena tus sesiones de psicología. Genera borradores de informes que tú revisas y decides.",
   metadataBase: new URL("https://psiconex.cl"),
   alternates: {
     canonical: "/",

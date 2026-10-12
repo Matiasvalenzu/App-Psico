@@ -90,7 +90,7 @@ export function HeroSection() {
               >
                 <Link href="#demo">
                   <PlayCircle className="mr-1 h-4 w-4" aria-hidden="true" />
-                  Ver demo de 90 segundos
+                  Ver demo
                 </Link>
               </Button>
             </motion.div>
