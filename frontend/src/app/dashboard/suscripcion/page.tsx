@@ -136,7 +136,7 @@ export default function SuscripcionPage() {
                 Tu período de prueba ha finalizado
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Tus pacientes, sesiones e informes clínicos están resguardados de forma 100% segura. Para continuar utilizando la asistencia de IA y desbloquear el acceso, activa tu suscripción al Plan Estándar.
+                Tus pacientes, sesiones e informes clínicos siguen guardados y puedes consultarlos o exportarlos. Para continuar utilizando la asistencia de IA y desbloquear el acceso, activa tu suscripción al Plan Estándar.
               </p>
               <div className="pt-2">
                 <Button
@@ -315,7 +315,7 @@ export default function SuscripcionPage() {
                 <p className="text-[11px] text-center text-muted-foreground leading-tight">
                   {isTrial
                     ? "Registra tu tarjeta sin cobro hoy. Cancela cuando quieras."
-                    : "Acceso inmediato garantizado."}
+                    : "El acceso se reactiva al confirmarse el pago."}
                 </p>
               </div>
             )}

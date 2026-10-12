@@ -349,7 +349,7 @@ export default function VoiceEnrollmentPage() {
           <span>¿Por qué es crucial un buen perfil de voz?</span>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Nuestra inteligencia artificial utiliza el modelo bioacústico <strong>ECAPA-TDNN</strong> para analizar las frecuencias de tu voz. Durante la sesión, este perfil permite distinguir con exactitud matemática cuándo estás hablando tú y cuándo el paciente, garantizando transcripciones clínicas impecables.
+          Nuestra inteligencia artificial utiliza el modelo bioacústico <strong>ECAPA-TDNN</strong> para analizar las frecuencias de tu voz. Durante la sesión, este perfil ayuda a distinguir cuándo hablas tú y cuándo el paciente, para atribuir mejor cada intervención en la transcripción.
         </p>
 
         <div className="grid gap-2.5 sm:grid-cols-2 pt-1">

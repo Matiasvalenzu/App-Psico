@@ -323,7 +323,7 @@ export default function CardCheckoutModal({
                       Plan Pro
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Checkout seguro y encriptado</p>
+                  <p className="text-xs text-muted-foreground">Pago procesado por Mercado Pago</p>
                 </div>
               </div>
 
@@ -663,7 +663,7 @@ export default function CardCheckoutModal({
                   </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground leading-relaxed text-center">
-                  Cifrado bancario TLS de 256 bits (PCI-DSS). Psiconex nunca almacena los números de tu tarjeta. Cancela cuando quieras en 1 clic.
+                  Pago procesado por Mercado Pago; Psiconex no almacena los números de tu tarjeta. Cancela cuando quieras en 1 clic.
                 </p>
               </div>
             </form>

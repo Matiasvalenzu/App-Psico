@@ -194,7 +194,7 @@ export default function PublicTestPage() {
           <div className="mt-6 rounded-xl border border-border/60 bg-muted/40 p-4 text-xs text-muted-foreground">
             {completionMeta?.paciente_id
               ? "Evaluación registrada y sincronizada con la ficha clínica del paciente."
-              : "Ya puedes cerrar esta pestaña. Toda la información ha sido transmitida de manera segura y confidencial."}
+              : "Ya puedes cerrar esta pestaña. Tus respuestas fueron enviadas a tu profesional tratante."}
           </div>
         </div>
       </main>

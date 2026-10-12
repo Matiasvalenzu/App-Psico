@@ -163,7 +163,7 @@ export function ModalCrearSesionVirtual({ open, onClose, paciente, onSessionCrea
             <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
             <span>
               Videollamada directa y cifrada entre tú y el paciente. Cada voz se graba en una pista
-              separada, así la transcripción identifica a cada participante sin errores.
+              separada, así la transcripción distingue mejor a cada participante.
             </span>
           </div>
 
