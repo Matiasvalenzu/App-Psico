@@ -1,21 +1,30 @@
 "use client"
 
 import { motion } from "motion/react"
-import { Lock, Server, Eye, FileKey } from "lucide-react"
+import Link from "next/link"
+import { Lock, Server, Eye, FileKey, AudioLines, Download } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
+import { ProvidersTable } from "@/components/sections/providers-table"
+import { SITE } from "@/lib/config"
 
 const PILLARS = [
   {
     icon: Lock,
-    title: "Conexión cifrada",
-    body: "Toda la información viaja cifrada mediante HTTPS.",
-    chip: "HTTPS",
+    title: "Cifrado en tránsito y en la base de datos",
+    body: "La información viaja cifrada mediante HTTPS. Diagnóstico, medicación, notas privadas, notas de sesión y firmas se guardan además cifrados.",
+    chip: "Cifrado",
+  },
+  {
+    icon: AudioLines,
+    title: "El audio no se queda",
+    body: "Eliminamos el audio de la sesión en cuanto termina la transcripción. Si el proceso falla, lo conservamos 7 días para reintentar y luego se borra.",
+    chip: "Audio efímero",
   },
   {
     icon: Server,
-    title: "Datos alojados en Chile",
-    body: "Toda la información clínica vive en servidores chilenos. Sin transferencia a EE.UU.",
-    chip: "Santiago, CL",
+    title: "Qué procesamos nosotros y qué no",
+    body: "La transcripción la hace nuestro servidor. Para separar las voces el audio va a Deepgram, y la IA de chat e informes recibe el texto sin el nombre del paciente.",
+    chip: "Transparencia",
   },
   {
     icon: Eye,
@@ -25,9 +34,15 @@ const PILLARS = [
   },
   {
     icon: FileKey,
-    title: "Ley 19.628 + RGPD (GDPR)",
-    body: "Borrado a petición y portabilidad. Cumple normativa chilena y europea.",
-    chip: "Normativa",
+    title: "Consentimiento informado",
+    body: "Plantilla editable que el paciente firma de forma electrónica mediante un enlace, y que nombra a cada proveedor. Te avisamos si un paciente no tiene consentimiento registrado.",
+    chip: "Plantilla editable",
+  },
+  {
+    icon: Download,
+    title: "Tus datos son tuyos",
+    body: "Descarga todo en un ZIP (JSON y PDF), revisa el registro de accesos de los últimos 12 meses y elimina tu cuenta desde la app cuando quieras.",
+    chip: "Control",
   },
 ]
 
@@ -48,14 +63,14 @@ export function SecuritySection() {
           eyebrow="Seguridad"
           title={
             <>
-              La privacidad{" "}
-              <span className="gradient-primary-text">no es un feature</span>
+              Qué pasa con tus datos,{" "}
+              <span className="gradient-primary-text">sin letra chica</span>
             </>
           }
-          description="Es la base. Construido desde el primer commit para resistir auditorías clínicas y cumplir la Ley 19.628."
+          description="Trabajas con información muy sensible. Aquí te contamos qué procesamos en nuestro servidor, qué servicios externos intervienen y qué decides tú."
         />
 
-        <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((p, i) => {
             const Icon = p.icon
             return (
@@ -87,12 +102,9 @@ export function SecuritySection() {
                 </p>
                 {/* status bar */}
                 <div className="relative mt-5 flex items-center gap-2 border-t border-border/60 pt-4">
-                  <span className="relative flex size-1.5">
-                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
-                    <span className="relative size-1.5 rounded-full bg-emerald-500" />
-                  </span>
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
                   <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    Activo
+                    Disponible hoy
                   </span>
                 </div>
               </motion.div>
@@ -100,15 +112,22 @@ export function SecuritySection() {
           })}
         </div>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.5 }}
-          className="mt-10 text-center text-xs text-muted-foreground"
-        >
-          ¿Necesitas un acuerdo de procesamiento de datos (DPA)? Lo firmamos.
-        </motion.p>
+        <div id="proveedores" className="mt-20 scroll-mt-24">
+          <h3 className="text-center text-2xl font-semibold tracking-tight text-foreground">Quién recibe qué</h3>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-muted-foreground">
+            Estos son los servicios que intervienen cuando usas Psiconex. Cada proveedor trata los datos según sus propias condiciones.
+          </p>
+          <div className="mt-8">
+            <ProvidersTable />
+          </div>
+        </div>
+
+        <p className="mt-10 text-center text-sm text-muted-foreground">
+          ¿Tienes preguntas sobre cómo tratamos los datos? Escríbenos a{" "}
+          <a className="text-primary underline underline-offset-4" href={`mailto:${SITE.email}`}>{SITE.email}</a>{" "}
+          o revisa nuestra{" "}
+          <Link className="text-primary underline underline-offset-4" href="/privacidad">política de privacidad</Link>.
+        </p>
       </div>
     </section>
   )
