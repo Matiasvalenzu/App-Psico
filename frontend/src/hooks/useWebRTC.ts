@@ -22,6 +22,7 @@ interface UseWebRTCOptions {
 
 const TERMINAL: SalaStatus[] = ["room-full", "unauthorized", "replaced", "left"];
 
+// Sin NEXT_PUBLIC_TURN_URL solo hay STUN: no se usa ningún relay público por defecto.
 function getIceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
   const turnUrls = (process.env.NEXT_PUBLIC_TURN_URL || "")
@@ -33,17 +34,6 @@ function getIceServers(): RTCIceServer[] {
       urls: turnUrls,
       username: process.env.NEXT_PUBLIC_TURN_USERNAME || "",
       credential: process.env.NEXT_PUBLIC_TURN_PASSWORD || "",
-    });
-  } else {
-    servers.push({
-      urls: [
-        "turn:openrelay.metered.ca:80",
-        "turn:openrelay.metered.ca:443",
-        "turn:openrelay.metered.ca:443?transport=tcp",
-        "turns:openrelay.metered.ca:443?transport=tcp",
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject",
     });
   }
   return servers;
