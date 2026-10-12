@@ -26,29 +26,29 @@ interface Feature {
 const FEATURES: Feature[] = [
   {
     icon: AudioLines,
-    title: "Transcripción y diarización clínica",
-    body: "Distingue con precisión tu voz de la del paciente y entrega minutas estructuradas con marcas de tiempo en minutos.",
+    title: "Transcripción y separación de voces",
+    body: "Separa la voz del psicólogo y la del paciente, y entrega la sesión con marcas de tiempo, lista para que la revises.",
     className: "md:col-span-2",
     visual: <WaveformVisual />,
     badge: "IA",
   },
   {
     icon: Fingerprint,
-    title: "Biometría de voz avanzada",
-    body: "Tu perfil de voz se entrena una vez. Después la IA reconoce quién habla aunque cambien de paciente.",
+    title: "Reconocimiento de tu voz",
+    body: "Registras tu voz una vez. Después Psiconex te reconoce y distingue quién habla en cada sesión.",
     className: "md:col-span-1",
     visual: <FingerprintVisual />,
-    badge: "Único",
+    badge: "Tu voz",
   },
   {
     icon: Search,
-    title: "Memoria semántica del paciente",
-    body: "Búsqueda contextual inteligente: pregunta '¿qué dijo en marzo sobre su madre?' y obtén el momento exacto al instante.",
+    title: "Chat con el historial del paciente",
+    body: "Pregunta '¿qué dijo en marzo sobre su madre?' y el chat busca en sus sesiones y te muestra los fragmentos de donde sale la respuesta.",
   },
   {
     icon: FileText,
-    title: "Informes y resúmenes en segundos",
-    body: "Resúmenes de sesión, evolución, derivaciones e informes clínicos generados con IA adaptados a tu plantilla.",
+    title: "Informes y resúmenes a partir del historial",
+    body: "Resúmenes de sesión, evolución y borradores de informe generados con IA a partir del historial del paciente. Tú los revisas y editas.",
   },
   {
     icon: ClipboardList,
@@ -58,17 +58,17 @@ const FEATURES: Feature[] = [
   {
     icon: Calendar,
     title: "Agenda con Google Calendar",
-    body: "Sincroniza sesiones con tu calendario. Recordatorios automáticos al paciente por correo.",
+    body: "Sincroniza tus citas con Google Calendar si conectas tu cuenta. Tus pacientes reciben un recordatorio por correo 24 horas antes, sin datos clínicos.",
   },
   {
     icon: Video,
     title: "Sesiones por Meet o Zoom",
-    body: "Graba la videollamada y la transcribe igual que las presenciales. Mismo pipeline, mismo informe.",
+    body: "Graba desde el navegador el audio de tu videollamada, o usa la extensión de Chrome para captar los subtítulos de Meet o Zoom. Todo queda en el historial del paciente.",
   },
   {
     icon: ShieldCheck,
-    title: "Conexión cifrada",
-    body: "Toda la información viaja cifrada mediante HTTPS. Cumple Ley 19.628 de protección de datos personales.",
+    title: "Cifrado y control de tus datos",
+    body: "La información viaja cifrada mediante HTTPS y los datos clínicos sensibles se guardan cifrados. Exportas o eliminas tu cuenta cuando quieras.",
   },
 ]
 
