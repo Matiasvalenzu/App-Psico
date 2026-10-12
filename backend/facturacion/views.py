@@ -1,4 +1,9 @@
+import mimetypes
+import os
+
 from django.conf import settings
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -31,6 +36,18 @@ class SolicitudesBHEThrottle(UserRateThrottle):
 def _no_permitida(exc):
     estado = status.HTTP_403_FORBIDDEN if exc.codigo in bhe.CODIGOS_BLOQUEO else status.HTTP_400_BAD_REQUEST
     return Response({"detail": exc.detalle, "code": exc.codigo}, status=estado)
+
+
+def descarga_privada(storage, ruta):
+    """Entrega un archivo del almacenamiento BHE como adjunto, sin caché."""
+    try:
+        archivo = storage.open(ruta, "rb")
+    except FileNotFoundError:
+        raise Http404
+    tipo = mimetypes.guess_type(ruta)[0] or "application/octet-stream"
+    respuesta = FileResponse(archivo, as_attachment=True, filename=os.path.basename(ruta), content_type=tipo)
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta
 
 
 def _confirmacion_requerida():
@@ -144,6 +161,14 @@ class CobroViewSet(viewsets.ModelViewSet):
     def emisiones(self, request, pk=None):
         cobro = self.get_object()
         return Response(EmisionBHESerializer(cobro.emisiones.all(), many=True).data)
+
+    @action(detail=True, methods=["get"], url_path=r"emisiones/(?P<emision_id>\d+)/pdf")
+    def pdf_emision(self, request, pk=None, emision_id=None):
+        # Solo el PDF: las capturas del portal quedan para el staff, en el admin.
+        emision = get_object_or_404(self.get_object().emisiones, pk=emision_id)
+        if not emision.pdf:
+            raise Http404
+        return descarga_privada(emision.pdf.storage, emision.pdf.name)
 
 
 class DelegacionView(APIView):

@@ -3,16 +3,18 @@ from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.core.validators import RegexValidator
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
 from .bhe import EmisionNoPermitida, reanudar_cola, resolver_manual
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
 from .serializers import CAMPOS_RECEPTOR
 from .services import enmascarar_rut
+from .views import descarga_privada
 
 
 @admin.register(Cobro)
@@ -91,12 +93,24 @@ class EmisionBHEAdmin(admin.ModelAdmin):
     # Solo lectura: el estado lo mueve la tarea o el formulario «Resolver» (solo superusuarios).
     list_display = ["id", "cobro_id", "tipo", "estado", "paso", "intentos", "folio", "backend", "created_at"]
     list_filter = ["tipo", "estado", "backend"]
-    # payload y evidencias contienen datos del receptor: ocultos para todos.
-    exclude = ["payload", "evidencias"]
+    # El payload lleva datos del receptor: oculto para todos. El PDF y las capturas se ven por «Archivos».
+    exclude = ["payload", "evidencias", "pdf"]
 
     def get_readonly_fields(self, request, obj=None):
         campos = [campo.name for campo in self.model._meta.fields if campo.name not in self.exclude]
-        return ["enlace_resolver", *campos]
+        return ["enlace_resolver", "archivos", *campos]
+
+    @admin.display(description="Archivos")
+    def archivos(self, obj):
+        enlaces = []
+        if obj.pdf:
+            enlaces.append((reverse("admin:facturacion_emisionbhe_pdf", args=[obj.pk]), "PDF de la boleta"))
+        for indice, _ruta in enumerate(obj.evidencias):
+            url = reverse("admin:facturacion_emisionbhe_evidencia", args=[obj.pk, indice])
+            enlaces.append((url, f"Captura {indice + 1}"))
+        if not enlaces:
+            return "-"
+        return format_html_join(" · ", '<a href="{}">{}</a>', enlaces)
 
     @admin.display(description="Resolución manual")
     def enlace_resolver(self, obj):
@@ -110,9 +124,32 @@ class EmisionBHEAdmin(admin.ModelAdmin):
                 "<int:emision_id>/resolver/",
                 self.admin_site.admin_view(self.resolver_view),
                 name="facturacion_emisionbhe_resolver",
-            )
+            ),
+            path(
+                "<int:emision_id>/pdf/",
+                self.admin_site.admin_view(self.archivo_view),
+                name="facturacion_emisionbhe_pdf",
+            ),
+            path(
+                "<int:emision_id>/evidencias/<int:indice>/",
+                self.admin_site.admin_view(self.archivo_view),
+                name="facturacion_emisionbhe_evidencia",
+            ),
         ]
         return propias + super().get_urls()
+
+    def archivo_view(self, request, emision_id, indice=None):
+        # Las capturas del portal muestran la sesión de la cuenta de Psiconex: solo staff (admin_view).
+        emision = get_object_or_404(EmisionBHE, pk=emision_id)
+        if indice is None:
+            ruta = emision.pdf.name
+        elif indice < len(emision.evidencias):
+            ruta = emision.evidencias[indice]
+        else:
+            ruta = ""
+        if not ruta:
+            raise Http404
+        return descarga_privada(emision.pdf.storage, ruta)
 
     def resolver_view(self, request, emision_id):
         if not request.user.is_superuser:

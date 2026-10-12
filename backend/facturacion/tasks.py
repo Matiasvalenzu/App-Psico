@@ -16,3 +16,8 @@ def conciliar_emision_bhe(emision_id, busqueda):
 @shared_task
 def rescatar_emisiones_bhe():
     bhe.rescatar_colgadas()
+
+
+@shared_task
+def purgar_evidencias_bhe():
+    return bhe.purgar_evidencias()

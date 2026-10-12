@@ -360,6 +360,8 @@ def eliminar_cuenta(user):
     for feedback in user.feedbacks.exclude(archivo_adjunto=""):
         feedback.archivo_adjunto.delete(save=False)
 
+    # Los PDF de boletas (BHE_STORAGE_PATH) no se borran con la cuenta: pendiente legal, se
+    # conservan el plazo que indique el contador. Las capturas se purgan solas a los 90 días.
     with transaction.atomic():
         user.delete()
 

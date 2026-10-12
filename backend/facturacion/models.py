@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.db import models
@@ -139,9 +141,25 @@ class DelegacionSII(models.Model):
         super().save(*args, **kwargs)
 
 
+class AlmacenamientoPrivado(FileSystemStorage):
+    """Sin URL pública: los archivos solo salen por una descarga autenticada."""
+
+    # La ruta se lee en cada uso, no al importar el modelo (sigue a override_settings en los tests).
+    @property
+    def base_location(self):
+        return settings.BHE_STORAGE_PATH
+
+    @property
+    def location(self):
+        return os.path.abspath(self.base_location)
+
+    def url(self, name):
+        raise NotImplementedError("Los archivos de boletas no tienen URL pública.")
+
+
 def _storage_bhe():
-    # Fuera de MEDIA_ROOT: estos archivos solo se descargan por un endpoint autenticado.
-    return FileSystemStorage(location=settings.BHE_STORAGE_PATH)
+    # Fuera de MEDIA_ROOT y legible solo por el usuario del proceso (backend y worker-bhe).
+    return AlmacenamientoPrivado(file_permissions_mode=0o600, directory_permissions_mode=0o700)
 
 
 def _ruta_archivo_bhe(instance, filename):

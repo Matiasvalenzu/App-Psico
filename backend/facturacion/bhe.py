@@ -13,6 +13,7 @@ import json
 import logging
 from dataclasses import asdict
 from datetime import date, timedelta
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -33,6 +34,7 @@ from .emisores import (
     Retencion,
     get_emisor,
 )
+from .logs import ocultar
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
 from .services import anulable_hasta
 
@@ -43,6 +45,8 @@ ESPERAS_REINTENTO = (60, 300, 900)
 # Primera búsqueda a los 2 minutos; la segunda, 10 minutos después.
 ESPERAS_BUSQUEDA = {1: 120, 2: 600}
 LIMITE_EN_CURSO = timedelta(minutes=15)
+# Las capturas del portal muestran la sesión de la cuenta de Psiconex: se borran a los 90 días.
+RETENCION_EVIDENCIAS = timedelta(days=90)
 
 ANTES_SUBMIT = "ANTES_SUBMIT"
 REVISION_MANUAL = "REVISION_MANUAL"
@@ -379,7 +383,7 @@ def _reintentar_o_fallar(emision_id, exc):
             emision.estado = Estado.PENDIENTE
             emision.paso = ""
             emision.error_codigo = exc.codigo
-            emision.error_detalle = exc.detalle
+            emision.error_detalle = ocultar(exc.detalle)
             emision.save(update_fields=["estado", "paso", "error_codigo", "error_detalle"])
             espera = ESPERAS_REINTENTO[emision.intentos - 1]
             transaction.on_commit(lambda: _encolar(emision_id, countdown=espera))
@@ -398,7 +402,7 @@ def _fallar(emision_id, codigo, detalle):
         cobro = Cobro.objects.select_for_update().get(pk=emision.cobro_id)
         emision.estado = Estado.FALLIDA
         emision.error_codigo = codigo
-        emision.error_detalle = detalle
+        emision.error_detalle = ocultar(detalle)
         emision.finished_at = timezone.now()
         emision.save(update_fields=["estado", "error_codigo", "error_detalle", "finished_at"])
         if emision.tipo == Tipo.EMISION and cobro.estado_boleta == Cobro.EstadoBoleta.EN_EMISION:
@@ -416,7 +420,7 @@ def _marcar_desconocido(emision_id, codigo, detalle):
         emision.estado = Estado.DESCONOCIDO
         emision.paso = "BUSQUEDA_1"
         emision.error_codigo = codigo
-        emision.error_detalle = detalle
+        emision.error_detalle = ocultar(detalle)
         emision.save(update_fields=["estado", "paso", "error_codigo", "error_detalle"])
         transaction.on_commit(lambda: _programar_busqueda(emision_id, 1))
     logger.warning("Emisión BHE %s por confirmar (%s): se buscará en el SII.", emision_id, codigo)
@@ -599,3 +603,23 @@ def rescatar_colgadas():
                 transaction.on_commit(lambda pk=emision_id: _encolar(pk))
             emision.save(update_fields=["estado", "paso", "error_codigo", "error_detalle"])
         logger.warning("Emisión BHE %s rescatada tras quedar en curso.", emision_id)
+
+
+def purgar_evidencias():
+    """Borra las capturas del portal con más de 90 días. El PDF de la boleta se conserva.
+
+    Recorre el disco y no la base, para alcanzar también las capturas de cobros ya borrados.
+    """
+    limite = timezone.now() - RETENCION_EVIDENCIAS
+    storage = EmisionBHE._meta.get_field("pdf").storage
+    borradas = 0
+    for archivo in Path(storage.location).glob("*/*/evidencias/*"):
+        if archivo.is_file() and archivo.stat().st_mtime < limite.timestamp():
+            archivo.unlink()
+            borradas += 1
+    for emision in EmisionBHE.objects.filter(created_at__lt=limite).exclude(evidencias=[]).only("id", "evidencias"):
+        restantes = [ruta for ruta in emision.evidencias if storage.exists(ruta)]
+        if restantes != emision.evidencias:
+            EmisionBHE.objects.filter(pk=emision.pk).update(evidencias=restantes)
+    logger.info("Purga de evidencias BHE: %s capturas borradas.", borradas)
+    return borradas

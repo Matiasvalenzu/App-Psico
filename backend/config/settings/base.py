@@ -191,6 +191,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "sesiones.tasks.purgar_audios_vencidos",
         "schedule": crontab(hour=4, minute=10),
     },
+    "purgar-evidencias-bhe": {
+        "task": "facturacion.tasks.purgar_evidencias_bhe",
+        "schedule": crontab(hour=4, minute=40),
+    },
     "ciclo-suscripciones": {
         "task": "suscripciones.tasks.ciclo_suscripciones",
         "schedule": crontab(hour=9, minute=5),
@@ -277,6 +281,8 @@ BHE_BACKEND = os.environ.get("BHE_BACKEND", "")
 BHE_FAKE_ESCENARIO = os.environ.get("BHE_FAKE_ESCENARIO", "exito")
 # RUT de la cuenta que el psicólogo autoriza en el SII ("usuario autorizado").
 BHE_RUT_AUTORIZADO = os.environ.get("BHE_RUT_AUTORIZADO", "")
+# Clave de esa cuenta. Solo la usa el robot; se oculta en todos los logs (facturacion/logs.py).
+BHE_SII_CLAVE = os.environ.get("BHE_SII_CLAVE", "")
 
 # Audio AI pipeline
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")
