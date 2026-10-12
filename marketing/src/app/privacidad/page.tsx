@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { ConsentPreferences } from "@/components/analytics/consent-preferences"
 import { Footer } from "@/components/layout/footer"
+import { ProvidersTable } from "@/components/sections/providers-table"
 import { Logo } from "@/components/brand/logo"
 import { BASE_OPEN_GRAPH } from "@/lib/seo"
 
@@ -32,7 +33,7 @@ export default function PrivacyPage() {
         <article className="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-24">
           <p className="text-sm font-medium text-primary">Información legal</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">Política de privacidad</h1>
-          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 10 de octubre de 2026</p>
+          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 11 de octubre de 2026</p>
 
           <div className="mt-12 space-y-10 text-base leading-7 text-muted-foreground">
             <section>
@@ -43,13 +44,17 @@ export default function PrivacyPage() {
               </p>
             </section>
 
+            {/* TODO(revisión legal): secciones 2, 4, 6 y 7 actualizadas el 11-10-2026 para reflejar la app (audio efímero, proveedores, exportación, eliminación, cifrado). Revisar con abogado antes de publicar. */}
             <section>
               <h2 className="text-xl font-semibold text-foreground">2. Datos que tratamos</h2>
               <p className="mt-3">
                 Tratamos los datos necesarios para crear y administrar la cuenta, prestar las funciones contratadas y brindar soporte. Esto puede incluir datos de identificación y contacto del profesional, datos de agenda, fichas y notas clínicas, audios, transcripciones, documentos, resultados de evaluaciones y perfiles de voz que el usuario incorpore voluntariamente a la plataforma.
               </p>
               <p className="mt-3">
-                El profesional es responsable de contar con la base legal y los consentimientos que correspondan antes de incorporar datos de pacientes o de terceros.
+                El audio de las sesiones se usa solo para generar la transcripción: se elimina en cuanto termina. Si el procesamiento falla, lo conservamos hasta 7 días para reintentarlo y luego se elimina. Para separar las voces, el audio se envía a Deepgram por una conexión cifrada. Cuando usas el chat, los informes o la observación de tests con IA, enviamos a DeepSeek el texto necesario con el nombre del paciente reemplazado y la ficha sin nombre.
+              </p>
+              <p className="mt-3">
+                El profesional es responsable de contar con la base legal y los consentimientos que correspondan antes de incorporar datos de pacientes o de terceros. Psiconex ofrece una plantilla de consentimiento informado editable que nombra a los proveedores que intervienen, y avisa cuando un paciente no tiene un consentimiento registrado.
               </p>
             </section>
 
@@ -59,7 +64,7 @@ export default function PrivacyPage() {
                 La conexión con Google es opcional. Si el usuario la autoriza, solicitamos el perfil básico para autenticar la cuenta y el acceso a Google Calendar para crear y sincronizar el calendario dedicado de Psiconex y sus citas.
               </p>
               <p className="mt-3">
-                Almacenamos los tokens de acceso y actualización de OAuth, el identificador del calendario dedicado y de los eventos sincronizados, y el nombre y correo electrónico asociados a la cuenta. No almacenamos correos electrónicos de Gmail, ni el contenido de calendarios personales ajenos a la integración de Psiconex.
+                Almacenamos cifrados los tokens de acceso y actualización de OAuth, el identificador del calendario dedicado y de los eventos sincronizados, y el nombre y correo electrónico asociados a la cuenta. No almacenamos correos electrónicos de Gmail, ni el contenido de calendarios personales ajenos a la integración de Psiconex.
               </p>
               <p className="mt-3">
                 Usamos los datos obtenidos de las APIs de Google exclusivamente para autenticar al profesional y proporcionar la sincronización solicitada. No los vendemos, no los usamos para publicidad y no los transferimos a terceros salvo cuando sea necesario para prestar la integración solicitada o exista una obligación legal.
@@ -70,10 +75,16 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-foreground">4. Finalidades</h2>
+              <h2 className="text-xl font-semibold text-foreground">4. Finalidades y proveedores</h2>
               <p className="mt-3">
-                Utilizamos los datos para operar la plataforma, gestionar cuentas y suscripciones, procesar sesiones y registros clínicos solicitados por el usuario, sincronizar citas, responder solicitudes de soporte y proteger la seguridad e integridad del servicio.
+                Utilizamos los datos para operar la plataforma, gestionar cuentas y suscripciones, procesar sesiones y registros clínicos solicitados por el usuario, sincronizar citas, enviar recordatorios y avisos por correo, responder solicitudes de soporte y proteger la seguridad e integridad del servicio.
               </p>
+              <p className="mt-3">
+                Para prestar el servicio trabajamos con los siguientes proveedores. Esta es la lista completa de quién recibe qué:
+              </p>
+              <div className="mt-5 text-base">
+                <ProvidersTable />
+              </div>
             </section>
 
             <section>
@@ -85,20 +96,36 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-foreground">6. Eliminación de cuentas y retención</h2>
+              <h2 className="text-xl font-semibold text-foreground">6. Exportación, eliminación de cuentas y retención</h2>
               <p className="mt-3">
-                El usuario puede solicitar la eliminación total de su cuenta y sus datos escribiendo a{" "}
-                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20y%20Datos">matias@datnexia.com</a> con el asunto &ldquo;Solicitud de Eliminación de Cuenta y Datos&rdquo;. Procesamos las solicitudes verificadas en un plazo máximo de 48 horas hábiles.
+                El usuario puede descargar en cualquier momento todos sus datos (fichas, consentimientos, transcripciones, tests, informes y agenda) en un archivo ZIP, desde Configuración &gt; Privacidad.
               </p>
               <p className="mt-3">
-                Al completar la eliminación, se purgan permanentemente los datos de la cuenta, incluidos perfiles, configuraciones, tokens de OAuth, citas, fichas y registros clínicos asociados. Las copias de seguridad automatizadas se sobrescriben y eliminan dentro de un plazo máximo de 30 días naturales.
+                También puede eliminar su cuenta y todos sus datos desde Configuración &gt; Privacidad, de forma inmediata, o solicitarlo escribiendo a{" "}
+                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20y%20Datos">matias@datnexia.com</a> con el asunto &ldquo;Solicitud de Eliminación de Cuenta y Datos&rdquo;. Procesamos las solicitudes verificadas a la brevedad.
+              </p>
+              <p className="mt-3">
+                Al completar la eliminación, se purgan permanentemente los datos de la cuenta, incluidos perfiles, configuraciones, tokens de OAuth, citas, fichas y registros clínicos asociados.
+              </p>
+              <p className="mt-3">
+                Si la suscripción se cancela o vence, la cuenta queda en modo de solo lectura durante 30 días: puedes consultar y exportar tus datos, pero no agregar nuevos. Te avisamos por correo 7 días y 1 día antes del plazo. Al cumplirse, la cuenta y sus datos se eliminan de forma permanente, salvo que reactives la suscripción.
+              </p>
+              {/* TODO(revisión legal/backups): mantener solo si el backup cifrado diario con rotación de 30 días está activo en el servidor y se borraron las copias antiguas. */}
+              <p className="mt-3">
+                Los datos eliminados pueden permanecer en copias de seguridad cifradas hasta que estas se eliminen, en un plazo máximo de 30 días naturales.
+              </p>
+              <p className="mt-3">
+                El registro de accesos a datos clínicos se conserva durante 12 meses.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold text-foreground">7. Seguridad y derechos</h2>
               <p className="mt-3">
-                Aplicamos medidas técnicas y organizativas razonables para proteger los datos contra acceso no autorizado, pérdida o alteración. Puedes solicitar acceso, rectificación o eliminación de tus datos a través del correo de contacto indicado en esta política.
+                Aplicamos medidas técnicas y organizativas razonables para proteger los datos contra acceso no autorizado, pérdida o alteración. Toda la comunicación con la plataforma va cifrada (HTTPS). En la base de datos guardamos cifrados el diagnóstico, la medicación, las notas privadas y de sesión, la derivación, los objetivos de intervención, las firmas de consentimiento y los tokens de Google. Cada acceso a datos clínicos queda registrado y puedes revisarlo en Configuración &gt; Privacidad.
+              </p>
+              <p className="mt-3">
+                Puedes solicitar acceso, rectificación o eliminación de tus datos a través del correo de contacto indicado en esta política, o ejercerlos directamente desde la plataforma con la exportación y la eliminación de cuenta.
               </p>
             </section>
 
