@@ -22,6 +22,6 @@ class ConsentimientoInformadoAdmin(admin.ModelAdmin):
         "id", "paciente", "psicologo", "estado", "fecha_envio", "fecha_firma", "firma_nombre", "created_at"
     ]
     list_filter = ["estado", "email_enviado"]
-    search_fields = ["paciente__nombre", "paciente__apellido", "paciente__rut", "firma_nombre", "firma_rut"]
+    search_fields = ["paciente__nombre", "paciente__apellido", "paciente__rut", "firma_nombre"]
     readonly_fields = ["token_hash", "enlace_firma", "firma_ip", "firma_user_agent", "created_at", "updated_at"]
 

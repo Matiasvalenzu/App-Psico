@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 
+from config.fields import EncryptedTextField
+
 from .documentos import TIPOS_DOCUMENTO
 
 
@@ -55,14 +57,14 @@ class Paciente(models.Model):
     contacto_emergencia_nombre = models.CharField(max_length=200, blank=True, default="")
     contacto_emergencia_telefono = models.CharField(max_length=30, blank=True, default="")
     origen_consulta = models.CharField(max_length=100, blank=True, default="")
-    derivacion_interconsulta = models.TextField(blank=True, default="")
-    diagnostico_sospechado = models.TextField(blank=True, default="")
-    medicacion_actual = models.TextField(blank=True, default="")
+    derivacion_interconsulta = EncryptedTextField(blank=True, default="")
+    diagnostico_sospechado = EncryptedTextField(blank=True, default="")
+    medicacion_actual = EncryptedTextField(blank=True, default="")
     riesgo_suicida = models.BooleanField(default=False)
     ideacion_suicida_nivel = models.PositiveSmallIntegerField(null=True, blank=True)
     frecuencia_atencion = models.CharField(max_length=80, blank=True, default="")
-    objetivos_intervencion = models.TextField(blank=True, default="")
-    notas_privadas = models.TextField(blank=True, default="")
+    objetivos_intervencion = EncryptedTextField(blank=True, default="")
+    notas_privadas = EncryptedTextField(blank=True, default="")
     # Consentimiento firmado fuera de Psiconex (papel u otro medio), declarado por el profesional.
     consentimiento_papel_fecha = models.DateField(null=True, blank=True)
     estado = models.CharField(
@@ -131,8 +133,8 @@ class ConsentimientoInformado(models.Model):
 
     # Datos de firma digital
     firma_nombre = models.CharField(max_length=200, blank=True, default="")
-    firma_rut = models.CharField(max_length=30, blank=True, default="")
-    firma_imagen = models.TextField(blank=True, default="", help_text="Data URL base64 de la firma gráfica")
+    firma_rut = EncryptedTextField(blank=True, default="")
+    firma_imagen = EncryptedTextField(blank=True, default="", help_text="Data URL base64 de la firma gráfica")
     firma_ip = models.CharField(max_length=60, blank=True, default="")
     firma_user_agent = models.TextField(blank=True, default="")
 

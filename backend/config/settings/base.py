@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -18,6 +20,14 @@ def env_bool(name, default=False):
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "dev-secret-change-me-minimum-32-characters"
 )
+
+# Claves Fernet separadas por coma: la primera cifra, las demás solo descifran (rotación).
+FIELD_ENCRYPTION_KEYS = [
+    clave.strip() for clave in os.environ.get("FIELD_ENCRYPTION_KEYS", "").split(",") if clave.strip()
+]
+if not FIELD_ENCRYPTION_KEYS:
+    # Solo para desarrollo: clave derivada de SECRET_KEY. production.py exige la variable.
+    FIELD_ENCRYPTION_KEYS = [base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest()).decode()]
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 

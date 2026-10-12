@@ -3,6 +3,8 @@ from django.conf import settings
 from django.db.models import Max
 from django.utils import timezone
 from pgvector.django import VectorField
+
+from config.fields import EncryptedTextField
 from pacientes.models import Paciente
 
 
@@ -54,7 +56,7 @@ class Sesion(models.Model):
     estado = models.CharField(
         max_length=20, choices=Estado.choices, default=Estado.PENDIENTE
     )
-    notas_sesion = models.TextField(blank=True, default="")
+    notas_sesion = EncryptedTextField(blank=True, default="")
     plataforma_virtual = models.CharField(
         max_length=20, choices=Plataforma.choices, null=True, blank=True
     )

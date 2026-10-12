@@ -1,5 +1,8 @@
 from .base import *
 
+if not os.environ.get("FIELD_ENCRYPTION_KEYS", "").strip():
+    raise ImproperlyConfigured("FIELD_ENCRYPTION_KEYS es obligatoria en producción.")
+
 DEBUG = False
 
 SECURE_SSL_REDIRECT = True
