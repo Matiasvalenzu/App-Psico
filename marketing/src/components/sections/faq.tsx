@@ -11,28 +11,28 @@ import { SectionHeading } from "@/components/sections/section-heading"
 
 const FAQS = [
   {
-    q: "¿Mis pacientes saben que se está grabando?",
-    a: "Sí, y deben firmar consentimiento informado. Psiconex incluye una plantilla editable que cumple con la Ley 19.628 chilena y con los lineamientos del Colegio de Psicólogos.",
+    q: "¿Necesito el consentimiento de mis pacientes?",
+    a: "Sí. Grabar o transcribir una sesión requiere el consentimiento informado del paciente. Psiconex incluye una plantilla de consentimiento editable, que puedes ajustar a tu práctica y que el paciente firma de forma electrónica mediante un enlace. Si un paciente aún no tiene consentimiento registrado, te lo advertimos. Revisa con tu marco ético y legal que el texto sirva a tu caso.",
   },
   {
     q: "¿Qué tan precisa es la transcripción?",
-    a: "Alcanza ~95% de precisión en español chileno con audio de calidad clínica. La separación y reconocimiento de voces llega a ~92% cuando el psicólogo entrena su perfil de voz una vez.",
+    a: "Ninguna transcripción automática es perfecta. La precisión depende de la calidad del audio, el ruido, los acentos y la cantidad de voces. Por eso la transcripción es editable: la revisas y corriges antes de usarla. Separamos las voces cuando el audio y la configuración lo permiten.",
   },
   {
-    q: "¿Los datos van a OpenAI o a servidores en EE.UU.?",
-    a: "La transcripción se procesa en infraestructura chilena. Las funciones de IA se solicitan de forma explícita por el profesional; los datos obtenidos mediante Google Calendar nunca se envían a servicios de IA. Detallamos la arquitectura en el DPA.",
+    q: "¿Qué servicios externos reciben mis datos?",
+    a: "La transcripción la hace nuestro servidor, y el audio se elimina en cuanto termina. Para separar las voces, el audio se envía a Deepgram por una conexión cifrada, indicándole que no lo use para mejorar sus modelos. Cuando usas el chat, los informes o la observación de tests con IA, el texto se envía a DeepSeek sin el nombre del paciente. Los datos de Google Calendar nunca se envían a la IA. En la sección de seguridad detallamos cada proveedor y qué recibe.",
   },
   {
     q: "¿Puedo migrar mis fichas actuales?",
-    a: "Sí. Aceptamos importación de PDF, Word, Google Docs y exportaciones de Doctoralia o Calenda. El equipo de onboarding hace la migración por ti en planes Práctica y Clínica.",
+    a: "Puedes subir documentos en PDF, Word o TXT a la ficha de cada paciente para que queden con su historial. Si necesitas ayuda con una migración, escríbenos y lo conversamos.",
   },
   {
     q: "¿Funciona en sesiones por Meet o Zoom?",
-    a: "Sí. Hay una extensión opcional que graba localmente la videollamada y la sube mediante una conexión cifrada (HTTPS). El paciente solo ve el aviso estándar de grabación.",
+    a: "Sí, de dos formas. Desde el navegador puedes grabar el audio de tu videollamada compartiendo la pestaña o la pantalla (Chrome o Edge, en computador). O puedes usar la extensión de Chrome opcional, que capta los subtítulos de Meet o Zoom y los incorpora al historial del paciente. Recuerda informar al paciente y contar con su consentimiento.",
   },
   {
     q: "¿Qué pasa si cancelo? ¿Me llevo mis datos?",
-    a: "Toda la información es tuya. Exportas la base completa (audios, transcripciones, informes) en JSON + PDF en un click. Al cancelar borramos todo a los 30 días, o de inmediato si lo pides.",
+    a: "Tus datos son tuyos. Desde la sección Privacidad de la app descargas cuando quieras un ZIP con fichas, consentimientos, sesiones, transcripciones, tests, informes y agenda, en JSON y PDF. Si cancelas, tu cuenta queda 30 días en solo lectura para que exportes lo que necesites; te avisamos por correo 7 días y 1 día antes, y luego eliminamos tus datos. También puedes eliminar tu cuenta de inmediato desde la app.",
   },
   {
     q: "¿Reemplaza al psicólogo?",
@@ -70,7 +70,7 @@ export function FAQSection() {
         <SectionHeading
           eyebrow="Preguntas"
           title="Lo que más nos preguntan"
-          description="Y si tienes una distinta, escríbenos. Respondemos en menos de 24 horas hábiles."
+          description="Y si tienes una distinta, escríbenos."
         />
 
         <motion.div
