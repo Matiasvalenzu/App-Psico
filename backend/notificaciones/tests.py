@@ -422,3 +422,106 @@ class SessionReadyEmailTests(TestCase):
         )
         self.assertIsNone(enqueue_session_ready_email(sesion))
         self.assertEqual(NotificacionEmail.objects.count(), 0)
+
+
+@override_settings(**EMAIL_TEST_SETTINGS)
+class AppointmentReminderTests(TestCase):
+    """Recordatorio 24 h antes: uno por cita e inicio, respeta anulaciones y el toggle."""
+
+    def setUp(self):
+        self.psychologist = get_user_model().objects.create_user(
+            username="psicologa-rec",
+            email="psicologa-rec@example.com",
+            first_name="Ana",
+            last_name="Rojas",
+        )
+        self.patient = Paciente.objects.create(
+            psicologo=self.psychologist,
+            nombre="María",
+            apellido="Pérez",
+            email_contacto="maria-rec@example.com",
+            notas_privadas="NOTA-CLINICA-RESERVADA",
+        )
+        start = timezone.now() + timedelta(hours=24)
+        self.cita = AgendaCita.objects.create(
+            psicologo=self.psychologist,
+            paciente=self.patient,
+            inicio=start,
+            fin=start + timedelta(minutes=50),
+            estado=AgendaCita.Estado.CONFIRMADA,
+        )
+
+    def _enqueue(self):
+        from .services import enqueue_appointment_reminders
+
+        with patch("notificaciones.tasks.send_notification.delay"):
+            with self.captureOnCommitCallbacks(execute=True):
+                return enqueue_appointment_reminders()
+
+    def _reminders(self):
+        return NotificacionEmail.objects.filter(tipo=NotificacionEmail.Tipo.RECORDATORIO_CITA)
+
+    def test_one_reminder_without_clinical_data(self):
+        self.assertEqual(self._enqueue(), 1)
+        self.assertEqual(self._enqueue(), 0)
+        notification = self._reminders().get()
+        self.assertEqual(notification.destinatario, "maria-rec@example.com")
+        self.assertEqual(notification.responder_a, "psicologa-rec@example.com")
+
+        self.assertEqual(send_notification(notification.pk), "sent")
+        message = mail.outbox[0]
+        self.assertIn("es mañana", message.subject)
+        self.assertIn("María", message.body)
+        self.assertNotIn("NOTA-CLINICA-RESERVADA", message.body)
+        self.assertIn("responde este correo", message.body)
+
+    def test_cancelled_appointment_gets_no_reminder(self):
+        self.cita.estado = AgendaCita.Estado.ANULADA
+        self.cita.save()
+        self.assertEqual(self._enqueue(), 0)
+
+    def test_appointment_outside_window_gets_no_reminder(self):
+        self.cita.inicio = timezone.now() + timedelta(hours=30)
+        self.cita.fin = self.cita.inicio + timedelta(minutes=50)
+        self.cita.save()
+        self.assertEqual(self._enqueue(), 0)
+
+    def test_rescheduled_appointment_gets_new_reminder(self):
+        self._enqueue()
+        first = self._reminders().get()
+        self.cita.inicio += timedelta(minutes=30)
+        self.cita.fin += timedelta(minutes=30)
+        self.cita.save()
+
+        self.assertEqual(self._enqueue(), 1)
+        self.assertEqual(send_notification(first.pk), "skipped")
+        first.refresh_from_db()
+        self.assertEqual(first.estado, NotificacionEmail.Estado.OMITIDA)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_disabled_toggle_gets_no_reminder(self):
+        perfil = self.psychologist.perfil_psicologo
+        perfil.recordatorios_paciente_activos = False
+        perfil.save()
+        self.assertEqual(self._enqueue(), 0)
+
+    def test_cancelled_after_enqueue_is_skipped(self):
+        self._enqueue()
+        notification = self._reminders().get()
+        self.cita.estado = AgendaCita.Estado.ANULADA
+        self.cita.save()
+        self.assertEqual(send_notification(notification.pk), "skipped")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_toggle_is_exposed_in_profile(self):
+        client = APIClient()
+        client.force_authenticate(self.psychologist)
+        response = client.get("/api/cuenta/perfil/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["recordatorios_paciente_activos"])
+        response = client.patch(
+            "/api/cuenta/perfil/", {"recordatorios_paciente_activos": False}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.psychologist.perfil_psicologo.refresh_from_db()
+        self.assertFalse(self.psychologist.perfil_psicologo.recordatorios_paciente_activos)

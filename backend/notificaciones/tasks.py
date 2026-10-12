@@ -89,6 +89,13 @@ def send_notification(self, notification_id):
 
 
 @shared_task
+def enqueue_appointment_reminders_task():
+    from .services import enqueue_appointment_reminders
+
+    return enqueue_appointment_reminders()
+
+
+@shared_task
 def dispatch_pending_notifications():
     now = timezone.now()
     pending_ids = list(

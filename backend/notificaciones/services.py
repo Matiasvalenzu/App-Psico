@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from email.mime.image import MIMEImage
 from email.utils import formataddr, parseaddr
 from pathlib import Path
@@ -148,6 +149,59 @@ def enqueue_purge_notice(suscripcion, dias):
     if created:
         _schedule(notification)
     return notification
+
+
+def _clave_recordatorio(cita):
+    return f"recordatorio:{cita.pk}:{int(cita.inicio.timestamp())}"
+
+
+def _email_paciente_cita(cita):
+    try:
+        email = cita.reserva_publica.email_confirmacion
+    except ObjectDoesNotExist:
+        email = ""
+    if not email and cita.paciente_id:
+        email = cita.paciente.email_contacto
+    return (email or cita.prospecto_email or "").strip().lower()
+
+
+def enqueue_appointment_reminders():
+    """Encola el recordatorio de las citas que empiezan en ~24 h.
+
+    La clave incluye el inicio: si la cita se reagenda, corresponde otro
+    recordatorio. Se corre cada 15 min, por eso la ventana es de 2 h.
+    """
+    from agenda.models import AgendaCita
+    from cuentas.services import get_notification_email
+
+    ahora = timezone.now()
+    citas = (
+        AgendaCita.objects.filter(
+            inicio__gte=ahora + timedelta(hours=23), inicio__lt=ahora + timedelta(hours=25)
+        )
+        .exclude(estado=AgendaCita.Estado.ANULADA)
+        .exclude(psicologo__perfil_psicologo__recordatorios_paciente_activos=False)
+        .select_related("psicologo", "paciente", "reserva_publica")
+    )
+    creadas = 0
+    for cita in citas:
+        recipient = _email_paciente_cita(cita)
+        if not recipient:
+            continue
+        notification, created = NotificacionEmail.objects.get_or_create(
+            clave_deduplicacion=_clave_recordatorio(cita),
+            defaults={
+                "tipo": NotificacionEmail.Tipo.RECORDATORIO_CITA,
+                "destinatario": recipient,
+                "responder_a": get_notification_email(cita.psicologo)
+                or settings.EMAIL_SUPPORT_ADDRESS,
+                "cita": cita,
+            },
+        )
+        if created:
+            creadas += 1
+            _schedule(notification)
+    return creadas
 
 
 def enqueue_booking_confirmations(cita, patient_email):
@@ -312,6 +366,15 @@ def notification_content(notification):
         }
 
     cita = notification.cita
+    if notification.tipo == NotificacionEmail.Tipo.RECORDATORIO_CITA:
+        perfil = getattr(cita.psicologo, "perfil_psicologo", None) if cita else None
+        if (
+            not cita
+            or cita.estado == cita.Estado.ANULADA
+            or notification.clave_deduplicacion != _clave_recordatorio(cita)
+            or (perfil and not perfil.recordatorios_paciente_activos)
+        ):
+            return None
     if not cita:
         raise ValueError("La notificación de reserva no tiene cita.")
 
@@ -350,6 +413,12 @@ def notification_content(notification):
             else ""
         ),
     }
+    if notification.tipo == NotificacionEmail.Tipo.RECORDATORIO_CITA:
+        return {
+            "subject": f"Recordatorio: tu sesión con {psychologist_name} es mañana",
+            "template": "recordatorio_cita",
+            "context": context,
+        }
     if notification.tipo == NotificacionEmail.Tipo.RESERVA_PACIENTE:
         return {
             "subject": f"Reserva confirmada con {psychologist_name}",

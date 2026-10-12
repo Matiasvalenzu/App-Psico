@@ -1,0 +1,14 @@
+Hola {{ patient_name }},
+
+Te recordamos tu sesión con {{ psychologist_name }}.
+
+Fecha: {{ appointment_date }}
+Horario: {{ appointment_start }} a {{ appointment_end }} hrs, hora de Chile
+Profesional: {{ psychologist_name }}
+{% if booking_instructions %}
+Indicaciones del profesional:
+{{ booking_instructions }}
+{% endif %}
+{% if management_url %}Si no puedes asistir, reprograma o cancela tu reserva: {{ management_url }}{% else %}Si no puedes asistir, responde este correo para avisar a tu profesional.{% endif %}
+
+Equipo Psiconex

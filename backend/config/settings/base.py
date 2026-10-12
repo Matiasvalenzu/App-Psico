@@ -173,11 +173,16 @@ CELERY_TIMEZONE = "America/Santiago"
 CELERY_TASK_ROUTES = {
     "notificaciones.tasks.send_notification": {"queue": "email"},
     "notificaciones.tasks.dispatch_pending_notifications": {"queue": "email"},
+    "notificaciones.tasks.enqueue_appointment_reminders_task": {"queue": "email"},
 }
 CELERY_BEAT_SCHEDULE = {
     "dispatch-pending-email-notifications": {
         "task": "notificaciones.tasks.dispatch_pending_notifications",
         "schedule": 60.0,
+    },
+    "recordatorios-citas": {
+        "task": "notificaciones.tasks.enqueue_appointment_reminders_task",
+        "schedule": 900.0,
     },
     "purgar-audios-vencidos": {
         "task": "sesiones.tasks.purgar_audios_vencidos",

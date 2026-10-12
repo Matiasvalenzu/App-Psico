@@ -14,6 +14,7 @@ class NotificacionEmail(models.Model):
         SESION_LISTA = "SESION_LISTA", "Sesión lista"
         AVISO_PURGA_7D = "AVISO_PURGA_7D", "Aviso de eliminación (7 días)"
         AVISO_PURGA_1D = "AVISO_PURGA_1D", "Aviso de eliminación (1 día)"
+        RECORDATORIO_CITA = "RECORDATORIO_CITA", "Recordatorio de cita"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
