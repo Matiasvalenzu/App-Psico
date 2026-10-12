@@ -175,6 +175,8 @@ CELERY_TASK_ROUTES = {
     "notificaciones.tasks.send_notification": {"queue": "email"},
     "notificaciones.tasks.dispatch_pending_notifications": {"queue": "email"},
     "notificaciones.tasks.enqueue_appointment_reminders_task": {"queue": "email"},
+    # Boletas en el SII: worker propio con concurrencia 1.
+    "facturacion.tasks.*": {"queue": "bhe"},
 }
 CELERY_BEAT_SCHEDULE = {
     "dispatch-pending-email-notifications": {
@@ -196,6 +198,10 @@ CELERY_BEAT_SCHEDULE = {
     "purgar-registros-acceso": {
         "task": "cuentas.tasks.purgar_registros_acceso",
         "schedule": crontab(hour=4, minute=20, day_of_week=0),
+    },
+    "rescatar-emisiones-bhe": {
+        "task": "facturacion.tasks.rescatar_emisiones_bhe",
+        "schedule": 600.0,
     },
 }
 

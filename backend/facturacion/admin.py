@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.db import transaction
 from django.utils import timezone
 
+from .bhe import reanudar_cola
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
 from .serializers import CAMPOS_RECEPTOR
 from .services import enmascarar_rut
@@ -66,6 +68,8 @@ class ConfiguracionBHEAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if "pausada" in form.changed_data:
             obj.pausada_at = timezone.now() if obj.pausada else None
+            if not obj.pausada:
+                transaction.on_commit(reanudar_cola)
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):

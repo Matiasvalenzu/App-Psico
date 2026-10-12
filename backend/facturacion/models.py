@@ -182,6 +182,9 @@ class EmisionBHE(models.Model):
     payload = EncryptedTextField(blank=True, default="")
     folio = models.CharField(max_length=30, blank=True, default="")
     codigo_sii = models.CharField(max_length=60, blank=True, default="")
+    # Lo que informó el SII, para compararlo con el cálculo del cobro.
+    monto_retencion_sii = models.PositiveIntegerField(null=True, blank=True)
+    monto_liquido_sii = models.PositiveIntegerField(null=True, blank=True)
     pdf = models.FileField(storage=_storage_bhe, upload_to=_ruta_archivo_bhe, blank=True)
     evidencias = models.JSONField(default=list, blank=True)
     solicitado_por = models.ForeignKey(

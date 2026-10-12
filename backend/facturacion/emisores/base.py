@@ -4,6 +4,8 @@ La tarea de emisión decide según el tipo de error:
 - ErrorAntesDeEnviar: no se llegó a enviar nada; se puede reintentar.
 - ErrorNegocio: el SII rechazó la boleta; no se reintenta.
 - ErrorDespuesDeEnviar: no se sabe si quedó emitida; nunca se reintenta, solo se busca.
+- ErrorCredencial: el SII rechazó la clave de la cuenta autorizada; no se reintenta y se pausa
+  la cola, porque varios intentos fallidos pueden bloquear la clave que usan todos los psicólogos.
 """
 
 from abc import ABC, abstractmethod
@@ -97,6 +99,10 @@ class ErrorNegocio(ErrorEmisor):
 
 
 class ErrorDespuesDeEnviar(ErrorEmisor):
+    pass
+
+
+class ErrorCredencial(ErrorEmisor):
     pass
 
 

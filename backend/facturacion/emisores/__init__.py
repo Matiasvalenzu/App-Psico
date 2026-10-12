@@ -6,6 +6,7 @@ from .base import (  # noqa: F401
     DatosBoleta,
     EmisorBHE,
     ErrorAntesDeEnviar,
+    ErrorCredencial,
     ErrorDespuesDeEnviar,
     ErrorEmisor,
     ErrorNegocio,

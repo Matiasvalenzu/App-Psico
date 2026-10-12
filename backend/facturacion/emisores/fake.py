@@ -17,6 +17,7 @@ from .base import (
     CausaAnulacion,
     EmisorBHE,
     ErrorAntesDeEnviar,
+    ErrorCredencial,
     ErrorDespuesDeEnviar,
     ErrorNegocio,
     ResultadoEmision,
@@ -30,6 +31,7 @@ ESCENARIOS = (
     "caida_despues_demora",  # igual, pero la primera búsqueda todavía no la encuentra
     "caida_despues_sin_boleta",  # el robot cayó y la boleta no quedó emitida
     "sin_delegacion",  # el psicólogo no autorizó o revocó la delegación
+    "credencial_rechazada",  # el SII rechaza la clave de la cuenta autorizada
 )
 
 
@@ -95,7 +97,12 @@ class FakeEmisor(EmisorBHE):
             pdf=_pdf_simulado(boleta["folio"]) if con_pdf else b"",
         )
 
+    def _login(self):
+        if self.escenario == "credencial_rechazada":
+            raise ErrorCredencial("clave_rechazada", "El SII rechazó la clave de la cuenta autorizada.")
+
     def _fallar_antes(self):
+        self._login()
         if self.escenario == "timeout_antes":
             raise ErrorAntesDeEnviar("timeout", "El portal del SII no respondió.")
         if self.escenario == "sin_delegacion":
@@ -149,6 +156,7 @@ class FakeEmisor(EmisorBHE):
             raise ErrorDespuesDeEnviar("sin_respuesta", "Se perdió la conexión después de enviar.")
 
     def buscar(self, rut_emisor, rut_receptor, fecha, monto_bruto):
+        self._login()
         encontradas = []
         with self._registro() as registro:
             for boleta in registro["boletas"]:
@@ -168,4 +176,5 @@ class FakeEmisor(EmisorBHE):
         return encontradas
 
     def verificar_delegacion(self, rut_emisor):
+        self._login()
         return self.escenario != "sin_delegacion"
