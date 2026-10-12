@@ -77,17 +77,6 @@ services:
       timeout: 5s
       retries: 5
 
-  sii_libredte:
-    image: php:7.4-apache
-    container_name: psicologo-sii-libredte-dev
-    volumes:
-      - ./docker/libredte:/var/www/html
-    ports:
-      - "8080:80"
-    restart: unless-stopped
-    networks:
-      default:
-
   redis:
     image: redis:7-alpine
     container_name: psicologo-redis-dev
