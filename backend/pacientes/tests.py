@@ -120,3 +120,75 @@ class CifradoCamposTests(TestCase):
                 self.assertEqual(Paciente.objects.get(pk=self.paciente.pk).notas_privadas, "secreto clínico")
         finally:
             _fernet.cache_clear()
+
+
+class PacienteDocumentoTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="psi_rut", email="r@test.com", password="x")
+        self.otro_user = User.objects.create_user(username="psi_otro", email="o2@test.com", password="x")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.paciente1 = Paciente.objects.create(
+            psicologo=self.user,
+            nombre="Juan",
+            apellido="Pérez",
+            rut="18.392.402-8",
+            documento_normalizado="183924028",
+            tipo_documento="RUT",
+            numero_documento="18.392.402-8",
+        )
+        self.paciente2 = Paciente.objects.create(
+            psicologo=self.user,
+            nombre="María",
+            apellido="Camila",
+        )
+
+    def test_editar_paciente_con_mismo_rut_falla_con_400(self):
+        # Intentar asignarle a paciente2 el mismo RUT que ya tiene paciente1
+        response = self.client.patch(
+            f"/api/pacientes/{self.paciente2.id}/",
+            {"rut": "18.392.402-8"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("rut", response.data)
+        self.assertEqual(
+            str(response.data["rut"][0]),
+            "Ya tienes un paciente registrado con este documento.",
+        )
+
+    def test_editar_paciente_conservando_su_propio_rut(self):
+        # paciente1 guarda cambios manteniendo su mismo RUT
+        response = self.client.patch(
+            f"/api/pacientes/{self.paciente1.id}/",
+            {"rut": "18.392.402-8", "nombre": "Juan Carlos"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.paciente1.refresh_from_db()
+        self.assertEqual(self.paciente1.nombre, "Juan Carlos")
+
+    def test_rut_invalido_devuelve_error_especifico_en_campo_rut(self):
+        response = self.client.patch(
+            f"/api/pacientes/{self.paciente2.id}/",
+            {"rut": "11.111.111-0"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("rut", response.data)
+
+    def test_mismo_rut_permitido_para_distinto_psicologo(self):
+        # Otro psicólogo puede tener un paciente con el mismo RUT
+        client_otro = APIClient()
+        client_otro.force_authenticate(user=self.otro_user)
+        response = client_otro.post(
+            "/api/pacientes/",
+            {
+                "nombre": "Pedro",
+                "apellido": "Soto",
+                "rut": "18.392.402-8",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+

@@ -171,16 +171,30 @@ export default function EditPacienteDialog({
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         const errors: Record<string, string> = {};
+        let singleMessage = "";
         if (data && typeof data === "object") {
           for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
             const message = Array.isArray(value) ? String(value[0]) : String(value);
-            if (key in form) errors[key] = message;
-            else setError(message);
+            if (key in form) {
+              errors[key] = message;
+            } else if (key === "detail" || key === "non_field_errors") {
+              singleMessage = message;
+            } else {
+              singleMessage = `${key}: ${message}`;
+            }
           }
         }
         setFieldErrors(errors);
-        if (!Object.keys(errors).length && !data) setError("No se pudieron guardar los cambios.");
-        else if (Object.keys(errors).length) setError("Revisa los campos marcados.");
+        const errorKeys = Object.keys(errors);
+        if (errorKeys.length === 1) {
+          setError(errors[errorKeys[0]]);
+        } else if (errorKeys.length > 1) {
+          setError("Revisa los campos marcados.");
+        } else if (singleMessage) {
+          setError(singleMessage);
+        } else {
+          setError("No se pudieron guardar los cambios.");
+        }
         return;
       }
       onSaved(data);

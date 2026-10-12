@@ -1,11 +1,12 @@
 from datetime import date
 
+from django.db import IntegrityError
 from django.db.models import OuterRef, Subquery
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, generics, status, viewsets
+from rest_framework import filters, generics, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -18,6 +19,7 @@ from cuentas.exportacion import carpeta_paciente, exportar_paciente
 from sesiones.audio import borrar_carpeta_paciente
 from sesiones.models import Sesion
 
+from .documentos import TIPO_RUT
 from .models import ConsentimientoInformado, Paciente
 from .serializers import (
     ConsentimientoInformadoSerializer,
@@ -126,7 +128,24 @@ class PacienteViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save(psicologo=self.request.user)
+        try:
+            serializer.save(psicologo=self.request.user)
+        except IntegrityError:
+            tipo = serializer.validated_data.get("tipo_documento", TIPO_RUT)
+            field_name = "rut" if tipo == TIPO_RUT else "numero_documento"
+            raise serializers.ValidationError(
+                {field_name: "Ya tienes un paciente registrado con este documento."}
+            )
+
+    def perform_update(self, serializer):
+        try:
+            serializer.save()
+        except IntegrityError:
+            tipo = serializer.validated_data.get("tipo_documento", TIPO_RUT)
+            field_name = "rut" if tipo == TIPO_RUT else "numero_documento"
+            raise serializers.ValidationError(
+                {field_name: "Ya tienes un paciente registrado con este documento."}
+            )
 
     def perform_destroy(self, instance):
         paciente_id = instance.pk

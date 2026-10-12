@@ -97,8 +97,14 @@ class PacienteSerializer(serializers.ModelSerializer):
         elif "rut" in attrs and "numero_documento" not in attrs:
             numero = attrs["rut"]
             tipo = TIPO_RUT
+        field_name = "rut" if tipo == TIPO_RUT else "numero_documento"
+
         if numero:
-            normalizado = normalizar_documento(tipo, numero)
+            try:
+                normalizado = normalizar_documento(tipo, numero)
+            except serializers.ValidationError as err:
+                raise serializers.ValidationError({field_name: err.detail})
+
             attrs["tipo_documento"] = tipo
             attrs["numero_documento"] = formatear_documento(tipo, normalizado)
             attrs["documento_normalizado"] = normalizado
@@ -106,6 +112,26 @@ class PacienteSerializer(serializers.ModelSerializer):
                 attrs["rut"] = formatear_documento(tipo, normalizado)
             elif "tipo_documento" in attrs or "numero_documento" in attrs:
                 attrs["rut"] = ""
+
+            # Validar unicidad de documento por psicólogo
+            psicologo = getattr(self.instance, "psicologo", None)
+            if not psicologo and "request" in self.context and self.context["request"]:
+                psicologo = getattr(self.context["request"], "user", None)
+            elif not psicologo and "psicologo" in attrs:
+                psicologo = attrs["psicologo"]
+
+            if psicologo and normalizado:
+                qs = Paciente.objects.filter(
+                    psicologo=psicologo,
+                    tipo_documento=tipo,
+                    documento_normalizado=normalizado,
+                )
+                if self.instance and self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError(
+                        {field_name: "Ya tienes un paciente registrado con este documento."}
+                    )
         elif "numero_documento" in attrs or "rut" in attrs:
             attrs["numero_documento"] = ""
             attrs["documento_normalizado"] = ""
