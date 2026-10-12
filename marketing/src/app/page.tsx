@@ -2,6 +2,7 @@ import { Nav } from "@/components/layout/nav"
 import { Footer } from "@/components/layout/footer"
 import { HeroSection } from "@/components/sections/hero"
 import { TrustSection } from "@/components/sections/trust"
+import { OneSessionSection } from "@/components/sections/one-session"
 import { ProblemSection } from "@/components/sections/problem"
 import { FeaturesBentoSection } from "@/components/sections/features-bento"
 import { HowItWorksSection } from "@/components/sections/how-it-works"
@@ -18,6 +19,7 @@ export default function Home() {
       <main className="flex flex-1 flex-col">
         <HeroSection />
         <TrustSection />
+        <OneSessionSection />
         <ProblemSection />
         <FeaturesBentoSection />
         <HowItWorksSection />
