@@ -66,18 +66,17 @@ export default function ChatIA({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    setIsChatSidebarOpen(false);
     loadChatConversations();
-    if (window.innerWidth >= 768) setIsChatSidebarOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
-    if (chatScrollContainerRef.current) {
-      chatScrollContainerRef.current.scrollTo({
-        top: chatScrollContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
+    if (!messages.length || !chatScrollContainerRef.current) return;
+    chatScrollContainerRef.current.scrollTo({
+      top: chatScrollContainerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, iaTyping]);
 
   // ---------- Chat logic ----------
@@ -363,7 +362,7 @@ export default function ChatIA({
     <>
       {/* ──────────────────────────────────────────────── */}
       <div className="relative rounded-2xl border border-border/60 bg-card chat-glow overflow-clip">
-        <div className="flex h-[calc(100dvh-16rem)] min-h-[480px]">
+        <div className="flex h-[calc(100dvh-16rem)] min-h-[520px]">
 
           {/* ── Chat Sidebar (Historial) ── */}
           <div
@@ -525,9 +524,9 @@ export default function ChatIA({
           </div>
 
           {/* ── Main Chat Area ── */}
-          <div className="flex flex-1 flex-col min-w-0">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* Chat Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
               <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                 <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-primary/10 shadow-glow shrink-0">
                   <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
@@ -609,24 +608,24 @@ export default function ChatIA({
             )}
 
             {/* Message Area */}
-            <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto space-y-4 p-5 transition-all">
+            <div ref={chatScrollContainerRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-5">
               {loadingChat ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-4">
+                <div className="flex items-center gap-2 pt-4 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Cargando conversación...
                 </div>
               ) : !chatId ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-4 py-6 text-center">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                     <MessageCircle className="h-6 w-6 text-primary" />
                   </div>
                   <p className="text-sm font-medium">Crea una conversación para empezar</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
                     La IA analizará las sesiones y documentos de este paciente
                   </p>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-4 py-6 text-center">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                     <Brain className="h-6 w-6 text-primary" />
                   </div>
@@ -638,7 +637,8 @@ export default function ChatIA({
                   </p>
                 </div>
               ) : (
-                messages.map((message) => {
+                <div className="space-y-4">
+                {messages.map((message) => {
                   const isUser = message.rol === "USER";
                   const sources = deduplicateSources(message.fuentes_json || []);
                   const sourcesOpen = expandedSources.has(message.id);
@@ -751,12 +751,13 @@ export default function ChatIA({
                       </div>
                     </div>
                   );
-                })
+                })}
+                </div>
               )}
 
               {/* Typing indicator */}
               {iaTyping && (
-                <div className="flex animate-fade-in-up items-start gap-3">
+                <div className="mt-4 flex animate-fade-in-up items-start gap-3">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">
                     <Sparkles className="h-4 w-4" />
                   </div>
@@ -771,7 +772,7 @@ export default function ChatIA({
             </div>
 
             {/* Suggested Prompts */}
-            <div className="border-t border-border/40 px-3.5 sm:px-5 py-2.5 sm:py-3">
+            <div className="shrink-0 border-t border-border/40 px-3.5 py-2.5 sm:px-5 sm:py-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Preguntas sugeridas
               </p>
@@ -782,7 +783,7 @@ export default function ChatIA({
                     type="button"
                     onClick={() => selectSuggestedChatPrompt(prompt)}
                     disabled={sendingChat || creatingChat}
-                    className="rounded-full border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50 text-left max-w-full truncate"
+                    className="w-fit max-w-full whitespace-normal rounded-full border border-border/80 bg-card px-3 py-1.5 text-left text-xs font-medium leading-snug text-foreground shadow-subtle transition-colors hover:bg-accent disabled:opacity-50"
                   >
                     {prompt}
                   </button>
@@ -791,7 +792,7 @@ export default function ChatIA({
             </div>
 
             {/* Chat Input */}
-            <div className="border-t border-border/40 px-3 sm:px-5 py-2.5 sm:py-3">
+            <div className="shrink-0 border-t border-border/40 px-3 py-2.5 sm:px-5 sm:py-3">
               {paciente.consentimiento_vigente === false && (
                 <AvisoConsentimiento
                   pacienteId={paciente.id}
