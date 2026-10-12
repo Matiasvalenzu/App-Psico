@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Download, History, Loader2, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, BellRing, Download, History, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import { apiFetch, clearTokens, getCurrentUser } from "@/lib/api";
 
 type Registro = {
@@ -43,8 +43,13 @@ export default function PrivacidadPage() {
   const [confirmacion, setConfirmacion] = useState("");
   const [eliminando, setEliminando] = useState(false);
   const [error, setError] = useState("");
+  const [recordatorios, setRecordatorios] = useState<boolean | null>(null);
 
   useEffect(() => {
+    apiFetch("/cuenta/perfil/")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((perfil) => setRecordatorios(perfil ? perfil.recordatorios_paciente_activos !== false : null))
+      .catch(() => setRecordatorios(null));
     Promise.all([apiFetch("/cuenta/actividad/").then((r) => (r.ok ? r.json() : [])), getCurrentUser()])
       .then(([actividad, user]) => {
         setRegistros(actividad);
@@ -63,6 +68,20 @@ export default function PrivacidadPage() {
       setError(caught instanceof Error ? caught.message : "No se pudo generar la exportación.");
     } finally {
       setExportando(false);
+    }
+  }
+
+  async function cambiarRecordatorios(activos: boolean) {
+    const anterior = recordatorios;
+    setRecordatorios(activos);
+    setError("");
+    const res = await apiFetch("/cuenta/perfil/", {
+      method: "PATCH",
+      body: JSON.stringify({ recordatorios_paciente_activos: activos }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      setRecordatorios(anterior);
+      setError("No se pudo guardar la preferencia de recordatorios.");
     }
   }
 
@@ -107,6 +126,25 @@ export default function PrivacidadPage() {
           {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           {exportando ? "Preparando archivo…" : "Descargar todo (ZIP)"}
         </button>
+      </section>
+
+      <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
+        <div className="mb-3 flex items-center gap-2"><BellRing className="h-5 w-5 text-primary" /><h2 className="font-semibold">Recordatorios a pacientes</h2></div>
+        <label className="flex items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 accent-primary"
+            checked={recordatorios ?? false}
+            disabled={recordatorios === null}
+            onChange={(e) => cambiarRecordatorios(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">Enviar un recordatorio por correo 24 horas antes de cada cita</span>
+            <span className="mt-1 block text-muted-foreground">
+              Incluye solo la fecha, la hora y tu nombre; nunca datos clínicos. Si la cita se anula o se reagenda, no se envía el recordatorio anterior.
+            </span>
+          </span>
+        </label>
       </section>
 
       <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
