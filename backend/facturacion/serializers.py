@@ -1,10 +1,12 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from pacientes.documentos import TIPO_RUT, formatear_documento, normalizar_documento
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 
-from .models import Cobro
+from .emisores import CausaAnulacion
+from .models import Cobro, DelegacionSII, EmisionBHE
 from .services import anulable_hasta, calcular_retencion, validar_glosa
 
 GLOSA_POR_DEFECTO = "Atención psicológica"
@@ -51,6 +53,7 @@ class CobroSerializer(serializers.ModelSerializer):
     glosa = serializers.CharField(max_length=200, required=False)
     paciente_nombre = serializers.SerializerMethodField()
     anulable_hasta = serializers.SerializerMethodField()
+    ultima_emision = serializers.SerializerMethodField()
 
     class Meta:
         model = Cobro
@@ -59,7 +62,7 @@ class CobroSerializer(serializers.ModelSerializer):
             "medio_pago", "estado_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulable_hasta",
-            "notas", "created_at", "updated_at",
+            "ultima_emision", "notas", "created_at", "updated_at",
         ]
         read_only_fields = [
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
@@ -72,6 +75,11 @@ class CobroSerializer(serializers.ModelSerializer):
 
     def get_anulable_hasta(self, obj):
         return anulable_hasta(obj.boleta_fecha_emision) if obj.boleta_fecha_emision else None
+
+    def get_ultima_emision(self, obj):
+        # Recorre la lista ya precargada por la vista en vez de hacer una consulta por cobro.
+        emisiones = list(obj.emisiones.all())
+        return EmisionBHESerializer(emisiones[0]).data if emisiones else None
 
     def validate_paciente(self, value):
         if value and value.psicologo_id != self.context["request"].user.id:
@@ -145,3 +153,71 @@ class CobroSerializer(serializers.ModelSerializer):
 class MarcarEmitidaSerializer(serializers.Serializer):
     folio = serializers.RegexField(r"^\d{1,12}$", error_messages={"invalid": "El folio debe ser numérico."})
     fecha_emision = serializers.DateField(required=False)
+
+
+# Detalles que pueden traer texto técnico del robot: al psicólogo se le muestra uno genérico.
+ERRORES_INTERNOS = {"error_interno", "error_inesperado"}
+
+
+class EmisionBHESerializer(serializers.ModelSerializer):
+    # Sin payload ni evidencias: llevan datos del receptor.
+    error_detalle = serializers.SerializerMethodField()
+    revision_manual = serializers.SerializerMethodField()
+    tiene_pdf = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmisionBHE
+        fields = [
+            "id", "tipo", "estado", "intentos", "folio", "error_codigo", "error_detalle",
+            "revision_manual", "monto_retencion_sii", "monto_liquido_sii", "tiene_pdf",
+            "created_at", "finished_at", "resuelta_at",
+        ]
+        read_only_fields = fields
+
+    def get_error_detalle(self, obj):
+        if obj.error_codigo in ERRORES_INTERNOS:
+            return "Ocurrió un error interno de Psiconex. Lo estamos revisando."
+        return obj.error_detalle
+
+    def get_revision_manual(self, obj):
+        return obj.paso == "REVISION_MANUAL"
+
+    def get_tiene_pdf(self, obj):
+        return bool(obj.pdf)
+
+
+class AnularSIISerializer(serializers.Serializer):
+    causa = serializers.ChoiceField(choices=CausaAnulacion.choices)
+    confirmado = serializers.BooleanField(default=False)
+
+
+class DelegacionSolicitudSerializer(serializers.Serializer):
+    acepta = serializers.BooleanField()
+    fecha_otorgada = serializers.DateField(required=False)
+    # Solo se usa si el perfil todavía no tiene RUT.
+    rut = serializers.CharField(max_length=12, required=False, allow_blank=True)
+
+    def validate_acepta(self, value):
+        if not value:
+            raise serializers.ValidationError("Debes aceptar las condiciones para autorizar a Psiconex.")
+        return value
+
+    def validate_fecha_otorgada(self, value):
+        if value > timezone.localdate():
+            raise serializers.ValidationError("La fecha no puede ser futura.")
+        return value
+
+    def validate(self, attrs):
+        perfil = self.context["perfil"]
+        rut = perfil.rut_profesional
+        if not rut:
+            if not attrs.get("rut"):
+                raise serializers.ValidationError({"rut": "Indica tu RUT. Quedará fijo en tu perfil."})
+            rut = formatear_documento(TIPO_RUT, normalizar_documento(TIPO_RUT, attrs["rut"]))
+            attrs["rut"] = rut
+        # Si otra cuenta ya declaró este RUT, podría ser alguien suplantando al psicólogo.
+        if DelegacionSII.objects.filter(rut_emisor=rut).exclude(psicologo_id=perfil.user_id).exists():
+            raise serializers.ValidationError(
+                {"rut": "Este RUT ya está asociado a otra cuenta de Psiconex. Escríbenos para revisarlo."}
+            )
+        return attrs

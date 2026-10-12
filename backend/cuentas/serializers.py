@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from pacientes.documentos import TIPO_RUT, formatear_documento, normalizar_documento
 
+from facturacion.models import DelegacionSII
 from facturacion.services import validar_glosa
 
 from .models import PerfilPsicologo
@@ -55,10 +56,16 @@ class PerfilPsicologoSerializer(serializers.Serializer):
         }
 
     def validate_rut_profesional(self, value):
-        if not value:
-            return ""
-        normalized = normalizar_documento(TIPO_RUT, value)
-        return formatear_documento(TIPO_RUT, normalized)
+        rut = formatear_documento(TIPO_RUT, normalizar_documento(TIPO_RUT, value)) if value else ""
+        if self.instance is not None and rut != self.instance.rut_profesional and (
+            DelegacionSII.objects.filter(psicologo_id=self.instance.user_id)
+            .exclude(estado=DelegacionSII.Estado.NO_INICIADA)
+            .exists()
+        ):
+            raise serializers.ValidationError(
+                "Tu RUT está ligado a la autorización del SII para emitir boletas. Escríbenos si necesitas cambiarlo."
+            )
+        return rut
 
     def validate_bhe_glosa_default(self, value):
         return validar_glosa(value)

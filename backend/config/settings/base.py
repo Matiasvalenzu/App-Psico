@@ -275,6 +275,8 @@ BHE_STORAGE_PATH = os.environ.get("BHE_STORAGE_PATH", "/data/bhe")
 # Emisor de boletas: "fake" (simulado, solo desarrollo) o "playwright" (portal real). Vacío = ninguno.
 BHE_BACKEND = os.environ.get("BHE_BACKEND", "")
 BHE_FAKE_ESCENARIO = os.environ.get("BHE_FAKE_ESCENARIO", "exito")
+# RUT de la cuenta que el psicólogo autoriza en el SII ("usuario autorizado").
+BHE_RUT_AUTORIZADO = os.environ.get("BHE_RUT_AUTORIZADO", "")
 
 # Audio AI pipeline
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")

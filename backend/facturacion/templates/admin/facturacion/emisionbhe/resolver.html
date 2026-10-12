@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p>{{ emision.get_tipo_display }} del cobro #{{ emision.cobro_id }} — {{ emision.get_estado_display }}{% if emision.error_codigo %} ({{ emision.error_codigo }}){% endif %}.</p>
+<p>Entra al portal del SII con la clave de la cuenta de Psiconex, busca la boleta del psicólogo por receptor, fecha y monto, y registra aquí lo que muestra el portal. Esta acción queda registrada con tu usuario.</p>
+{% if emision.estado == "DESCONOCIDO" %}
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" class="default" value="Resolver">
+</form>
+{% else %}
+<p>Esta emisión ya no está por confirmar.</p>
+{% endif %}
+{% endblock %}
