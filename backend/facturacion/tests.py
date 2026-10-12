@@ -2,6 +2,7 @@ from datetime import date
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, connection, transaction
 from django.test import RequestFactory, TestCase
 from rest_framework import serializers, status
 from rest_framework.test import APITestCase
@@ -9,8 +10,8 @@ from rest_framework.test import APITestCase
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 
-from .models import Cobro
-from .services import anulable_hasta, calcular_retencion, validar_glosa
+from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
+from .services import anulable_hasta, calcular_retencion, enmascarar_rut, un_anio_despues, validar_glosa
 
 User = get_user_model()
 URL = "/api/facturacion/cobros/"
@@ -185,3 +186,158 @@ class CobroAdminTests(TestCase):
         self.assertIn("receptor_documento", modelo_admin.get_fields(request))
         self.assertFalse(any(c.startswith("receptor_") for c in modelo_admin.list_display))
         self.assertFalse(modelo_admin.search_fields)
+
+
+def crear_cobro(psicologo, **extra):
+    datos = {
+        "psicologo": psicologo, "fecha_pago": date(2026, 10, 12), "monto_bruto": 250000,
+        "tasa_retencion": "15.25", "monto_retencion": 38125, "monto_liquido": 211875,
+        "receptor_documento": "11.111.111-1", "receptor_nombre": "Ana Rojas", "glosa": "Atención psicológica",
+        **extra,
+    }
+    return Cobro.objects.create(**datos)
+
+
+class EmisionBHEModeloTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
+        self.cobro = crear_cobro(self.user)
+
+    def emision(self, tipo=EmisionBHE.Tipo.EMISION, **extra):
+        clave = extra.pop("idempotency_key", None) or EmisionBHE.clave_idempotencia(self.cobro, tipo)
+        return EmisionBHE.objects.create(cobro=self.cobro, tipo=tipo, idempotency_key=clave, **extra)
+
+    def test_clave_idempotencia(self):
+        self.assertEqual(EmisionBHE.clave_idempotencia(self.cobro, EmisionBHE.Tipo.EMISION), f"cobro:{self.cobro.pk}:v1")
+        self.assertEqual(
+            EmisionBHE.clave_idempotencia(self.cobro, EmisionBHE.Tipo.ANULACION), f"cobro:{self.cobro.pk}:anulacion:v1"
+        )
+
+    def test_una_sola_emision_activa_por_cobro(self):
+        self.emision()
+        for estado in EmisionBHE.ESTADOS_ACTIVOS:
+            with self.subTest(estado=estado), self.assertRaises(IntegrityError), transaction.atomic():
+                self.emision(idempotency_key=f"otra-{estado}", estado=estado)
+
+    def test_tras_fallida_se_permite_otra(self):
+        primera = self.emision()
+        primera.estado = EmisionBHE.Estado.FALLIDA
+        primera.save()
+        self.cobro.version_emision += 1
+        self.cobro.save()
+        segunda = self.emision()
+        self.assertEqual(segunda.idempotency_key, f"cobro:{self.cobro.pk}:v2")
+
+    def test_anulacion_convive_con_emision_emitida(self):
+        self.emision(estado=EmisionBHE.Estado.EMITIDA)
+        self.emision(tipo=EmisionBHE.Tipo.ANULACION)
+        self.assertEqual(self.cobro.emisiones.count(), 2)
+
+    def test_idempotency_key_unica(self):
+        self.emision(estado=EmisionBHE.Estado.FALLIDA)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.emision(estado=EmisionBHE.Estado.FALLIDA)
+
+    def test_payload_cifrado_en_base(self):
+        emision = self.emision(payload='{"receptor": "11.111.111-1"}')
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT payload FROM facturacion_emisionbhe WHERE id = %s", [emision.pk])
+            crudo = cursor.fetchone()[0]
+        self.assertTrue(crudo.startswith("enc:"))
+        emision.refresh_from_db()
+        self.assertIn("11.111.111-1", emision.payload)
+
+
+class DelegacionSIITests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
+
+    def test_vencimiento_un_anio(self):
+        delegacion = DelegacionSII.objects.create(
+            psicologo=self.user, rut_emisor="777819771", fecha_otorgada=date(2026, 10, 12)
+        )
+        self.assertEqual(delegacion.fecha_vencimiento, date(2027, 10, 12))
+        self.assertEqual(delegacion.estado, DelegacionSII.Estado.NO_INICIADA)
+        self.assertFalse(delegacion.piloto)
+
+    def test_vencimiento_29_febrero(self):
+        self.assertEqual(un_anio_despues(date(2028, 2, 29)), date(2029, 2, 28))
+
+    def test_respeta_vencimiento_del_portal(self):
+        delegacion = DelegacionSII.objects.create(
+            psicologo=self.user, rut_emisor="777819771",
+            fecha_otorgada=date(2026, 10, 12), fecha_vencimiento=date(2027, 9, 30),
+        )
+        self.assertEqual(delegacion.fecha_vencimiento, date(2027, 9, 30))
+
+    def test_enmascarar_rut(self):
+        self.assertEqual(enmascarar_rut("777819771"), "77.***.***-1")
+        self.assertEqual(enmascarar_rut("12.345.678-k"), "12.***.***-K")
+        self.assertEqual(enmascarar_rut("11111111"), "1.***.***-1")
+        self.assertEqual(enmascarar_rut(""), "***")
+
+
+class ConfiguracionBHETests(TestCase):
+    def test_parte_pausada(self):
+        # La fila la crea la migración.
+        self.assertTrue(ConfiguracionBHE.objects.get(pk=1).pausada)
+        self.assertTrue(ConfiguracionBHE.cola_pausada())
+
+    def test_sin_fila_se_considera_pausada(self):
+        ConfiguracionBHE.objects.all().delete()
+        self.assertTrue(ConfiguracionBHE.cola_pausada())
+
+    def test_singleton(self):
+        config = ConfiguracionBHE(pausada=False)
+        config.save()
+        self.assertEqual(ConfiguracionBHE.objects.count(), 1)
+        self.assertFalse(ConfiguracionBHE.cola_pausada())
+
+
+class BHEAdminTests(TestCase):
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+        self.request.user = User(is_staff=True, is_superuser=True)
+
+    def test_delegacion_rut_siempre_enmascarado(self):
+        modelo_admin = admin.site._registry[DelegacionSII]
+        campos = modelo_admin.get_fields(self.request)
+        self.assertNotIn("rut_emisor", campos)
+        self.assertIn("rut_enmascarado", campos)
+        self.assertNotIn("rut_emisor", modelo_admin.list_display)
+
+    def test_emision_sin_payload_ni_evidencias_y_solo_lectura(self):
+        modelo_admin = admin.site._registry[EmisionBHE]
+        campos = modelo_admin.get_fields(self.request)
+        self.assertNotIn("payload", campos)
+        self.assertNotIn("evidencias", campos)
+        self.assertFalse(modelo_admin.search_fields)
+        self.assertFalse(modelo_admin.has_change_permission(self.request))
+        self.assertFalse(modelo_admin.has_add_permission(self.request))
+
+
+class CobroEnEmisionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
+        self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.save()
+        self.cobro = crear_cobro(self.user, estado_boleta=Cobro.EstadoBoleta.EN_EMISION)
+        self.client.force_authenticate(user=self.user)
+
+    def test_no_se_marca_emitida_a_mano(self):
+        response = self.client.post(
+            f"{URL}{self.cobro.id}/marcar-emitida/", {"folio": "123"}, format="json", secure=True
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "en_emision")
+
+    def test_no_se_editan_campos_de_la_boleta(self):
+        response = self.client.patch(f"{URL}{self.cobro.id}/", {"monto_bruto": 1000}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.client.patch(f"{URL}{self.cobro.id}/", {"notas": "ok"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_no_se_borra(self):
+        response = self.client.delete(f"{URL}{self.cobro.id}/", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Cobro.objects.filter(pk=self.cobro.pk).exists())

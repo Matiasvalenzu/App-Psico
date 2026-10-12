@@ -262,6 +262,10 @@ MERCADOPAGO_PUBLIC_KEY = os.environ.get("MERCADOPAGO_PUBLIC_KEY", "")
 MERCADOPAGO_PLAN_ID = os.environ.get("MERCADOPAGO_PLAN_ID", "")
 # Muestra el Plan Plus (boletas de honorarios) para contratación propia; el Admin puede asignarlo igual.
 PLAN_PLUS_DISPONIBLE = os.environ.get("PLAN_PLUS_DISPONIBLE", "False").lower() in ("1", "true", "yes")
+# Emisión automática de boletas como usuario autorizado (Fase 2). Independiente de PLAN_PLUS_DISPONIBLE.
+BHE_AUTO_DISPONIBLE = os.environ.get("BHE_AUTO_DISPONIBLE", "False").lower() in ("1", "true", "yes")
+# PDFs y evidencias de las emisiones: fuera de MEDIA_ROOT, en un volumen con respaldo.
+BHE_STORAGE_PATH = os.environ.get("BHE_STORAGE_PATH", "/data/bhe")
 
 # Audio AI pipeline
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")

@@ -28,6 +28,8 @@ class CobroViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         if instance.estado_boleta == Cobro.EstadoBoleta.EMITIDA:
             raise ValidationError("No se puede borrar un cobro con boleta emitida. Anúlala primero.")
+        if instance.estado_boleta == Cobro.EstadoBoleta.EN_EMISION:
+            raise ValidationError("La boleta se está emitiendo en el SII. Espera a que termine.")
         instance.delete()
 
     @action(detail=True, methods=["post"], url_path="marcar-emitida")
@@ -35,6 +37,11 @@ class CobroViewSet(viewsets.ModelViewSet):
         cobro = self.get_object()
         if cobro.estado_boleta == Cobro.EstadoBoleta.ANULADA:
             return Response({"detail": "La boleta está anulada."}, status=status.HTTP_400_BAD_REQUEST)
+        if cobro.estado_boleta == Cobro.EstadoBoleta.EN_EMISION:
+            return Response(
+                {"detail": "La boleta se está emitiendo en el SII. Espera a que termine.", "code": "en_emision"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if cobro.bhe_modo != Cobro.ModoBoleta.SIN_DATOS_RECEPTOR and not (
             cobro.receptor_documento and cobro.receptor_nombre
         ):

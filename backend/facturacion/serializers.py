@@ -93,6 +93,13 @@ class CobroSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         instance = self.instance
+        if instance and instance.estado_boleta == Cobro.EstadoBoleta.EN_EMISION:
+            cambiados = [
+                campo for campo in CAMPOS_BLOQUEADOS_SI_EMITIDA
+                if campo in attrs and attrs[campo] != getattr(instance, campo)
+            ]
+            if cambiados:
+                raise serializers.ValidationError("La boleta se está emitiendo en el SII. Espera a que termine.")
         if instance and instance.estado_boleta == Cobro.EstadoBoleta.EMITIDA:
             cambiados = [
                 campo for campo in CAMPOS_BLOQUEADOS_SI_EMITIDA
