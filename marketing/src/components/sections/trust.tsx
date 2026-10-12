@@ -3,21 +3,22 @@
 import { motion } from "motion/react"
 
 const TRUST_BADGES = [
-  "Cumple Ley 19.628",
   "Conexión cifrada (HTTPS)",
-  "Datos en Chile",
-  "Sin entrenamiento con tus datos",
+  "Datos clínicos sensibles cifrados",
+  "El audio se elimina al transcribir",
+  "Exportas o eliminas todo cuando quieras",
+  "Te mostramos qué proveedores intervienen",
 ]
 
 export function TrustSection() {
   return (
     <section
-      aria-label="Confianza y cumplimiento"
+      aria-label="Confianza y transparencia"
       className="border-y border-border/60 bg-muted/30 py-10"
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground">
-          Construido con estándares clínicos
+          Lo que puedes confirmar hoy
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 md:gap-x-12">
           {TRUST_BADGES.map((badge, i) => (
