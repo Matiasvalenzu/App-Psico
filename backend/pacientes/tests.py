@@ -122,6 +122,7 @@ class CifradoCamposTests(TestCase):
             _fernet.cache_clear()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class PacienteDocumentoTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="psi_rut", email="r@test.com", password="x")
