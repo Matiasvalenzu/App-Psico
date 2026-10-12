@@ -266,6 +266,9 @@ PLAN_PLUS_DISPONIBLE = os.environ.get("PLAN_PLUS_DISPONIBLE", "False").lower() i
 BHE_AUTO_DISPONIBLE = os.environ.get("BHE_AUTO_DISPONIBLE", "False").lower() in ("1", "true", "yes")
 # PDFs y evidencias de las emisiones: fuera de MEDIA_ROOT, en un volumen con respaldo.
 BHE_STORAGE_PATH = os.environ.get("BHE_STORAGE_PATH", "/data/bhe")
+# Emisor de boletas: "fake" (simulado, solo desarrollo) o "playwright" (portal real). Vacío = ninguno.
+BHE_BACKEND = os.environ.get("BHE_BACKEND", "")
+BHE_FAKE_ESCENARIO = os.environ.get("BHE_FAKE_ESCENARIO", "exito")
 
 # Audio AI pipeline
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")
