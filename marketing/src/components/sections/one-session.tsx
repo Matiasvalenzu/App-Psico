@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { Caveat } from "next/font/google"
+import Image from "next/image"
 import { AudioLines, FileText, Mic, RotateCcw, TrendingUp } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { cn } from "@/lib/utils"
@@ -87,37 +88,6 @@ function Arrow({ delay }: { delay: number }) {
   )
 }
 
-function SessionIllustration() {
-  const p = "hsl(255 80% 56%)"
-  const m = "hsl(280 75% 64%)"
-  return (
-    <svg viewBox="0 0 320 200" aria-hidden="true" focusable="false" className="h-full w-full">
-      <ellipse cx="92" cy="150" rx="78" ry="34" fill={p} fillOpacity=".10" />
-      <ellipse cx="236" cy="152" rx="74" ry="32" fill={m} fillOpacity=".12" />
-      <path d="M24 176 H296" stroke={p} strokeOpacity=".25" strokeWidth="2" strokeLinecap="round" />
-      <path d="M40 176 V120 Q40 104 56 104 H100 Q116 104 116 120 V176 Z" fill={p} fillOpacity=".18" />
-      <circle cx="80" cy="76" r="17" fill={p} fillOpacity=".85" />
-      <path d="M52 150 Q52 104 80 104 Q108 104 108 150 V176 H52 Z" fill={p} fillOpacity=".70" />
-      <path d="M204 176 V120 Q204 104 220 104 H264 Q280 104 280 120 V176 Z" fill={m} fillOpacity=".20" />
-      <circle cx="240" cy="78" r="16" fill={m} fillOpacity=".90" />
-      <path d="M214 150 Q214 106 240 106 Q266 106 266 150 V176 H214 Z" fill={m} fillOpacity=".72" />
-      <g fill="#fff" stroke={p} strokeOpacity=".35" strokeWidth="1.5">
-        <path d="M110 40 h40 a8 8 0 0 1 8 8 v12 a8 8 0 0 1 -8 8 h-26 l-10 8 v-8 h-4 a8 8 0 0 1 -8 -8 v-12 a8 8 0 0 1 8 -8z" />
-        <path d="M176 28 h40 a8 8 0 0 1 8 8 v12 a8 8 0 0 1 -8 8 h-4 v8 l-10 -8 h-26 a8 8 0 0 1 -8 -8 v-12 a8 8 0 0 1 8 -8z" />
-      </g>
-      <g fill={p} fillOpacity=".55">
-        <circle cx="122" cy="54" r="2.5" />
-        <circle cx="132" cy="54" r="2.5" />
-        <circle cx="142" cy="54" r="2.5" />
-      </g>
-      <g fill={m} fillOpacity=".8">
-        <circle cx="188" cy="42" r="2.5" />
-        <circle cx="198" cy="42" r="2.5" />
-        <circle cx="208" cy="42" r="2.5" />
-      </g>
-    </svg>
-  )
-}
 
 export function OneSessionSection() {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -203,18 +173,19 @@ export function OneSessionSection() {
                   className={cn(
                     styles.item,
                     styles.fadeUp,
-                    "w-full max-w-md rounded-2xl border border-white/80 bg-white/70 p-4 lg:max-w-none"
+                    "w-full max-w-md p-2 lg:max-w-none lg:p-0"
                   )}
                   style={t(0)}
                   data-os-item
                 >
-                  <div
-                    role="img"
-                    aria-label="Ilustración: un psicólogo y un paciente conversando en una sesión"
-                    className="mx-auto aspect-[16/10] w-full max-w-[320px]"
-                  >
-                    <SessionIllustration />
-                  </div>
+                  <Image
+                    src="/una-sesion-consulta.webp"
+                    alt="Ilustración: una paciente conversa con su psicólogo, que toma notas en una sesión"
+                    width={1000}
+                    height={646}
+                    sizes="(min-width: 1024px) 340px, 448px"
+                    className="mx-auto h-auto w-full max-w-[360px]"
+                  />
                   <div
                     className="mx-auto flex h-16 w-full max-w-[220px] items-center justify-between"
                     aria-hidden="true"
