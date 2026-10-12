@@ -3,6 +3,8 @@ from rest_framework import serializers
 
 from pacientes.documentos import TIPO_RUT, formatear_documento, normalizar_documento
 
+from facturacion.services import validar_glosa
+
 from .models import PerfilPsicologo
 
 
@@ -26,6 +28,7 @@ class PerfilPsicologoSerializer(serializers.Serializer):
     direccion_consulta = serializers.CharField(max_length=255, allow_blank=True, required=False)
     tutorial_visto = serializers.BooleanField(required=False)
     recordatorios_paciente_activos = serializers.BooleanField(required=False)
+    bhe_glosa_default = serializers.CharField(max_length=200, required=False)
 
     def to_representation(self, instance):
         return {
@@ -48,6 +51,7 @@ class PerfilPsicologoSerializer(serializers.Serializer):
             "direccion_consulta": instance.direccion_consulta,
             "tutorial_visto": instance.tutorial_visto,
             "recordatorios_paciente_activos": instance.recordatorios_paciente_activos,
+            "bhe_glosa_default": instance.bhe_glosa_default,
         }
 
     def validate_rut_profesional(self, value):
@@ -55,6 +59,9 @@ class PerfilPsicologoSerializer(serializers.Serializer):
             return ""
         normalized = normalizar_documento(TIPO_RUT, value)
         return formatear_documento(TIPO_RUT, normalized)
+
+    def validate_bhe_glosa_default(self, value):
+        return validar_glosa(value)
 
     @transaction.atomic
     def update(self, instance, validated_data):

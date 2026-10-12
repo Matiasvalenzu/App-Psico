@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Calendar, FileText, LayoutList, RefreshCw, SearchX, Sparkles, WifiOff } from "lucide-react";
+import { ArrowLeft, Calendar, FileText, LayoutList, Receipt, RefreshCw, SearchX, Sparkles, WifiOff } from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getCurrentUser } from "@/lib/api";
 import { RemoteSessionModal } from "@/components/sesion/RemoteSessionModal";
 import { ModalCrearSesionVirtual } from "@/components/sesion/ModalCrearSesionVirtual";
 import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTutorial } from "@/context/TutorialContext";
 import AlertaClinica from "./_components/AlertaClinica";
 import ChatIA from "./_components/ChatIA";
+import CobroDialog from "./_components/CobroDialog";
+import CobrosPaciente from "./_components/CobrosPaciente";
 import DeleteSesionDialog from "./_components/DeleteSesionDialog";
 import DocumentosExternos from "./_components/DocumentosExternos";
 import EditPacienteDialog from "./_components/EditPacienteDialog";
@@ -27,12 +29,12 @@ import PacienteLateral from "./_components/PacienteLateral";
 import PacienteResumen from "./_components/PacienteResumen";
 import SesionesLista from "./_components/SesionesLista";
 import TestDialog, { type TestMode } from "./_components/TestDialog";
-import { fetchAllPages, tieneRiesgo, type InformeIA, type Paciente, type Sesion } from "./_components/utils";
+import { fetchAllPages, getDateTimeInputValue, tieneRiesgo, type InformeIA, type Paciente, type Sesion } from "./_components/utils";
 
 // Elemento oculto por ahora; se conserva por si se vuelve a habilitar
 const MOSTRAR_SESION_REMOTA = false;
 
-const TABS = ["resumen", "sesiones", "documentos", "asistente"] as const;
+const TABS = ["resumen", "sesiones", "documentos", "asistente", "cobros"] as const;
 type Tab = (typeof TABS)[number];
 
 function FichaSkeleton() {
@@ -77,6 +79,10 @@ export default function PacienteDetailPage() {
   const [testMode, setTestMode] = useState<TestMode>("start");
   const [consentOpen, setConsentOpen] = useState(false);
   const [sesionToDelete, setSesionToDelete] = useState<Sesion | null>(null);
+  // Cobros: visibles con Plus; si bajó de plan y tiene cobros, quedan en solo lectura.
+  const [boletas, setBoletas] = useState<{ habilitadas: boolean; visibles: boolean }>({ habilitadas: false, visibles: false });
+  const [sesionCobro, setSesionCobro] = useState<Sesion | null>(null);
+  const [cobrosRefresh, setCobrosRefresh] = useState(0);
 
   const [remoteModalOpen, setRemoteModalOpen] = useState(false);
   const [psiconexModalOpen, setPsiconexModalOpen] = useState(false);
@@ -86,7 +92,19 @@ export default function PacienteDetailPage() {
   const editQueryHandledRef = useRef(false);
 
   const tabParam = searchParams.get("tab");
-  const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "resumen";
+  const tabSolicitada = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "resumen";
+  const tab: Tab = tabSolicitada === "cobros" && !boletas.visibles ? "resumen" : tabSolicitada;
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((user) =>
+        setBoletas({
+          habilitadas: Boolean(user.boletas_habilitadas),
+          visibles: Boolean(user.boletas_habilitadas || user.tiene_cobros),
+        })
+      )
+      .catch(() => {});
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -275,6 +293,12 @@ export default function PacienteDetailPage() {
               <span className="sm:hidden">IA</span>
               <span className="hidden sm:inline">Asistente IA</span>
             </TabsTrigger>
+            {boletas.visibles && (
+              <TabsTrigger value="cobros" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+                <Receipt className="hidden sm:block" />
+                Cobros
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="resumen">
@@ -291,6 +315,7 @@ export default function PacienteDetailPage() {
               onNewVirtual={() => setPsiconexModalOpen(true)}
               onNewRemote={() => setRemoteModalOpen(true)}
               onDelete={setSesionToDelete}
+              onCobro={boletas.habilitadas ? setSesionCobro : undefined}
             />
           </TabsContent>
 
@@ -310,8 +335,29 @@ export default function PacienteDetailPage() {
           <TabsContent value="asistente" keepMounted className="data-[hidden]:hidden">
             <ChatIA pacienteId={id} paciente={paciente} onInformeSaved={loadData} />
           </TabsContent>
+
+          {boletas.visibles && (
+            <TabsContent value="cobros">
+              <CobrosPaciente pacienteId={Number(id)} soloLectura={!boletas.habilitadas} refreshKey={cobrosRefresh} />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
+
+      {boletas.habilitadas && (
+        <CobroDialog
+          open={Boolean(sesionCobro)}
+          pacienteId={Number(id)}
+          sesionId={sesionCobro?.id}
+          fechaInicial={sesionCobro ? getDateTimeInputValue(new Date(sesionCobro.fecha_hora_inicio)).slice(0, 10) : undefined}
+          onOpenChange={(open) => !open && setSesionCobro(null)}
+          onSaved={() => {
+            toast.success("Cobro registrado. Revisa el borrador de la boleta en Cobros.");
+            setCobrosRefresh((n) => n + 1);
+            changeTab("cobros");
+          }}
+        />
+      )}
 
       <DeleteSesionDialog
         sesion={sesionToDelete}

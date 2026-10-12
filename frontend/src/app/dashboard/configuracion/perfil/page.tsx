@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Mail, ShieldCheck, UserRound, PlayCircle } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { CheckCircle2, Loader2, Mail, Receipt, ShieldCheck, UserRound, PlayCircle } from "lucide-react";
+import { apiFetch, getCurrentUser } from "@/lib/api";
 import { useTutorial } from "@/context/TutorialContext";
 
 interface Profile {
@@ -21,6 +21,7 @@ interface Profile {
   modalidad_atencion: "PRESENCIAL" | "ONLINE" | "HIBRIDA";
   comuna: string;
   direccion_consulta: string;
+  bhe_glosa_default: string;
 }
 
 const EMPTY_PROFILE: Profile = {
@@ -39,6 +40,7 @@ const EMPTY_PROFILE: Profile = {
   modalidad_atencion: "HIBRIDA",
   comuna: "",
   direccion_consulta: "",
+  bhe_glosa_default: "",
 };
 
 function getError(data: unknown, fallback: string) {
@@ -59,9 +61,13 @@ export default function ProfessionalProfilePage() {
   const [verifying, setVerifying] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [boletasHabilitadas, setBoletasHabilitadas] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    getCurrentUser()
+      .then((user) => setBoletasHabilitadas(Boolean(user.boletas_habilitadas)))
+      .catch(() => {});
   }, []);
 
   async function loadProfile() {
@@ -101,6 +107,7 @@ export default function ProfessionalProfilePage() {
           modalidad_atencion: profile.modalidad_atencion,
           comuna: profile.comuna,
           direccion_consulta: profile.direccion_consulta,
+          ...(boletasHabilitadas && { bhe_glosa_default: profile.bhe_glosa_default }),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -200,6 +207,13 @@ export default function ProfessionalProfilePage() {
             <Field label="Dirección de consulta" value={profile.direccion_consulta} onChange={(value) => update("direccion_consulta", value)} />
           </div>
         </section>
+
+        {boletasHabilitadas && (
+          <section className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
+            <div className="mb-5 flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" /><h2 className="font-semibold">Boletas de honorarios</h2></div>
+            <Field label="Glosa por defecto" value={profile.bhe_glosa_default} onChange={(value) => update("bhe_glosa_default", value)} placeholder="Atención psicológica" helper="Se usa al registrar un cobro. No incluyas diagnósticos ni términos clínicos: la boleta la ve el SII y quien la recibe." />
+          </section>
+        )}
 
         <div className="flex justify-end"><button type="submit" disabled={saving} className="flex min-w-40 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />}Guardar cambios</button></div>
       </form>

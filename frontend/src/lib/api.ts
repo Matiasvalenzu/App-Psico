@@ -106,6 +106,11 @@ export async function apiFetch(
         id: "subscription_inactive",
         description: "Reactiva tu plan para hacer cambios. Puedes ver y exportar tus datos.",
       });
+    } else if (data?.code === "plan_required") {
+      toast.error("Esta función es parte del Plan Plus", {
+        id: "plan_required",
+        action: { label: "Ver planes", onClick: () => window.location.assign("/dashboard/suscripcion") },
+      });
     }
   }
 
@@ -239,7 +244,7 @@ export async function getAdminSystemStats() {
 
 export async function updateUserSubscription(
   userId: number,
-  data: { dias_adicionales_prueba?: number; estado?: string }
+  data: { dias_adicionales_prueba?: number; estado?: string; plan?: string }
 ) {
   const res = await apiFetch(`/auth/users/${userId}/subscription/`, {
     method: "PATCH",

@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
-from .models import Suscripcion
+from .models import PLANES, Suscripcion
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,20 @@ def _get_mp_sdk():
     if not token:
         logger.warning("MERCADOPAGO_ACCESS_TOKEN is not configured.")
     return mercadopago.SDK(token)
+
+
+def _plan_solicitado(request):
+    """Plan pedido en el body; Plus solo se contrata cuando PLAN_PLUS_DISPONIBLE está activo."""
+    plan = request.data.get("plan") or "estandar"
+    if plan not in PLANES or (plan == "plus" and not settings.PLAN_PLUS_DISPONIBLE):
+        return None
+    return plan
+
+
+def _asignar_plan(suscripcion, plan):
+    """Un piloto Plus asignado por Admin conserva Plus al contratar Estándar mientras el flag está apagado."""
+    if not (plan == "estandar" and suscripcion.plan == "plus" and not settings.PLAN_PLUS_DISPONIBLE):
+        suscripcion.plan = plan
 
 
 class SuscripcionEstadoView(APIView):
@@ -45,6 +59,10 @@ class SuscripcionEstadoView(APIView):
         return Response(
             {
                 "estado": suscripcion.estado,
+                "plan": suscripcion.plan,
+                "boletas_habilitadas": suscripcion.tiene_boletas,
+                "plan_plus_disponible": settings.PLAN_PLUS_DISPONIBLE,
+                "planes": {clave: {"nombre": nombre, "monto": monto} for clave, (nombre, monto) in PLANES.items()},
                 "fin_prueba": suscripcion.fin_prueba,
                 "dias_restantes_prueba": dias_restantes,
                 "is_active_or_trial": suscripcion.is_active_or_trial,
@@ -79,6 +97,10 @@ class ContratarCardView(APIView):
                 {"error": "El token de tarjeta es requerido."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        plan = _plan_solicitado(request)
+        if plan is None:
+            return Response({"error": "Plan no disponible."}, status=status.HTTP_400_BAD_REQUEST)
+        nombre_plan, monto_plan = PLANES[plan]
 
         suscripcion, _ = Suscripcion.objects.get_or_create(
             user=request.user,
@@ -112,14 +134,14 @@ class ContratarCardView(APIView):
         sdk = _get_mp_sdk()
 
         preapproval_data = {
-            "reason": "Plan Estándar - Psiconex",
+            "reason": nombre_plan,
             "external_reference": str(request.user.id),
             "payer_email": payer_email,
             "card_token_id": token,
             "auto_recurring": {
                 "frequency": 1,
                 "frequency_type": "months",
-                "transaction_amount": 4990,
+                "transaction_amount": monto_plan,
                 "currency_id": "CLP",
                 "start_date": start_date_str,
             },
@@ -127,9 +149,9 @@ class ContratarCardView(APIView):
             "status": "authorized",
         }
 
-        # Si existe un plan_id configurado, vincularlo opcionalmente
+        # Si existe un plan_id configurado, vincularlo opcionalmente (corresponde al Plan Estándar)
         plan_id = getattr(settings, "MERCADOPAGO_PLAN_ID", "")
-        if plan_id:
+        if plan_id and plan == "estandar":
             preapproval_data["preapproval_plan_id"] = plan_id
 
         try:
@@ -150,6 +172,7 @@ class ContratarCardView(APIView):
         if resp_status in (200, 201):
             preapproval_id = resp_data.get("id")
             suscripcion.estado = "activa"
+            _asignar_plan(suscripcion, plan)
             suscripcion.mp_preapproval_id = preapproval_id
             suscripcion.mp_payer_id = str(resp_data.get("payer_id", ""))
             suscripcion.card_brand = payment_method_id
@@ -221,6 +244,51 @@ class CancelarSuscripcionView(APIView):
         )
 
 
+class CambiarPlanView(APIView):
+    """
+    Cambia el monto del preapproval vigente en Mercado Pago (Estándar <-> Plus) sin pedir la tarjeta de nuevo.
+    Sin suscripción pagada activa, el frontend debe contratar con el plan elegido.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        plan = _plan_solicitado(request)
+        if plan is None:
+            return Response({"error": "Plan no disponible."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            suscripcion = request.user.suscripcion
+        except Suscripcion.DoesNotExist:
+            suscripcion = None
+        if not suscripcion or suscripcion.estado != "activa" or not suscripcion.mp_preapproval_id:
+            return Response(
+                {"error": "Primero activa tu suscripción con una tarjeta.", "code": "sin_suscripcion"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if suscripcion.plan == plan:
+            return Response({"status": "ok", "plan": plan})
+
+        nombre_plan, monto_plan = PLANES[plan]
+        try:
+            mp_resp = _get_mp_sdk().preapproval().update(
+                suscripcion.mp_preapproval_id,
+                {"reason": nombre_plan, "auto_recurring": {"transaction_amount": monto_plan, "currency_id": "CLP"}},
+            )
+        except Exception as e:
+            logger.error(f"Excepción al cambiar plan en Mercado Pago: {e}")
+            mp_resp = {}
+        if mp_resp.get("status") != 200:
+            logger.error(f"Error Mercado Pago API al cambiar plan ({mp_resp.get('status')}): {mp_resp.get('response')}")
+            return Response(
+                {"error": "No fue posible cambiar el plan en Mercado Pago. Intente nuevamente."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        suscripcion.plan = plan
+        suscripcion.save(update_fields=["plan"])
+        return Response({"status": "ok", "plan": plan})
+
+
 class CheckoutView(APIView):
     """
     Genera un checkout hospedado en Mercado Pago retornando init_point
@@ -240,14 +308,19 @@ class CheckoutView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        plan = _plan_solicitado(request)
+        if plan is None:
+            return Response({"error": "Plan no disponible."}, status=status.HTTP_400_BAD_REQUEST)
+        nombre_plan, monto_plan = PLANES[plan]
+
         preapproval_data = {
-            "reason": "Plan Estándar - Psiconex",
+            "reason": nombre_plan,
             "external_reference": str(request.user.id),
             "payer_email": request.user.email,
             "auto_recurring": {
                 "frequency": 1,
                 "frequency_type": "months",
-                "transaction_amount": 4990,
+                "transaction_amount": monto_plan,
                 "currency_id": "CLP",
             },
             "back_url": f"{settings.PUBLIC_APP_URL}/dashboard/suscripcion",
@@ -266,6 +339,7 @@ class CheckoutView(APIView):
         if preapproval_response.get("status") == 201:
             init_point = preapproval_response["response"]["init_point"]
             suscripcion.mp_preapproval_id = preapproval_response["response"]["id"]
+            _asignar_plan(suscripcion, plan)
             suscripcion.save()
             return Response({"init_point": init_point})
         else:

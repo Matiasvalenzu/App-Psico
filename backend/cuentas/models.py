@@ -32,6 +32,7 @@ class PerfilPsicologo(models.Model):
     direccion_consulta = models.CharField(max_length=255, blank=True, default="")
     tutorial_visto = models.BooleanField(default=False)
     recordatorios_paciente_activos = models.BooleanField(default=True)
+    bhe_glosa_default = models.CharField(max_length=200, default="Atención psicológica")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

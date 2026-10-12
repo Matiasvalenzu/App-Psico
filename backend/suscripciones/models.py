@@ -12,6 +12,11 @@ DIAS_GRACIA_PAGO = 7
 # Tras quedar inactiva, la cuenta queda en solo lectura y se elimina pasado este plazo.
 DIAS_HASTA_PURGA = 30
 ESTADOS_INACTIVOS = ("past_due", "cancelada", "expirada")
+# Nombre y precio mensual (CLP) de cada plan en Mercado Pago.
+PLANES = {
+    "estandar": ("Plan Estándar - Psiconex", 4990),
+    "plus": ("Plan Plus - Psiconex", 9990),
+}
 
 
 class Suscripcion(models.Model):
@@ -25,6 +30,11 @@ class Suscripcion(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='suscripcion')
     estado = models.CharField(max_length=20, choices=ESTADOS, default='trial')
+    plan = models.CharField(
+        max_length=20,
+        choices=[('estandar', 'Estándar'), ('plus', 'Plus')],
+        default='estandar',
+    )
     fin_prueba = models.DateTimeField(null=True, blank=True)
     
     mp_preapproval_id = models.CharField(max_length=100, null=True, blank=True)
@@ -60,6 +70,12 @@ class Suscripcion(models.Model):
         if self.estado == 'trial' and self.fin_prueba and timezone.now() < self.fin_prueba:
             return True
         return False
+
+    @property
+    def tiene_boletas(self):
+        if self.user.is_staff or self.user.is_superuser:
+            return True
+        return self.plan == "plus" and self.is_active_or_trial
 
     def expirar_si_vencida(self):
         """Pasa un trial vencido a 'expirada'; el plazo de purga corre desde fin_prueba."""

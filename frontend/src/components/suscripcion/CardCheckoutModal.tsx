@@ -40,6 +40,9 @@ interface CardCheckoutModalProps {
   finPrueba: string | null;
   diasRestantes: number | null;
   publicKey?: string;
+  plan?: string;
+  monto?: number;
+  nombre?: string;
 }
 
 export default function CardCheckoutModal({
@@ -51,7 +54,11 @@ export default function CardCheckoutModal({
   finPrueba,
   diasRestantes,
   publicKey,
+  plan = "estandar",
+  monto = 4990,
+  nombre = "Plan Psiconex Pro",
 }: CardCheckoutModalProps) {
+  const precio = `$${monto.toLocaleString("es-CL")}`;
   const [mpReady, setMpReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,6 +205,7 @@ export default function CardCheckoutModal({
           payment_method_id: brand !== "card" ? brand : "visa",
           card_last_four: rawCard.slice(-4),
           payer_email: email || userEmail,
+          plan,
         }),
       });
 
@@ -288,7 +296,7 @@ export default function CardCheckoutModal({
             </h2>
             <p className="mt-2 text-sm text-muted-foreground max-w-sm leading-relaxed">
               {isTrial && formattedFinPrueba
-                ? `Tu tarjeta ha quedado respaldada con éxito. Tu periodo de prueba gratuito continúa activo y tu primer cobro de $4.990 CLP se efectuará el ${formattedFinPrueba}.`
+                ? `Tu tarjeta ha quedado respaldada con éxito. Tu periodo de prueba gratuito continúa activo y tu primer cobro de ${precio} CLP se efectuará el ${formattedFinPrueba}.`
                 : "Tu plan ha sido activado correctamente. Ya cuentas con acceso completo e ininterrumpido a todas las herramientas de Psiconex."}
             </p>
 
@@ -382,7 +390,7 @@ export default function CardCheckoutModal({
                   <div className="flex items-center justify-between">
                     <span>Primer cobro automático:</span>
                     <span className="font-semibold text-foreground">
-                      $4.990 CLP el {formattedFinPrueba}
+                      {precio} CLP el {formattedFinPrueba}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-[10px] pt-1.5 border-t border-border/40">
@@ -398,12 +406,12 @@ export default function CardCheckoutModal({
                     <ShieldCheck className="h-4 w-4" />
                   </div>
                   <div>
-                    <span className="font-semibold text-foreground text-sm block">Plan Psiconex Pro</span>
+                    <span className="font-semibold text-foreground text-sm block">{nombre}</span>
                     <span className="text-muted-foreground text-[11px]">Acceso total e ilimitado</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="font-bold text-foreground text-base block">$4.990 CLP</span>
+                  <span className="font-bold text-foreground text-base block">{precio} CLP</span>
                   <span className="text-[10px] text-muted-foreground">Facturación mensual</span>
                 </div>
               </div>
@@ -632,7 +640,7 @@ export default function CardCheckoutModal({
                   ) : (
                     <span className="inline-flex items-center gap-2">
                       <Lock className="h-4 w-4" />
-                      Pagar $4.990 CLP y reactivar plan
+                      Pagar {precio} CLP y reactivar plan
                     </span>
                   )}
                 </Button>

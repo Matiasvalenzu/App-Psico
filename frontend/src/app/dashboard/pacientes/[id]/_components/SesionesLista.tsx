@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, ClipboardList, Clock, MoreHorizontal, Trash2, Users, Video } from "lucide-react";
+import { Calendar, ClipboardList, Clock, MoreHorizontal, Receipt, Trash2, Users, Video } from "lucide-react";
 import { cn, formatDate, formatDuration, formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +43,7 @@ export default function SesionesLista({
   onNewVirtual,
   onNewRemote,
   onDelete,
+  onCobro,
 }: {
   pacienteId: string;
   sesiones: Sesion[];
@@ -52,6 +53,7 @@ export default function SesionesLista({
   onNewVirtual: () => void;
   onNewRemote: () => void;
   onDelete: (sesion: Sesion) => void;
+  onCobro?: (sesion: Sesion) => void;
 }) {
   const grupos: { mes: string; items: Sesion[] }[] = [];
   for (const sesion of sesiones) {
@@ -165,6 +167,12 @@ export default function SesionesLista({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
+                      {onCobro && (
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => onCobro(sesion)}>
+                          <Receipt className="mr-2 h-4 w-4" />
+                          Registrar cobro
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem variant="destructive" className="cursor-pointer" onClick={() => onDelete(sesion)}>
                         <Trash2 className="mr-2 h-4 w-4" />
                         Eliminar

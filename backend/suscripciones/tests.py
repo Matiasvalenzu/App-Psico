@@ -261,3 +261,123 @@ class CicloSuscripcionesTests(APITestCase):
         aviso.usuario.refresh_from_db()
         aviso = type(aviso).objects.get(pk=aviso.pk)
         self.assertIsNone(notification_content(aviso))
+
+
+class PlanPlusTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="plus@psiconex.cl", email="plus@psiconex.cl", password="x")
+        self.client.force_authenticate(user=self.user)
+
+    def test_trial_estandar_sin_boletas(self):
+        response = self.client.get("/api/auth/me/", secure=True)
+        self.assertEqual(response.data["plan"], "estandar")
+        self.assertFalse(response.data["boletas_habilitadas"])
+        self.assertFalse(response.data["plan_plus_disponible"])
+        self.assertFalse(response.data["tiene_cobros"])
+
+    def test_tiene_cobros_aunque_sin_plus(self):
+        from facturacion.models import Cobro
+
+        Cobro.objects.create(
+            psicologo=self.user, fecha_pago="2026-10-12", monto_bruto=10000,
+            tasa_retencion="15.25", monto_retencion=1525, monto_liquido=8475,
+        )
+        data = self.client.get("/api/auth/me/", secure=True).data
+        self.assertTrue(data["tiene_cobros"])
+        self.assertFalse(data["boletas_habilitadas"])
+
+    def test_plus_vigente_habilita_boletas(self):
+        self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.save()
+        self.assertTrue(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+        self.user.suscripcion.estado = "expirada"
+        self.user.suscripcion.save()
+        self.assertFalse(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+
+    def test_contratar_plus_bloqueado_sin_flag(self):
+        response = self.client.post(
+            "/api/suscripciones/contratar/", {"token": "tok", "plan": "plus"}, format="json", secure=True
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_contratar_plus_con_flag_cobra_9990(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().create.return_value = {"status": 201, "response": {"id": "pre_1", "payer_id": 1}}
+        with self.settings(PLAN_PLUS_DISPONIBLE=True):
+            response = self.client.post(
+                "/api/suscripciones/contratar/", {"token": "tok", "plan": "plus"}, format="json", secure=True
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        datos = mock_sdk.preapproval().create.call_args[0][0]
+        self.assertEqual(datos["auto_recurring"]["transaction_amount"], 9990)
+        self.assertEqual(datos["reason"], "Plan Plus - Psiconex")
+        self.user.suscripcion.refresh_from_db()
+        self.assertEqual(self.user.suscripcion.plan, "plus")
+
+    def test_admin_asigna_plus(self):
+        admin = User.objects.create_superuser(username="Admin", email="admin@psiconex.cl", password="x")
+        self.client.force_authenticate(user=admin)
+        response = self.client.patch(
+            f"/api/auth/users/{self.user.id}/subscription/", {"plan": "plus"}, format="json", secure=True
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["suscripcion"]["plan"], "plus")
+        self.assertEqual(
+            self.client.patch(f"/api/auth/users/{self.user.id}/subscription/", {"plan": "oro"}, format="json", secure=True).status_code,
+            400,
+        )
+
+    def _activa(self, plan="estandar"):
+        s = self.user.suscripcion
+        s.estado, s.plan, s.mp_preapproval_id = "activa", plan, "pre_9"
+        s.save()
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_cambiar_plan_actualiza_preapproval(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().update.return_value = {"status": 200, "response": {}}
+        self._activa()
+        with self.settings(PLAN_PLUS_DISPONIBLE=True):
+            response = self.client.post("/api/suscripciones/cambiar-plan/", {"plan": "plus"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mp_id, datos = mock_sdk.preapproval().update.call_args[0]
+        self.assertEqual(mp_id, "pre_9")
+        self.assertEqual(datos["auto_recurring"]["transaction_amount"], 9990)
+        self.user.suscripcion.refresh_from_db()
+        self.assertEqual(self.user.suscripcion.plan, "plus")
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_cambiar_plan_error_mp_no_cambia(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().update.return_value = {"status": 400, "response": {"message": "bad"}}
+        self._activa("plus")
+        response = self.client.post("/api/suscripciones/cambiar-plan/", {"plan": "estandar"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.user.suscripcion.refresh_from_db()
+        self.assertEqual(self.user.suscripcion.plan, "plus")
+
+    def test_cambiar_plan_sin_suscripcion_o_sin_flag(self):
+        with self.settings(PLAN_PLUS_DISPONIBLE=True):
+            response = self.client.post("/api/suscripciones/cambiar-plan/", {"plan": "plus"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "sin_suscripcion")
+        self._activa()
+        response = self.client.post("/api/suscripciones/cambiar-plan/", {"plan": "plus"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_piloto_plus_conserva_plan_al_contratar_sin_flag(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().create.return_value = {"status": 201, "response": {"id": "pre_2", "payer_id": 1}}
+        self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.save()
+        response = self.client.post("/api/suscripciones/contratar/", {"token": "tok"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(mock_sdk.preapproval().create.call_args[0][0]["auto_recurring"]["transaction_amount"], 4990)
+        self.user.suscripcion.refresh_from_db()
+        self.assertEqual(self.user.suscripcion.plan, "plus")

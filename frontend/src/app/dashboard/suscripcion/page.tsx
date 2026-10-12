@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getCurrentUser, apiFetch } from "@/lib/api";
-import { formatDateCL } from "@/lib/utils";
+import { cn, formatDateCL } from "@/lib/utils";
 import {
   CreditCard,
   CheckCircle2,
@@ -26,6 +26,9 @@ export default function SuscripcionPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [planElegido, setPlanElegido] = useState("estandar");
+  const [confirmCambio, setConfirmCambio] = useState(false);
+  const [cambiando, setCambiando] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -38,6 +41,7 @@ export default function SuscripcionPage() {
       if (subRes.ok) {
         const subJson = await subRes.json();
         setSubData(subJson);
+        setPlanElegido(subJson.plan || "estandar");
       }
     } catch (err) {
       console.error("Error al cargar datos de suscripción:", err);
@@ -70,6 +74,25 @@ export default function SuscripcionPage() {
     }
   };
 
+  const handleCambiarPlan = async (plan: string) => {
+    setCambiando(true);
+    setError("");
+    try {
+      const res = await apiFetch("/suscripciones/cambiar-plan/", { method: "POST", body: JSON.stringify({ plan }) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "No se pudo cambiar el plan.");
+      }
+      setSuccessMsg("Tu plan fue actualizado. El nuevo monto se aplica desde la próxima renovación.");
+      setConfirmCambio(false);
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo cambiar el plan. Intenta nuevamente.");
+    } finally {
+      setCambiando(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
@@ -84,6 +107,18 @@ export default function SuscripcionPage() {
   const isTrial = estado === "trial";
   const isActive = estado === "activa";
   const isCancelled = estado === "cancelada";
+
+  // Plan Plus: se elige solo al contratar y mientras PLAN_PLUS_DISPONIBLE esté activo.
+  const plusDisponible = Boolean(subData?.plan_plus_disponible);
+  const planes: Record<string, { nombre: string; monto: number }> =
+    subData?.planes || { estandar: { nombre: "Plan Estándar", monto: 4990 } };
+  const nombreCorto = (nombre: string) => nombre.replace(" - Psiconex", "");
+  const planMostrado = isActive ? subData?.plan || "estandar" : plusDisponible ? planElegido : "estandar";
+  const infoPlan = planes[planMostrado] || planes.estandar;
+  const nombrePlan = nombreCorto(infoPlan.nombre);
+  const precioPlan = `$${infoPlan.monto.toLocaleString("es-CL")}`;
+  const planDestino = planMostrado === "plus" ? "estandar" : "plus";
+  const infoDestino = planes[planDestino];
 
   const diasRestantes =
     subData?.dias_restantes_prueba ?? user?.dias_restantes_prueba ?? 0;
@@ -136,14 +171,14 @@ export default function SuscripcionPage() {
                 Tu período de prueba ha finalizado
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Tus pacientes, sesiones e informes clínicos siguen guardados y puedes consultarlos o exportarlos. Para continuar utilizando la asistencia de IA y desbloquear el acceso, activa tu suscripción al Plan Estándar.
+                Tus pacientes, sesiones e informes clínicos siguen guardados y puedes consultarlos o exportarlos. Para continuar utilizando la asistencia de IA y desbloquear el acceso, activa tu suscripción al {nombrePlan}.
               </p>
               <div className="pt-2">
                 <Button
                   onClick={() => setModalOpen(true)}
                   className="shadow-md shadow-destructive/20"
                 >
-                  Reactivar mi cuenta ($4.990 CLP/mes)
+                  Reactivar mi cuenta ({precioPlan} CLP/mes)
                 </Button>
               </div>
             </div>
@@ -209,12 +244,31 @@ export default function SuscripcionPage() {
 
             <div>
               <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                Plan Estándar
+                {nombrePlan}
               </h2>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-4xl font-extrabold text-foreground">$4.990</span>
+                <span className="text-4xl font-extrabold text-foreground">{precioPlan}</span>
                 <span className="text-sm text-muted-foreground">CLP / mes</span>
               </div>
+              {plusDisponible && !isActive && (
+                <div role="radiogroup" aria-label="Elegir plan" className="mt-4 inline-flex rounded-xl border border-border/80 p-1">
+                  {Object.entries(planes).map(([clave, info]) => (
+                    <button
+                      key={clave}
+                      type="button"
+                      role="radio"
+                      aria-checked={planElegido === clave}
+                      onClick={() => setPlanElegido(clave)}
+                      className={cn(
+                        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                        planElegido === clave ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {nombreCorto(info.nombre)} · ${info.monto.toLocaleString("es-CL")}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
@@ -232,6 +286,7 @@ export default function SuscripcionPage() {
                 "Test de Creencias Ellis y Rueda de la Vida",
                 "Sesiones por Meet/Zoom",
                 "Enlace privado para reserva de horas",
+                ...(planMostrado === "plus" ? ["Cobros y borrador de boletas de honorarios"] : []),
               ].map((feature) => (
                 <li key={feature} className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> {feature}
@@ -263,6 +318,29 @@ export default function SuscripcionPage() {
                     </div>
                   )}
                 </div>
+
+                {plusDisponible && infoDestino && subData?.mp_preapproval_id && (
+                  !confirmCambio ? (
+                    <Button variant="outline" size="sm" onClick={() => setConfirmCambio(true)} className="w-full text-xs">
+                      {planDestino === "plus" ? "Cambiar a" : "Volver al"} {nombreCorto(infoDestino.nombre)} ({`$${infoDestino.monto.toLocaleString("es-CL")}`}/mes)
+                    </Button>
+                  ) : (
+                    <div className="rounded-xl border border-border/70 bg-muted/40 p-3 space-y-2 text-left animate-in fade-in">
+                      <p className="text-xs text-foreground font-medium">
+                        Desde la próxima renovación pagarás ${infoDestino.monto.toLocaleString("es-CL")} CLP/mes.
+                        {planDestino === "estandar" && " Tus cobros y boletas quedarán solo de lectura."}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={() => handleCambiarPlan(planDestino)} disabled={cambiando} className="text-xs h-8">
+                          {cambiando ? "Cambiando..." : "Confirmar"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmCambio(false)} disabled={cambiando} className="text-xs h-8">
+                          Volver
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
 
                 {!confirmCancel ? (
                   <Button
@@ -344,6 +422,9 @@ export default function SuscripcionPage() {
         finPrueba={finPrueba}
         diasRestantes={diasRestantes}
         publicKey={subData?.public_key}
+        plan={planMostrado}
+        monto={infoPlan.monto}
+        nombre={nombrePlan}
       />
     </div>
   );

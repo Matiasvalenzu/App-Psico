@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "notificaciones",
     "cuentas",
     "feedback",
+    "facturacion",
 ]
 
 MIDDLEWARE = [
@@ -259,6 +260,8 @@ GOOGLE_CALENDAR_NAME = os.environ.get("GOOGLE_CALENDAR_NAME", "Agenda Psicológi
 MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
 MERCADOPAGO_PUBLIC_KEY = os.environ.get("MERCADOPAGO_PUBLIC_KEY", "")
 MERCADOPAGO_PLAN_ID = os.environ.get("MERCADOPAGO_PLAN_ID", "")
+# Muestra el Plan Plus (boletas de honorarios) para contratación propia; el Admin puede asignarlo igual.
+PLAN_PLUS_DISPONIBLE = os.environ.get("PLAN_PLUS_DISPONIBLE", "False").lower() in ("1", "true", "yes")
 
 # Audio AI pipeline
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")

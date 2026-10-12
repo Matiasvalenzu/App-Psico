@@ -36,6 +36,7 @@ import { ClientPortal } from "@/components/ui/ClientPortal";
 
 interface SystemUserSubscription {
   estado: string;
+  plan?: string;
   is_active_or_trial: boolean;
   fin_prueba: string | null;
   dias_restantes_prueba: number | null;
@@ -135,6 +136,7 @@ export default function UsuariosPage() {
   // Modal Gestionar Suscripción
   const [manageSubUser, setManageSubUser] = useState<SystemUser | null>(null);
   const [subEstado, setSubEstado] = useState("trial");
+  const [subPlan, setSubPlan] = useState("estandar");
   const [subDiasAdicionales, setSubDiasAdicionales] = useState<number | "">("");
   const [managingSub, setManagingSub] = useState(false);
   const [subError, setSubError] = useState("");
@@ -228,8 +230,9 @@ export default function UsuariosPage() {
     setSubSuccess("");
 
     try {
-      const payload: { dias_adicionales_prueba?: number; estado?: string } = {
+      const payload: { dias_adicionales_prueba?: number; estado?: string; plan?: string } = {
         estado: subEstado,
+        plan: subPlan,
       };
       if (typeof subDiasAdicionales === "number" && subDiasAdicionales > 0) {
         payload.dias_adicionales_prueba = subDiasAdicionales;
@@ -632,6 +635,7 @@ export default function UsuariosPage() {
                             onClick={() => {
                               setManageSubUser(user);
                               setSubEstado(user.suscripcion?.estado || "trial");
+                              setSubPlan(user.suscripcion?.plan || "estandar");
                               setSubDiasAdicionales("");
                               setSubError("");
                               setSubSuccess("");
@@ -852,6 +856,22 @@ export default function UsuariosPage() {
                   <option value="cancelada">Cancelada</option>
                   <option value="expirada">Expirada</option>
                 </select>
+              </div>
+
+              {/* Plan */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Plan
+                </label>
+                <select
+                  value={subPlan}
+                  onChange={(e) => setSubPlan(e.target.value)}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="estandar">Estándar</option>
+                  <option value="plus">Plus (boletas)</option>
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">Solo cambia el plan en Psiconex; no modifica el monto que cobra Mercado Pago.</p>
               </div>
 
               {/* Extensión de días de prueba */}

@@ -17,9 +17,10 @@ import logging
 from django.db.models import Count, Sum
 from cuentas.models import RegistroConsumoIA
 from cuentas.services import eliminar_cuenta
+from facturacion.models import Cobro
 from pacientes.models import Paciente
 from sesiones.models import Sesion
-from suscripciones.models import Suscripcion
+from suscripciones.models import PLANES, Suscripcion
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,15 @@ def current_user(request):
     solo_lectura = False
     fecha_purga = None
     dias_para_purga = None
+    plan = "estandar"
+    boletas_habilitadas = request.user.is_staff or request.user.is_superuser
 
     if hasattr(request.user, "suscripcion"):
         suscripcion = request.user.suscripcion
         suscripcion_activa = suscripcion.is_active_or_trial
         suscripcion_estado = suscripcion.estado
+        plan = suscripcion.plan
+        boletas_habilitadas = suscripcion.tiene_boletas
         fin_prueba = suscripcion.fin_prueba
         if fin_prueba and suscripcion.estado == "trial":
             delta = fin_prueba - timezone.now()
@@ -71,6 +76,10 @@ def current_user(request):
             "is_superuser": request.user.is_superuser,
             "suscripcion_activa": suscripcion_activa,
             "suscripcion_estado": suscripcion_estado,
+            "plan": plan,
+            "boletas_habilitadas": boletas_habilitadas,
+            "plan_plus_disponible": settings.PLAN_PLUS_DISPONIBLE,
+            "tiene_cobros": Cobro.objects.filter(psicologo=request.user).exists(),
             "fin_prueba": fin_prueba,
             "dias_restantes_prueba": dias_restantes_prueba,
             "solo_lectura": solo_lectura,
@@ -198,6 +207,7 @@ def list_users(request):
 
         susc_info = {
             "estado": susc.estado if susc else "trial",
+            "plan": susc.plan if susc else "estandar",
             "is_active_or_trial": susc.is_active_or_trial if susc else True,
             "fin_prueba": susc.fin_prueba if susc else None,
             "dias_restantes_prueba": dias_restantes,
@@ -305,6 +315,12 @@ def manage_user_subscription(request, user_id):
 
     dias_adicionales = request.data.get("dias_adicionales_prueba")
     nuevo_estado = request.data.get("estado")
+    nuevo_plan = request.data.get("plan")
+    # Cambia solo el plan local (pilotos); no modifica el monto que cobra Mercado Pago.
+    if nuevo_plan is not None:
+        if nuevo_plan not in PLANES:
+            return Response({"detail": "Plan inválido."}, status=status.HTTP_400_BAD_REQUEST)
+        suscripcion.plan = nuevo_plan
 
     if dias_adicionales is not None:
         try:
@@ -329,6 +345,7 @@ def manage_user_subscription(request, user_id):
         "detail": "Suscripción actualizada exitosamente.",
         "suscripcion": {
             "estado": suscripcion.estado,
+            "plan": suscripcion.plan,
             "is_active_or_trial": suscripcion.is_active_or_trial,
             "fin_prueba": suscripcion.fin_prueba,
             "dias_restantes_prueba": dias_restantes,
