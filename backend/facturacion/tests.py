@@ -115,6 +115,11 @@ class CobroApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_anonimo_recibe_401(self):
+        self.client.force_authenticate(user=None)
+        self.assertEqual(self.client.get("/api/facturacion/cobros/", secure=True).status_code, 401)
+        self.assertEqual(self.client.post("/api/facturacion/cobros/", {}, format="json", secure=True).status_code, 401)
+
     def test_plan_estandar_lee_pero_no_escribe(self):
         cobro_id = self.crear().data["id"]
         self.user.suscripcion.plan = "estandar"

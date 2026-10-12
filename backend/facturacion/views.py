@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Cobro
@@ -11,7 +12,7 @@ from .serializers import CobroSerializer, MarcarEmitidaSerializer
 
 class CobroViewSet(viewsets.ModelViewSet):
     serializer_class = CobroSerializer
-    permission_classes = [TienePlanPlus]
+    permission_classes = [IsAuthenticated, TienePlanPlus]
 
     def get_queryset(self):
         qs = Cobro.objects.select_related("paciente").filter(psicologo=self.request.user)
