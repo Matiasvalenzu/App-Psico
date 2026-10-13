@@ -7,7 +7,7 @@ Sin sesión, el enlace lleva al login de AUT2000 (mapeado en la prueba en seco d
 Desde el clic en «Emitir» cualquier falla es ErrorDespuesDeEnviar: la boleta pudo quedar emitida.
 """
 
-import base64
+import logging
 import re
 import unicodedata
 from contextlib import contextmanager
@@ -25,6 +25,8 @@ from .base import (
     ErrorNegocio,
     ResultadoEmision,
 )
+
+logger = logging.getLogger(__name__)
 
 PORTAL = "https://www.sii.cl/servicios_online/1040-1287.html"
 ESPERA_MS = 30_000
@@ -146,7 +148,7 @@ class PlaywrightEmisor(EmisorBHE):
         with self._navegador() as page:
             self._llegar_a_vista_previa(page, datos)
             folio, codigo = self._paso_4(page)
-            # En esta sesión con un reintento; si falla, bhe.recuperar_pdf prueba una vez la consulta de terceros.
+            # En esta sesión, con un reintento y sin otro login; si falla, bhe.recuperar_pdf prueba una vez más.
             pdf = self._descargar_pdf(page, codigo) or self._descargar_pdf(page, codigo)
         return ResultadoEmision(
             folio=folio,
@@ -378,26 +380,17 @@ class PlaywrightEmisor(EmisorBHE):
             return archivo.read()
 
     def _descargar_pdf(self, page, codigo):
-        """El PDF con la misma sesión. Si falla la boleta igual quedó emitida: el psicólogo lo sube desde la ficha."""
-        from playwright.sync_api import Error as ErrorPlaywright
+        """El PDF con la misma sesión, por la consulta de terceros (la que sí se lo entrega a la cuenta autorizada).
 
-        url = urljoin(
-            page.url,
-            f"TMBCOT_ConsultaBoletaPdf.cgi?txt_codigobarras={codigo}&veroriginal=si&origen=OCTAVO&enviar=si",
-        )
+        Si falla la boleta igual quedó emitida: bhe.recuperar_pdf lo intenta una vez más y, si no, el psicólogo lo sube.
+        """
+        url = urljoin(CONSULTAS, "TMBCOT_ConsultaBoletaPdf.cgi?" + urlencode({"origen": "TERCEROS", "txt_codigobarras": codigo}))
         try:
-            # fetch desde la página: lleva las cookies de la sesión (y pasa por las rutas en los tests).
-            contenido = page.evaluate(
-                """async url => {
-                    const r = await fetch(url, {credentials: "include"});
-                    if (!r.ok) return "";
-                    let s = "";
-                    for (const b of new Uint8Array(await r.arrayBuffer())) s += String.fromCharCode(b);
-                    return btoa(s);
-                }""",
-                url,
-            )
-        except ErrorPlaywright:
+            pdf = self._bajar(page, url)
+        except Exception as exc:  # ya está emitida: nada de aquí puede cambiar ese resultado
+            logger.warning("BHE: el PDF no bajó en la sesión de la emisión (%s).", type(exc).__name__)
             return b""
-        pdf = base64.b64decode(contenido or "")
-        return pdf if pdf.startswith(b"%PDF") else b""
+        if not pdf.startswith(b"%PDF"):
+            logger.warning("BHE: la consulta del PDF en la sesión de la emisión no entregó un PDF.")
+            return b""
+        return pdf

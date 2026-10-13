@@ -251,6 +251,7 @@ class PortalSimuladoTests(SimpleTestCase):
         self.assertEqual((resultado.folio, resultado.codigo_sii), ("81", "12345678000008112AB3"))
         self.assertEqual((resultado.monto_bruto, resultado.monto_retencion, resultado.monto_liquido), (250000, None, None))
         self.assertEqual(resultado.pdf, PDF)
+        self.assertEqual(self.consulta(emisor), {"origen": ["TERCEROS"], "txt_codigobarras": [CODIGO]})
         evidencias = dict(resultado.evidencias)
         self.assertIn("04-paso-4-emitida.png", evidencias)
         self.assertIn(CODIGO.encode(), evidencias["04-paso-4-boleta.html"])
@@ -269,6 +270,14 @@ class PortalSimuladoTests(SimpleTestCase):
         resultado = emisor.emitir(datos())
         self.assertEqual((resultado.folio, resultado.pdf), ("81", b""))
         self.assertEqual(emisor.pedidas.count("TMBCOT_ConsultaBoletaPdf.cgi"), 2)  # un solo reintento
+
+    def test_respuesta_que_no_es_pdf_se_descarta_sin_loguear_el_codigo(self):
+        emisor = PortalSimulado(pdf=b"<html>No ha sido posible completar su solicitud</html>")
+        with self.assertLogs("facturacion.emisores.playwright", "WARNING") as logs:
+            resultado = emisor.emitir(datos())
+        self.assertEqual((resultado.folio, resultado.pdf), ("81", b""))
+        self.assertEqual(len(logs.output), 2)
+        self.assertNotIn(CODIGO, "".join(logs.output))
 
     def test_pdf_con_la_sesion_que_emitio_y_un_reintento_sin_otro_login(self):
         emisor = PortalSimulado(pdf=[None, PDF])

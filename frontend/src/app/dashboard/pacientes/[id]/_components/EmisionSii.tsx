@@ -24,6 +24,9 @@ const URL_SII = "https://www.sii.cl/servicios_online/";
 const EN_SEGUIMIENTO: EstadoEmision[] = ["PENDIENTE", "EN_CURSO"];
 const ESPERA_INICIAL_MS = 2000;
 const ESPERA_MAXIMA_MS = 30000;
+// Si quedó EMITIDA sin PDF, la recuperación de respaldo puede traerlo en unos segundos: se espera como máximo esto.
+const ESPERA_PDF_MS = 30000;
+const INTERVALO_PDF_MS = 5000;
 
 export function emitidaPorPsiconex(cobro: Cobro) {
   const emision = cobro.ultima_emision;
@@ -56,6 +59,7 @@ export default function EmisionSii({
   const [busy, setBusy] = useState(false);
   const [confirmarAnulada, setConfirmarAnulada] = useState(false);
   const [error, setError] = useState("");
+  const [buscandoPdf, setBuscandoPdf] = useState(false);
   const enviadoRef = useRef(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const onChangedRef = useRef(onChanged);
@@ -76,7 +80,11 @@ export default function EmisionSii({
           const data: Cobro = await res.json();
           if (cancelado) return;
           onChangedRef.current(data);
-          if (!data.ultima_emision || !EN_SEGUIMIENTO.includes(data.ultima_emision.estado)) return;
+          const ultima = data.ultima_emision;
+          if (!ultima || !EN_SEGUIMIENTO.includes(ultima.estado)) {
+            if (ultima?.estado === "EMITIDA" && !ultima.tiene_pdf) setBuscandoPdf(true);
+            return;
+          }
         }
       } catch {
         // Un fallo de red no corta el seguimiento: se reintenta con la espera siguiente.
@@ -91,6 +99,28 @@ export default function EmisionSii({
       clearTimeout(timer);
     };
   }, [cobro.id, enSeguimiento]);
+
+  useEffect(() => {
+    if (!buscandoPdf) return;
+    const hasta = Date.now() + ESPERA_PDF_MS;
+    let timer: ReturnType<typeof setTimeout>;
+    async function consultar() {
+      try {
+        const res = await apiFetch(`/facturacion/cobros/${cobro.id}/`);
+        if (res.ok) {
+          const data: Cobro = await res.json();
+          onChangedRef.current(data);
+          if (data.ultima_emision?.tiene_pdf) return setBuscandoPdf(false);
+        }
+      } catch {
+        // Igual que el seguimiento: un fallo de red se reintenta hasta el plazo.
+      }
+      if (Date.now() >= hasta) return setBuscandoPdf(false);
+      timer = setTimeout(consultar, INTERVALO_PDF_MS);
+    }
+    timer = setTimeout(consultar, INTERVALO_PDF_MS);
+    return () => clearTimeout(timer);
+  }, [cobro.id, buscandoPdf]);
 
   async function accion(path: string, init: RequestInit, exito: string) {
     setBusy(true);
@@ -232,7 +262,9 @@ export default function EmisionSii({
 
         {emision && !emision.tiene_pdf && !soloLectura && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 p-4 text-sm">
-            <span className="text-muted-foreground">Descárgala desde tu SII: Consultas › boletas emitidas.</span>
+            <span className="text-muted-foreground">
+              {buscandoPdf ? "Bajando el PDF del SII…" : "Descárgala desde tu SII: Consultas › boletas emitidas."}
+            </span>
             <input ref={pdfInputRef} type="file" accept="application/pdf" className="hidden" onChange={subirPdf} />
             <Button size="sm" variant="outline" onClick={() => pdfInputRef.current?.click()} disabled={busy}>
               <Upload />
