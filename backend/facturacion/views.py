@@ -23,6 +23,7 @@ from .serializers import (
     DelegacionSolicitudSerializer,
     EmisionBHESerializer,
     MarcarEmitidaSerializer,
+    receptor_desde_ficha,
 )
 
 
@@ -116,6 +117,21 @@ class CobroViewSet(viewsets.ModelViewSet):
     def _cobro_actualizado(self, cobro, estado=status.HTTP_200_OK):
         cobro = self.get_queryset().get(pk=cobro.pk)
         return Response(self.get_serializer(cobro).data, status=estado)
+
+    @action(detail=True, methods=["post"], url_path="actualizar-receptor")
+    def actualizar_receptor(self, request, pk=None):
+        cobro = self.get_object()
+        if cobro.estado_boleta not in (Cobro.EstadoBoleta.PENDIENTE, Cobro.EstadoBoleta.ANULADA):
+            return Response(
+                {"detail": "Solo se actualiza el receptor de una boleta sin emitir."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not cobro.paciente:
+            return Response({"detail": "El cobro ya no tiene paciente."}, status=status.HTTP_400_BAD_REQUEST)
+        cambios = receptor_desde_ficha(cobro)
+        for campo, valor in cambios.items():
+            setattr(cobro, campo, valor)
+        cobro.save(update_fields=[*cambios, "updated_at"])
+        return self._cobro_actualizado(cobro)
 
     @action(detail=True, methods=["post"], url_path="emitir-sii", throttle_classes=[SolicitudesBHEThrottle])
     def emitir_sii(self, request, pk=None):

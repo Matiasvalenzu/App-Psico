@@ -48,11 +48,13 @@ export default function EmisionSii({
   delegacion,
   soloLectura,
   onChanged,
+  onEdit,
 }: {
   cobro: Cobro;
   delegacion: DelegacionBHE | null;
   soloLectura: boolean;
   onChanged: (cobro: Cobro) => void;
+  onEdit: () => void;
 }) {
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -358,6 +360,12 @@ export default function EmisionSii({
 
   const fallida = cobro.estado_boleta === "PENDIENTE" && emision?.estado === "FALLIDA" ? emision : null;
   const listo = receptorListoParaSii(cobro);
+  const faltan = [
+    (cobro.receptor_tipo_doc !== "RUT" || !cobro.receptor_documento?.trim()) && "RUT",
+    !cobro.receptor_nombre?.trim() && "nombre",
+    !cobro.receptor_direccion?.trim() && "dirección",
+    !cobro.receptor_comuna?.trim() && "comuna",
+  ].filter(Boolean);
   const porEmisor = cobro.bhe_modo === "RETENCION_POR_EMISOR";
   const tasa = Number(cobro.tasa_retencion).toLocaleString("es-CL");
 
@@ -369,6 +377,23 @@ export default function EmisionSii({
           <AlertDescription>
             No se pudo emitir en el SII: {fallida.error_detalle || "el SII no aceptó la boleta."} No quedó ninguna boleta
             emitida. Corrige el cobro si hace falta e inténtalo de nuevo, o emítela a mano.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {cobro.receptor_desactualizado && (
+        <Alert variant="warning">
+          <AlertTriangle />
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>Los datos del paciente cambiaron en su ficha después de crear este cobro.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => accion("actualizar-receptor/", { method: "POST" }, "Datos del receptor actualizados.")}
+              disabled={busy}
+            >
+              Actualizar datos del receptor desde la ficha
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -387,14 +412,22 @@ export default function EmisionSii({
               "Mientras tanto, puedes emitirla a mano."}
           </AlertDescription>
         </Alert>
+      ) : !listo ? (
+        <Alert variant="warning">
+          <AlertTriangle />
+          <AlertDescription>
+            {cobro.bhe_modo === "SIN_DATOS_RECEPTOR"
+              ? "Sin datos del receptor no se puede emitir en el SII: elige otra forma de retención."
+              : `Para emitirla en el SII falta ${faltan.join(", ")} del receptor.`}{" "}
+            <button type="button" onClick={onEdit} className="font-medium underline">
+              Editar cobro
+            </button>
+          </AlertDescription>
+        </Alert>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-          <p className="min-w-0 flex-1">
-            {listo
-              ? "Psiconex puede emitir esta boleta en el SII por ti."
-              : "Para emitirla en el SII completa RUT, nombre, dirección y comuna del receptor (edita el cobro)."}
-          </p>
-          <Button onClick={() => setConfirmando(true)} disabled={!listo || busy}>
+          <p className="min-w-0 flex-1">Psiconex puede emitir esta boleta en el SII por ti.</p>
+          <Button onClick={() => setConfirmando(true)} disabled={busy}>
             <Send />
             {cobro.estado_boleta === "ANULADA" ? "Emitir de nuevo en el SII" : "Emitir en el SII"}
           </Button>

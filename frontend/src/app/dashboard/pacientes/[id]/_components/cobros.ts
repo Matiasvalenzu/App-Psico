@@ -62,6 +62,7 @@ export interface Cobro {
   plazo_anulacion_vencido: boolean | null;
   anulacion_solicitada_at: string | null;
   ultima_emision: EmisionBHE | null;
+  receptor_desactualizado: boolean;
   notas: string;
 }
 

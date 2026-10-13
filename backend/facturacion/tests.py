@@ -152,6 +152,39 @@ class CobroApiTests(APITestCase):
         self.assertEqual(emitir.data["estado_boleta"], "EMITIDA")
         self.assertEqual(emitir.data["anulable_hasta"], date(2026, 11, 10))
 
+    def test_actualiza_el_receptor_si_la_ficha_cambio(self):
+        cobro = self.crear().data
+        url = f"{URL}{cobro['id']}/"
+        self.assertFalse(cobro["receptor_desactualizado"])
+        self.paciente.direccion, self.paciente.comuna = "Calle 2", "Providencia"
+        self.paciente.save()
+        self.assertTrue(self.client.get(url, secure=True).data["receptor_desactualizado"])
+        response = self.client.post(f"{url}actualizar-receptor/", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual((response.data["receptor_direccion"], response.data["receptor_comuna"]), ("Calle 2", "Providencia"))
+        self.assertFalse(response.data["receptor_desactualizado"])
+
+    def test_actualizar_receptor_de_menor_conserva_el_rut_del_tutor(self):
+        menor = Paciente.objects.create(
+            psicologo=self.user, nombre="Tomás", apellido="Rojas", es_menor_edad=True, nombre_tutor="Ana Rojas"
+        )
+        cobro = self.crear(paciente=menor.id, receptor_documento="12.345.678-5").data
+        self.assertFalse(cobro["receptor_desactualizado"])
+        menor.direccion = "Calle 3"
+        menor.save()
+        response = self.client.post(f"{URL}{cobro['id']}/actualizar-receptor/", secure=True)
+        self.assertEqual((response.data["receptor_documento"], response.data["receptor_direccion"]), ("12.345.678-5", "Calle 3"))
+
+    def test_no_actualiza_el_receptor_de_una_boleta_emitida(self):
+        cobro = self.crear().data
+        url = f"{URL}{cobro['id']}/"
+        self.client.post(f"{url}marcar-emitida/", {"folio": "99"}, secure=True)
+        self.paciente.direccion = "Calle 2"
+        self.paciente.save()
+        self.assertFalse(self.client.get(url, secure=True).data["receptor_desactualizado"])
+        self.assertEqual(self.client.post(f"{url}actualizar-receptor/", secure=True).status_code, 400)
+        self.assertEqual(Cobro.objects.get(id=cobro["id"]).receptor_direccion, "Calle 1")
+
     def test_rut_invalido_rechazado(self):
         response = self.crear(receptor_documento="12.345.678-9")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

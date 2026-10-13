@@ -42,6 +42,16 @@ def snapshot_receptor(paciente):
     }
 
 
+def receptor_desde_ficha(cobro):
+    """Lo que cambió en la ficha desde que se creó el cobro; un dato vacío en la ficha (p. ej. el RUT del tutor) no pisa el del cobro."""
+    if not cobro.paciente or cobro.estado_boleta not in (Cobro.EstadoBoleta.PENDIENTE, Cobro.EstadoBoleta.ANULADA):
+        return {}
+    return {
+        campo: valor for campo, valor in snapshot_receptor(cobro.paciente).items()
+        if valor and valor != getattr(cobro, campo)
+    }  # fmt: skip
+
+
 class CobroSerializer(serializers.ModelSerializer):
     paciente = serializers.PrimaryKeyRelatedField(
         queryset=Paciente.objects.all(), required=False, allow_null=True
@@ -54,6 +64,7 @@ class CobroSerializer(serializers.ModelSerializer):
     anulable_hasta = serializers.SerializerMethodField()
     plazo_anulacion_vencido = serializers.SerializerMethodField()
     ultima_emision = serializers.SerializerMethodField()
+    receptor_desactualizado = serializers.SerializerMethodField()
 
     class Meta:
         model = Cobro
@@ -62,7 +73,8 @@ class CobroSerializer(serializers.ModelSerializer):
             "medio_pago", "estado_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulable_hasta",
-            "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "notas", "created_at", "updated_at",
+            "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "receptor_desactualizado", "notas",
+            "created_at", "updated_at",
         ]
         read_only_fields = [
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
@@ -83,6 +95,9 @@ class CobroSerializer(serializers.ModelSerializer):
         # Recorre la lista ya precargada por la vista en vez de hacer una consulta por cobro.
         emisiones = list(obj.emisiones.all())
         return EmisionBHESerializer(emisiones[0]).data if emisiones else None
+
+    def get_receptor_desactualizado(self, obj):
+        return bool(receptor_desde_ficha(obj))
 
     def validate_paciente(self, value):
         if value and value.psicologo_id != self.context["request"].user.id:

@@ -160,7 +160,13 @@ export default function BorradorBoleta({
           )}
 
           {(delegacion || enEmision || porPsiconex) && (
-            <EmisionSii cobro={actual} delegacion={delegacion} soloLectura={soloLectura} onChanged={onChanged} />
+            <EmisionSii
+              cobro={actual}
+              delegacion={delegacion}
+              soloLectura={soloLectura}
+              onChanged={onChanged}
+              onEdit={() => onEdit(actual)}
+            />
           )}
 
           {actual.estado_boleta === "PENDIENTE" && incompleto && (
