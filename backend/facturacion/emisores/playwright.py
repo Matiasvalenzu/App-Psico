@@ -3,17 +3,28 @@
 Ruta según el mapa de pantallas (§K, folio 77 emitido a mano):
 portal → «Por usuario autorizado» → paso 1 (retención) → paso 2 (datos) → paso 3 (vista previa)
 → «Emitir Boleta de Honorarios Electrónica» → paso 4 (folio y código).
-El login no está mapeado (la sesión ya estaba abierta): la prueba en seco lo captura.
+Sin sesión, el enlace lleva al login de AUT2000 (mapeado en la prueba en seco de la T7a).
+Desde el clic en «Emitir» cualquier falla es ErrorDespuesDeEnviar: la boleta pudo quedar emitida.
 """
 
+import base64
 import re
 import unicodedata
 from contextlib import contextmanager
+from urllib.parse import urljoin
 
 from django.conf import settings
 
 from ..comunas import normalizar
-from .base import EmisorBHE, ErrorAntesDeEnviar, ErrorCredencial, ErrorEmisor, ErrorNegocio
+from .base import (
+    EmisorBHE,
+    ErrorAntesDeEnviar,
+    ErrorCredencial,
+    ErrorDespuesDeEnviar,
+    ErrorEmisor,
+    ErrorNegocio,
+    ResultadoEmision,
+)
 
 PORTAL = "https://www.sii.cl/servicios_online/1040-1287.html"
 ESPERA_MS = 30_000
@@ -86,6 +97,15 @@ def _credenciales():
     return rut, clave
 
 
+def leer_paso_4(texto):
+    """Folio y código tal como los muestra el paso 4, cada uno por su lado (no se deduce uno del otro)."""
+    folios = set(re.findall(r"N\s*[°º]\s*(\d+)", texto))
+    codigos = set(re.findall(r"[Cc][óoÓO][Dd][Ii][Gg][Oo]\s*:?\s*([0-9A-Z]{12,})", texto))
+    if len(folios) != 1 or len(codigos) != 1:
+        raise ErrorDespuesDeEnviar("paso_4_ilegible", "No se leyó un folio y un código únicos en el paso 4.")
+    return folios.pop(), codigos.pop()
+
+
 def _rut_formateado(rut):
     limpio = _rut_limpio(rut)
     return f"{limpio[:-1]}-{limpio[-1]}"
@@ -93,10 +113,13 @@ def _rut_formateado(rut):
 
 class PlaywrightEmisor(EmisorBHE):
     nombre = "playwright"
+    # La sesión de la empresa ve «Sin Datos» en los informes del SII (mapa §K): no hay cómo buscar.
+    puede_buscar = False
 
     def __init__(self):
         self.evidencias = []  # [(nombre de archivo, bytes)], también cuando falla
         self.dialogos = []
+        self.enviado = False
 
     def vista_previa(self, datos):
         """Llena la boleta hasta la vista previa (paso 3) y sale sin emitir."""
@@ -107,7 +130,24 @@ class PlaywrightEmisor(EmisorBHE):
         return self.evidencias
 
     def emitir(self, datos):
-        raise NotImplementedError("La emisión real llega en la T7b.")
+        validar(datos)
+        _credenciales()
+        with self._navegador() as page:
+            self._llegar_a_vista_previa(page, datos)
+            folio, codigo = self._paso_4(page)
+            pdf = self._descargar_pdf(page, codigo)
+        return ResultadoEmision(
+            folio=folio,
+            fecha=datos.fecha,
+            rut_receptor=datos.receptor.rut,
+            monto_bruto=datos.monto_bruto,
+            # Con retención del emisor el SII no muestra retención ni líquido.
+            monto_retencion=None,
+            monto_liquido=None,
+            codigo_sii=codigo,
+            pdf=pdf,
+            evidencias=tuple(self.evidencias),
+        )
 
     def buscar(self, rut_emisor, rut_receptor, fecha, monto_bruto):
         raise NotImplementedError("La búsqueda llega en la T7c.")
@@ -120,7 +160,7 @@ class PlaywrightEmisor(EmisorBHE):
         from playwright.sync_api import Error as ErrorPlaywright
         from playwright.sync_api import sync_playwright
 
-        self.evidencias, self.dialogos = [], []
+        self.evidencias, self.dialogos, self.enviado = [], [], False
         with sync_playwright() as pw:
             navegador = pw.chromium.launch()
             try:
@@ -131,10 +171,13 @@ class PlaywrightEmisor(EmisorBHE):
                     yield page
                 except ErrorPlaywright as exc:
                     self._capturar(page, "error")
+                    clase = ErrorDespuesDeEnviar if self.enviado else ErrorAntesDeEnviar
                     # Solo la primera línea: el call log de Playwright puede traer valores escritos.
-                    raise ErrorAntesDeEnviar("portal_sin_respuesta", str(exc).splitlines()[0]) from None
-                except ErrorEmisor:
+                    raise clase("portal_sin_respuesta", str(exc).splitlines()[0]) from None
+                except ErrorEmisor as exc:
                     self._capturar(page, "error")
+                    if self.enviado and not isinstance(exc, ErrorDespuesDeEnviar):
+                        raise ErrorDespuesDeEnviar(exc.codigo, exc.detalle) from None
                     raise
             finally:
                 navegador.close()
@@ -156,11 +199,11 @@ class PlaywrightEmisor(EmisorBHE):
         except ErrorPlaywright:
             pass
 
-    def _en(self, page, cgi):
+    def _en(self, page, cgi, espera=None):
         from playwright.sync_api import TimeoutError as TimeoutPlaywright
 
         try:
-            page.wait_for_url(re.compile(re.escape(cgi)))
+            page.wait_for_url(re.compile(re.escape(cgi)), timeout=espera)
         except TimeoutPlaywright:
             raise ErrorAntesDeEnviar(
                 "pantalla_desconocida", f"Se esperaba {cgi} y el portal mostró {page.url.split('?')[0]}."
@@ -261,3 +304,35 @@ class PlaywrightEmisor(EmisorBHE):
             mensaje = " ".join(texto.split("Sr. Contribuyente:")[-1].split())[:300]
             raise ErrorNegocio("rechazada_sii", mensaje)
         revisar_vista_previa(texto, datos)
+
+    def _paso_4(self, page):
+        self.enviado = True  # antes del clic: si se cae justo ahí, igual pudo llegar al SII
+        page.get_by_role("button", name=BOTON_EMITIR).click()  # un solo clic; el JS del SII lo deshabilita
+        self._en(page, "TMBEUS_BoletaHonorariosElectronica.cgi", espera=ESPERA_MS * 2)
+        self._capturar(page, "paso-4-emitida")
+        return leer_paso_4(page.locator("body").inner_text())
+
+    def _descargar_pdf(self, page, codigo):
+        """El PDF con la misma sesión. Si falla la boleta igual quedó emitida: el psicólogo lo baja del SII."""
+        from playwright.sync_api import Error as ErrorPlaywright
+
+        url = urljoin(
+            page.url,
+            f"TMBCOT_ConsultaBoletaPdf.cgi?txt_codigobarras={codigo}&veroriginal=si&origen=OCTAVO&enviar=si",
+        )
+        try:
+            # fetch desde la página: lleva las cookies de la sesión (y pasa por las rutas en los tests).
+            contenido = page.evaluate(
+                """async url => {
+                    const r = await fetch(url, {credentials: "include"});
+                    if (!r.ok) return "";
+                    let s = "";
+                    for (const b of new Uint8Array(await r.arrayBuffer())) s += String.fromCharCode(b);
+                    return btoa(s);
+                }""",
+                url,
+            )
+        except ErrorPlaywright:
+            return b""
+        pdf = base64.b64decode(contenido or "")
+        return pdf if pdf.startswith(b"%PDF") else b""

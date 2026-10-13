@@ -129,8 +129,16 @@ class GetEmisorTests(SimpleTestCase):
     def test_fake(self):
         self.assertIsInstance(get_emisor(), FakeEmisor)
 
+    @override_settings(BHE_BACKEND="playwright")
+    def test_playwright_sin_busqueda(self):
+        from .emisores.playwright import PlaywrightEmisor
+
+        emisor = get_emisor()
+        self.assertIsInstance(emisor, PlaywrightEmisor)
+        self.assertFalse(emisor.puede_buscar)
+
     def test_sin_backend_o_no_implementado(self):
-        for backend in ("", "playwright", "otro"):
+        for backend in ("", "otro"):
             with self.subTest(backend=backend), override_settings(BHE_BACKEND=backend):
                 with self.assertRaises(ImproperlyConfigured):
                     get_emisor()

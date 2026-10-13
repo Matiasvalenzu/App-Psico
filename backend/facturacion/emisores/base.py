@@ -66,9 +66,9 @@ class ResultadoEmision:
     fecha: date
     rut_receptor: str
     monto_bruto: int
-    # Lo que informa el SII, para compararlo con lo que calcula Psiconex.
-    monto_retencion: int
-    monto_liquido: int
+    # Lo que informa el SII, para compararlo con lo que calcula Psiconex (None: el SII no lo muestra).
+    monto_retencion: int | None
+    monto_liquido: int | None
     anulada: bool = False
     codigo_sii: str = ""
     pdf: bytes = b""
@@ -101,6 +101,8 @@ class ErrorCredencial(ErrorEmisor):
 
 class EmisorBHE(ABC):
     nombre = ""
+    # Sin una consulta usable en el SII, una emisión DESCONOCIDA va directo a revisión manual.
+    puede_buscar = True
 
     @abstractmethod
     def emitir(self, datos: DatosBoleta) -> ResultadoEmision:

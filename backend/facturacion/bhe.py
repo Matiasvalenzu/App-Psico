@@ -413,7 +413,13 @@ def procesar(emision_id):
         _fallar(emision.pk, exc.codigo, exc.detalle)
     except Exception as exc:
         # ErrorDespuesDeEnviar o un error inesperado: el formulario pudo quedar enviado.
-        _marcar_desconocido(emision.pk, getattr(exc, "codigo", "error_inesperado"), str(exc))
+        _marcar_desconocido(
+            emision.pk,
+            getattr(exc, "codigo", "error_inesperado"),
+            str(exc),
+            puede_buscar=emisor.puede_buscar,
+            evidencias=getattr(emisor, "evidencias", ()),
+        )
     else:
         _completar(emision.pk, resultado, Estado.EN_CURSO)
 
@@ -473,7 +479,7 @@ def _fallar(emision_id, codigo, detalle):
     logger.warning("Emisión BHE %s fallida: %s.", emision_id, codigo)
 
 
-def _marcar_desconocido(emision_id, codigo, detalle):
+def _marcar_desconocido(emision_id, codigo, detalle, puede_buscar=True, evidencias=()):
     with transaction.atomic():
         emision = _bloquear(emision_id, Estado.EN_CURSO)
         if emision is None:
@@ -482,16 +488,27 @@ def _marcar_desconocido(emision_id, codigo, detalle):
         emision.paso = "BUSQUEDA_1"
         emision.error_codigo = codigo
         emision.error_detalle = ocultar(detalle)
-        emision.save(update_fields=["estado", "paso", "error_codigo", "error_detalle"])
-        transaction.on_commit(lambda: _programar_busqueda(emision_id, 1))
+        # Las capturas sirven para confirmarla a mano.
+        _guardar_evidencias(emision, evidencias)
+        emision.save(update_fields=["estado", "paso", "error_codigo", "error_detalle", "evidencias"])
+        if puede_buscar:
+            transaction.on_commit(lambda: _programar_busqueda(emision_id, 1))
+    if not puede_buscar:
+        # El usuario autorizado no ve las boletas en las consultas del SII: nunca reintento ni búsqueda.
+        _a_revision(emision_id, codigo, ocultar(detalle))
+        return
     logger.warning("Emisión BHE %s por confirmar (%s): se buscará en el SII.", emision_id, codigo)
 
 
 def _guardar_archivos(emision, resultado):
     if resultado.pdf:
         emision.pdf.save(f"boleta-{resultado.folio}.pdf", ContentFile(resultado.pdf), save=False)
+    _guardar_evidencias(emision, resultado.evidencias)
+
+
+def _guardar_evidencias(emision, evidencias):
     storage = emision.pdf.storage
-    for nombre, contenido in resultado.evidencias:
+    for nombre, contenido in evidencias:
         ruta = storage.save(f"{emision.cobro.psicologo_id}/{emision.pk}/evidencias/{nombre}", ContentFile(contenido))
         emision.evidencias.append(ruta)
 
@@ -513,7 +530,8 @@ def _completar(emision_id, resultado, estado_esperado):
         emision.monto_retencion_sii = resultado.monto_retencion
         emision.monto_liquido_sii = resultado.monto_liquido
         _guardar_archivos(emision, resultado)
-        if (resultado.monto_retencion, resultado.monto_liquido) != (cobro.monto_retencion, cobro.monto_liquido):
+        informados = (resultado.monto_retencion, resultado.monto_liquido)
+        if informados != (None, None) and informados != (cobro.monto_retencion, cobro.monto_liquido):
             # Queda emitida igual: el SII manda. Se avisa para revisar el cálculo.
             emision.error_codigo = "montos_distintos"
             emision.error_detalle = (

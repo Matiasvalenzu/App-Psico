@@ -23,5 +23,7 @@ def get_emisor():
 
         return FakeEmisor()
     if backend == "playwright":
-        raise ImproperlyConfigured("El emisor playwright todavía no está implementado.")
+        from .playwright import PlaywrightEmisor
+
+        return PlaywrightEmisor()
     raise ImproperlyConfigured("BHE_BACKEND no está configurado.")

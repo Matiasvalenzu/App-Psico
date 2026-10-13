@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from . import bhe
 from .comunas import COMUNAS, REGIONES, buscar_comuna
-from .emisores import Retencion
+from .emisores import ErrorDespuesDeEnviar, Retencion
 from .emisores.fake import FakeEmisor
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
 from .services import calcular_retencion
@@ -287,6 +287,21 @@ class ProcesarTests(EntornoBHE, TestCase):
         self.assertEqual((emision.estado, emision.paso), (Estado.DESCONOCIDO, "BUSQUEDA_1"))
         self.assertEqual(emision.error_codigo, "error_inesperado")
         self.assertEqual(self.busquedas, [((emision.pk, 1), {})])
+
+    def test_sin_busqueda_va_directo_a_revision_con_las_capturas(self):
+        emision = self.solicitar()
+        error = ErrorDespuesDeEnviar("paso_4_ilegible", "No se leyó el folio.")
+        with mock.patch.object(FakeEmisor, "puede_buscar", False), \
+                mock.patch.object(FakeEmisor, "evidencias", [("04-paso-4-emitida.png", b"png")], create=True), \
+                mock.patch.object(FakeEmisor, "emitir", side_effect=error), \
+                self.captureOnCommitCallbacks(execute=True):
+            bhe.procesar(emision.pk)
+        self.recargar(emision)
+        self.assertEqual((emision.estado, emision.paso), (Estado.DESCONOCIDO, bhe.REVISION_MANUAL))
+        self.assertEqual(emision.error_codigo, "paso_4_ilegible")
+        self.assertEqual([ruta.rsplit("/", 1)[-1] for ruta in emision.evidencias], ["04-paso-4-emitida.png"])
+        self.assertEqual((self.busquedas, len(self.encoladas)), ([], 1))  # solo la de la solicitud
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_caida_despues_se_concilia_sin_reenviar(self):
         emision = self.solicitar()
