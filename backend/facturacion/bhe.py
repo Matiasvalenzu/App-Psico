@@ -24,7 +24,6 @@ from django.utils import timezone
 
 from .comunas import buscar_comuna
 from .emisores import (
-    CausaAnulacion,
     DatosBoleta,
     ErrorAntesDeEnviar,
     ErrorCredencial,
@@ -36,7 +35,7 @@ from .emisores import (
 )
 from .logs import ocultar
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
-from .services import anulable_hasta
+from .services import HORA_CHILE, anulable_hasta, hoy_chile
 
 logger = logging.getLogger(__name__)
 
@@ -68,15 +67,13 @@ MENSAJES = {
     "estado_invalido": "La boleta de este cobro no está en un estado que permita esta acción.",
     "receptor_incompleto": "Para emitir en el SII la boleta necesita RUT, nombre, dirección y comuna del receptor.",
     "comuna_desconocida": "No reconocemos la comuna del receptor. Corrígela en el cobro.",
-    "causa_invalida": "Elige una de las causas de anulación que acepta el SII.",
     "fuera_de_plazo": (
         "Pasó el plazo para anular la boleta directamente (día 10 del mes siguiente a su emisión). "
         "Ahora el SII exige que el receptor confirme la anulación o presentar el formulario 2117. "
-        "Hazlo en el portal del SII y después márcala anulada aquí."
+        "Hazlo en el portal del SII y después márcala como anulada aquí."
     ),
     "no_cancelable": "La boleta ya se está procesando en el SII y no se puede cancelar. Espera a que termine.",
     "confirmacion_requerida": "Confirma los datos de la boleta antes de enviarla al SII.",
-    "anulacion_en_curso": "La anulación de esta boleta se está procesando en el SII. Espera a que termine.",
     "folio_requerido": "Indica el folio que muestra el SII.",
     "folio_ocupado": "Ese folio ya está registrado en otro cobro.",
 }
@@ -136,6 +133,28 @@ def revisar_vencimientos():
         # El umbral más cercano (30, 7 o 1): la clave del correo evita repetirlo los días siguientes.
         aviso = next(umbral for umbral in AVISOS_VENCIMIENTO if dias <= umbral)
         enqueue_delegation_expiry_notice(delegacion, aviso)
+
+
+DIAS_RECORDATORIO_ANULACION = 3
+
+
+def recordar_anulaciones():
+    """Recuerda anular en el SII las boletas pedidas y no marcadas, unos días antes del plazo simple."""
+    from notificaciones.services import enqueue_cancellation_reminder
+
+    cobros = Cobro.objects.select_related("psicologo").filter(
+        estado_boleta=Cobro.EstadoBoleta.EMITIDA,
+        anulacion_solicitada_at__isnull=False,
+        boleta_fecha_emision__isnull=False,
+    )
+    hoy = hoy_chile()
+    for cobro in cobros:
+        dias = (anulable_hasta(cobro.boleta_fecha_emision) - hoy).days
+        # Pasado el plazo el camino es otro (receptor o formulario 2117) y la ficha lo explica.
+        # Si la pidió hoy, la está anulando ahora: no hace falta recordárselo.
+        pedida_hoy = timezone.localdate(cobro.anulacion_solicitada_at, timezone=HORA_CHILE) == hoy
+        if 0 <= dias <= DIAS_RECORDATORIO_ANULACION and not pedida_hoy:
+            enqueue_cancellation_reminder(cobro)
 
 
 def _cola_detenida():
@@ -212,11 +231,21 @@ def solicitar_emision(cobro, usuario):
         raise EmisionNoPermitida(codigo)
     with transaction.atomic():
         cobro = Cobro.objects.select_for_update().get(pk=cobro.pk)
-        activa = cobro.emisiones.filter(tipo=Tipo.EMISION, estado__in=EmisionBHE.ESTADOS_ACTIVOS).first()
-        if activa:
-            return activa
-        if cobro.estado_boleta != Cobro.EstadoBoleta.PENDIENTE:
-            raise EmisionNoPermitida("estado_invalido")
+        if cobro.estado_boleta == Cobro.EstadoBoleta.ANULADA:
+            # Boleta nueva para un cobro cuya boleta se anuló: otra clave, y sin rastro de la anterior en el cobro
+            # (el folio anulado queda en sus EmisionBHE).
+            cobro.version_emision += 1
+            cobro.boleta_folio = ""
+            cobro.boleta_fecha_emision = None
+            cobro.boleta_anulada_at = None
+            cobro.anulacion_solicitada_at = None
+            cobro.anulacion_solicitada_por = None
+        else:
+            activa = cobro.emisiones.filter(tipo=Tipo.EMISION, estado__in=EmisionBHE.ESTADOS_ACTIVOS).first()
+            if activa:
+                return activa
+            if cobro.estado_boleta != Cobro.EstadoBoleta.PENDIENTE:
+                raise EmisionNoPermitida("estado_invalido")
         datos = datos_desde_cobro(cobro, usuario.delegacion_sii.rut_emisor, timezone.localdate())
         emision = EmisionBHE.objects.create(
             cobro=cobro,
@@ -227,49 +256,53 @@ def solicitar_emision(cobro, usuario):
             backend=settings.BHE_BACKEND,
         )
         cobro.estado_boleta = Cobro.EstadoBoleta.EN_EMISION
-        cobro.save(update_fields=["estado_boleta", "updated_at"])
+        cobro.save()
         transaction.on_commit(lambda: _encolar(emision.pk))
     return emision
 
 
-def solicitar_anulacion(cobro, causa, usuario):
-    codigo = motivo_bloqueo(usuario)
-    if codigo:
-        raise EmisionNoPermitida(codigo)
-    if causa not in CausaAnulacion.values:
-        raise EmisionNoPermitida("causa_invalida")
+def solicitar_anulacion(cobro, usuario):
+    """El psicólogo va a anular la boleta en el SII. La cuenta autorizada no puede anular ni ver sus boletas."""
     with transaction.atomic():
         cobro = Cobro.objects.select_for_update().get(pk=cobro.pk)
-        activa = cobro.emisiones.filter(tipo=Tipo.ANULACION, estado__in=EmisionBHE.ESTADOS_ACTIVOS).first()
-        if activa:
-            return activa
-        if cobro.estado_boleta != Cobro.EstadoBoleta.EMITIDA or not cobro.boleta_folio or not cobro.boleta_fecha_emision:
+        if cobro.estado_boleta != Cobro.EstadoBoleta.EMITIDA:
             raise EmisionNoPermitida("estado_invalido")
-        if timezone.localdate() > anulable_hasta(cobro.boleta_fecha_emision):
-            # El robot no puede pedir la confirmación del receptor ni el formulario 2117.
-            raise EmisionNoPermitida("fuera_de_plazo")
-        payload = {
-            "rut_emisor": usuario.delegacion_sii.rut_emisor,
-            "folio": cobro.boleta_folio,
-            "causa": causa,
-            "rut_receptor": cobro.receptor_documento,
-            "fecha": cobro.boleta_fecha_emision.isoformat(),
-            "monto_bruto": cobro.monto_bruto,
-        }
-        emision = EmisionBHE.objects.create(
+        if cobro.anulacion_solicitada_at is None:
+            cobro.anulacion_solicitada_at = timezone.now()
+            cobro.anulacion_solicitada_por = usuario
+            cobro.save(update_fields=["anulacion_solicitada_at", "anulacion_solicitada_por", "updated_at"])
+    return cobro
+
+
+def registrar_anulacion(cobro, usuario):
+    """«Ya la anulé»: no se puede verificar en el SII, así que queda registrado quién lo marcó y cuándo."""
+    with transaction.atomic():
+        cobro = Cobro.objects.select_for_update().get(pk=cobro.pk)
+        if cobro.estado_boleta != Cobro.EstadoBoleta.EMITIDA:
+            raise EmisionNoPermitida("estado_invalido")
+        ahora = timezone.now()
+        cobro.emisiones.filter(tipo=Tipo.EMISION, estado=Estado.EMITIDA).update(estado=Estado.ANULADA)
+        EmisionBHE.objects.create(
             cobro=cobro,
             tipo=Tipo.ANULACION,
             idempotency_key=EmisionBHE.clave_idempotencia(cobro, Tipo.ANULACION),
-            payload=json.dumps(payload),
-            solicitado_por=usuario,
-            backend=settings.BHE_BACKEND,
+            estado=Estado.REGISTRADA,
+            folio=cobro.boleta_folio,
+            solicitado_por=cobro.anulacion_solicitada_por,
+            resuelta_por=usuario,
+            resuelta_at=ahora,
+            finished_at=ahora,
+            backend="manual",
         )
-        transaction.on_commit(lambda: _encolar(emision.pk))
-    return emision
+        cobro.estado_boleta = Cobro.EstadoBoleta.ANULADA
+        cobro.boleta_anulada_at = ahora
+        cobro.save(update_fields=["estado_boleta", "boleta_anulada_at", "updated_at"])
+    logger.info("Cobro %s: boleta marcada anulada por el usuario %s.", cobro.pk, usuario.pk)
+    return cobro
 
 
 def cancelar_emision(cobro):
-    """Saca de la cola una emisión o anulación que el worker todavía no toma."""
+    """Saca de la cola una emisión que el worker todavía no toma."""
     with transaction.atomic():
         pendiente = cobro.emisiones.filter(estado=Estado.PENDIENTE).values_list("pk", flat=True).first()
         # El lock va sobre la emisión: si un worker la está tomando, se espera y se vuelve a
@@ -293,7 +326,7 @@ def cancelar_emision(cobro):
 def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None):
     """El operador revisó en el portal del SII una emisión por confirmar.
 
-    `hecha` dice si la boleta (o su anulación) aparece en el SII. Una emisión hecha necesita el folio.
+    `hecha` dice si la boleta aparece en el SII; si aparece, se necesita el folio.
     """
     with transaction.atomic():
         emision = _bloquear(emision_id, Estado.DESCONOCIDO)
@@ -301,7 +334,7 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None):
             raise EmisionNoPermitida("estado_invalido")
         cobro = Cobro.objects.select_for_update().get(pk=emision.cobro_id)
         ahora = timezone.now()
-        if hecha and emision.tipo == Tipo.EMISION:
+        if hecha:
             if not folio:
                 raise EmisionNoPermitida("folio_requerido")
             if _folio_ocupado(emision, folio):
@@ -311,9 +344,6 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None):
             cobro.boleta_folio = folio
             cobro.boleta_fecha_emision = fecha or date.fromisoformat(json.loads(emision.payload)["fecha"])
             cobro.boleta_anulada_at = None
-        elif hecha:
-            cobro.estado_boleta = Cobro.EstadoBoleta.ANULADA
-            cobro.boleta_anulada_at = ahora
         else:
             # No está en el SII: el cobro vuelve a quedar disponible y la boleta sigue como estaba.
             if emision.tipo == Tipo.EMISION and cobro.estado_boleta == Cobro.EstadoBoleta.EN_EMISION:
@@ -364,7 +394,7 @@ def procesar(emision_id):
     try:
         emisor = get_emisor()
         payload = json.loads(emision.payload)
-        datos = datos_desde_payload(payload) if emision.tipo == Tipo.EMISION else None
+        datos = datos_desde_payload(payload)
     except Exception as exc:
         logger.exception("Emisión BHE %s: no se pudo preparar.", emision.pk)
         _fallar(emision.pk, "error_interno", str(exc))
@@ -373,11 +403,7 @@ def procesar(emision_id):
     # Confirmado en la base antes de tocar el SII: si el proceso muere desde aquí, no se reenvía.
     EmisionBHE.objects.filter(pk=emision.pk).update(paso=ANTES_SUBMIT)
     try:
-        if emision.tipo == Tipo.EMISION:
-            resultado = emisor.emitir(datos)
-        else:
-            emisor.anular(payload["rut_emisor"], payload["folio"], payload["causa"])
-            resultado = None
+        resultado = emisor.emitir(datos)
     except ErrorCredencial as exc:
         _devolver_por_credencial(emision.pk)
         pausar_por_credencial(exc)
@@ -471,7 +497,7 @@ def _guardar_archivos(emision, resultado):
 
 
 def _completar(emision_id, resultado, estado_esperado):
-    """La boleta (o su anulación) quedó hecha en el SII. `resultado` es None en una anulación."""
+    """La boleta quedó emitida en el SII."""
     with transaction.atomic():
         emision = _bloquear(emision_id, estado_esperado)
         if emision is None:
@@ -482,26 +508,22 @@ def _completar(emision_id, resultado, estado_esperado):
         emision.error_codigo = ""
         emision.error_detalle = ""
         emision.finished_at = timezone.now()
-        if emision.tipo == Tipo.EMISION:
-            emision.folio = resultado.folio
-            emision.codigo_sii = resultado.codigo_sii
-            emision.monto_retencion_sii = resultado.monto_retencion
-            emision.monto_liquido_sii = resultado.monto_liquido
-            _guardar_archivos(emision, resultado)
-            if (resultado.monto_retencion, resultado.monto_liquido) != (cobro.monto_retencion, cobro.monto_liquido):
-                # Queda emitida igual: el SII manda. Se avisa para revisar el cálculo.
-                emision.error_codigo = "montos_distintos"
-                emision.error_detalle = (
-                    f"El SII informó retención ${resultado.monto_retencion} y líquido ${resultado.monto_liquido}; "
-                    f"Psiconex calculó ${cobro.monto_retencion} y ${cobro.monto_liquido}."
-                )
-                logger.warning("Emisión BHE %s: los montos del SII no coinciden con el cobro.", emision.pk)
-            cobro.estado_boleta = Cobro.EstadoBoleta.EMITIDA
-            cobro.boleta_folio = resultado.folio
-            cobro.boleta_fecha_emision = resultado.fecha
-        else:
-            cobro.estado_boleta = Cobro.EstadoBoleta.ANULADA
-            cobro.boleta_anulada_at = timezone.now()
+        emision.folio = resultado.folio
+        emision.codigo_sii = resultado.codigo_sii
+        emision.monto_retencion_sii = resultado.monto_retencion
+        emision.monto_liquido_sii = resultado.monto_liquido
+        _guardar_archivos(emision, resultado)
+        if (resultado.monto_retencion, resultado.monto_liquido) != (cobro.monto_retencion, cobro.monto_liquido):
+            # Queda emitida igual: el SII manda. Se avisa para revisar el cálculo.
+            emision.error_codigo = "montos_distintos"
+            emision.error_detalle = (
+                f"El SII informó retención ${resultado.monto_retencion} y líquido ${resultado.monto_liquido}; "
+                f"Psiconex calculó ${cobro.monto_retencion} y ${cobro.monto_liquido}."
+            )
+            logger.warning("Emisión BHE %s: los montos del SII no coinciden con el cobro.", emision.pk)
+        cobro.estado_boleta = Cobro.EstadoBoleta.EMITIDA
+        cobro.boleta_folio = resultado.folio
+        cobro.boleta_fecha_emision = resultado.fecha
         emision.save()
         cobro.save()
     logger.info("Emisión BHE %s completada.", emision_id)
@@ -526,11 +548,8 @@ def conciliar(emision_id, busqueda):
         # Se retoma al reanudar la cola.
         return
     payload = json.loads(emision.payload)
-    if emision.tipo == Tipo.EMISION:
-        rut_receptor, fecha = payload["receptor"]["rut"], payload["fecha"]
-        monto = sum(linea["monto"] for linea in payload["lineas"])
-    else:
-        rut_receptor, fecha, monto = payload["rut_receptor"], payload["fecha"], payload["monto_bruto"]
+    rut_receptor, fecha = payload["receptor"]["rut"], payload["fecha"]
+    monto = sum(linea["monto"] for linea in payload["lineas"])
     try:
         encontradas = get_emisor().buscar(payload["rut_emisor"], rut_receptor, date.fromisoformat(fecha), monto)
     except ErrorCredencial as exc:
@@ -541,16 +560,12 @@ def conciliar(emision_id, busqueda):
         logger.warning("Emisión BHE %s: la búsqueda %s falló (%s).", emision_id, busqueda, getattr(exc, "codigo", exc))
         encontradas = None
 
-    if emision.tipo == Tipo.EMISION:
-        candidatas = [r for r in encontradas or [] if not r.anulada and not _folio_ocupado(emision, r.folio)]
-        if len(candidatas) == 1:
-            _completar(emision_id, candidatas[0], Estado.DESCONOCIDO)
-            return
-        if len(candidatas) > 1:
-            _a_revision(emision_id, "varias_coincidencias", "El SII muestra varias boletas que coinciden.")
-            return
-    elif any(r.folio == payload["folio"] and r.anulada for r in encontradas or []):
-        _completar(emision_id, None, Estado.DESCONOCIDO)
+    candidatas = [r for r in encontradas or [] if not r.anulada and not _folio_ocupado(emision, r.folio)]
+    if len(candidatas) == 1:
+        _completar(emision_id, candidatas[0], Estado.DESCONOCIDO)
+        return
+    if len(candidatas) > 1:
+        _a_revision(emision_id, "varias_coincidencias", "El SII muestra varias boletas que coinciden.")
         return
 
     if busqueda == 1:

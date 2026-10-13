@@ -24,13 +24,6 @@ class Retencion(models.TextChoices):
     CONTRIBUYENTE = "RETCONTRIBUYENTE", "Retiene el emisor"
 
 
-class CausaAnulacion(models.TextChoices):
-    # El SII obliga a elegir una de estas tres causas. Confirmar textos con la prueba manual.
-    NO_PAGO = "NO_PAGO", "No se efectuó el pago"
-    SERVICIO_NO_PRESTADO = "SERVICIO_NO_PRESTADO", "No se prestó el servicio"
-    ERROR_DIGITACION = "ERROR_DIGITACION", "Error en la digitación"
-
-
 @dataclass(frozen=True)
 class LineaBoleta:
     nombre: str
@@ -111,10 +104,6 @@ class EmisorBHE(ABC):
 
     @abstractmethod
     def emitir(self, datos: DatosBoleta) -> ResultadoEmision:
-        ...
-
-    @abstractmethod
-    def anular(self, rut_emisor: str, folio: str, causa: str) -> None:
         ...
 
     @abstractmethod

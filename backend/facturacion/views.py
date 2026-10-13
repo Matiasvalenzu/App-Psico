@@ -16,10 +16,9 @@ from rest_framework.views import APIView
 from cuentas.services import get_or_create_profile
 
 from . import bhe
-from .models import Cobro, DelegacionSII, EmisionBHE
+from .models import Cobro, DelegacionSII
 from .permissions import TienePlanPlus
 from .serializers import (
-    AnularSIISerializer,
     CobroSerializer,
     DelegacionSolicitudSerializer,
     EmisionBHESerializer,
@@ -108,17 +107,11 @@ class CobroViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="marcar-anulada")
     def marcar_anulada(self, request, pk=None):
         cobro = self.get_object()
-        if cobro.estado_boleta != Cobro.EstadoBoleta.EMITIDA:
+        try:
+            bhe.registrar_anulacion(cobro, request.user)
+        except bhe.EmisionNoPermitida:
             return Response({"detail": "Solo se puede anular una boleta emitida."}, status=status.HTTP_400_BAD_REQUEST)
-        if cobro.emisiones.filter(tipo=EmisionBHE.Tipo.ANULACION, estado__in=EmisionBHE.ESTADOS_ACTIVOS).exists():
-            return Response(
-                {"detail": bhe.MENSAJES["anulacion_en_curso"], "code": "anulacion_en_curso"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        cobro.estado_boleta = Cobro.EstadoBoleta.ANULADA
-        cobro.boleta_anulada_at = timezone.now()
-        cobro.save()
-        return Response(self.get_serializer(cobro).data)
+        return self._cobro_actualizado(cobro)
 
     def _cobro_actualizado(self, cobro, estado=status.HTTP_200_OK):
         cobro = self.get_queryset().get(pk=cobro.pk)
@@ -137,16 +130,13 @@ class CobroViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="anular-sii", throttle_classes=[SolicitudesBHEThrottle])
     def anular_sii(self, request, pk=None):
+        # Solo deja pedida la anulación: el psicólogo la hace en el SII y vuelve a marcar «Ya la anulé».
         cobro = self.get_object()
-        datos = AnularSIISerializer(data=request.data)
-        datos.is_valid(raise_exception=True)
-        if not datos.validated_data["confirmado"]:
-            return _confirmacion_requerida()
         try:
-            bhe.solicitar_anulacion(cobro, datos.validated_data["causa"], request.user)
+            bhe.solicitar_anulacion(cobro, request.user)
         except bhe.EmisionNoPermitida as exc:
             return _no_permitida(exc)
-        return self._cobro_actualizado(cobro, status.HTTP_202_ACCEPTED)
+        return self._cobro_actualizado(cobro)
 
     @action(detail=True, methods=["post"], url_path="cancelar-sii")
     def cancelar_sii(self, request, pk=None):

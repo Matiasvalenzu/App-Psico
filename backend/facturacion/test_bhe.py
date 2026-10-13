@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from . import bhe
 from .comunas import COMUNAS, REGIONES, buscar_comuna
-from .emisores import CausaAnulacion, Retencion
+from .emisores import Retencion
 from .emisores.fake import FakeEmisor
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
 from .services import calcular_retencion
@@ -374,58 +374,6 @@ class ProcesarTests(EntornoBHE, TestCase):
         ConfiguracionBHE.objects.update(pausada=False)
         bhe.reanudar_cola()
         self.assertEqual(self.busquedas[-1], ((emision.pk, 1), {"countdown": 0}))
-
-
-class AnulacionTests(EntornoBHE, TestCase):
-    def setUp(self):
-        super().setUp()
-        self.user = preparar_psicologo()
-        self.cobro = crear_cobro(self.user)
-        with self.captureOnCommitCallbacks(execute=True):
-            emision = bhe.solicitar_emision(self.cobro, self.user)
-        bhe.procesar(emision.pk)
-        self.cobro.refresh_from_db()
-
-    def anular(self):
-        with self.captureOnCommitCallbacks(execute=True):
-            return bhe.solicitar_anulacion(self.cobro, CausaAnulacion.ERROR_DIGITACION, self.user)
-
-    def test_anulacion(self):
-        anulacion = self.anular()
-        self.assertEqual(anulacion.idempotency_key, f"cobro:{self.cobro.pk}:anulacion:v1")
-        self.cobro.refresh_from_db()
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.EMITIDA)
-        bhe.procesar(anulacion.pk)
-        anulacion.refresh_from_db()
-        self.cobro.refresh_from_db()
-        self.assertEqual(anulacion.estado, Estado.EMITIDA)
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.ANULADA)
-        self.assertIsNotNone(self.cobro.boleta_anulada_at)
-
-    def test_causa_invalida(self):
-        with self.assertRaises(bhe.EmisionNoPermitida) as ctx:
-            bhe.solicitar_anulacion(self.cobro, "PORQUE_SI", self.user)
-        self.assertEqual(ctx.exception.codigo, "causa_invalida")
-
-    def test_caida_despues_se_concilia(self):
-        anulacion = self.anular()
-        with self.escenario("caida_despues"), self.captureOnCommitCallbacks(execute=True):
-            bhe.procesar(anulacion.pk)
-        bhe.conciliar(anulacion.pk, 1)
-        anulacion.refresh_from_db()
-        self.cobro.refresh_from_db()
-        self.assertEqual(anulacion.estado, Estado.EMITIDA)
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.ANULADA)
-
-    def test_error_negocio_deja_la_boleta_emitida(self):
-        anulacion = self.anular()
-        with self.escenario("error_negocio"):
-            bhe.procesar(anulacion.pk)
-        anulacion.refresh_from_db()
-        self.cobro.refresh_from_db()
-        self.assertEqual(anulacion.estado, Estado.FALLIDA)
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.EMITIDA)
-        self.assertEqual(self.anular().idempotency_key, f"cobro:{self.cobro.pk}:anulacion:v2")
 
 
 class RescateTests(EntornoBHE, TestCase):

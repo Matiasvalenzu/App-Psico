@@ -16,7 +16,6 @@ from rest_framework.test import APIClient
 from cuentas.services import get_or_create_profile
 
 from . import bhe
-from .emisores import CausaAnulacion
 from .emisores.fake import FakeEmisor
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
 from .test_bhe import RUT_EMISOR, EntornoBHE, User, crear_cobro, preparar_psicologo
@@ -24,11 +23,8 @@ from .test_bhe import RUT_EMISOR, EntornoBHE, User, crear_cobro, preparar_psicol
 Estado = EmisionBHE.Estado
 
 
-def emision_por_confirmar(cobro, usuario, tipo=EmisionBHE.Tipo.EMISION):
-    if tipo == EmisionBHE.Tipo.EMISION:
-        emision = bhe.solicitar_emision(cobro, usuario)
-    else:
-        emision = bhe.solicitar_anulacion(cobro, CausaAnulacion.ERROR_DIGITACION, usuario)
+def emision_por_confirmar(cobro, usuario):
+    emision = bhe.solicitar_emision(cobro, usuario)
     EmisionBHE.objects.filter(pk=emision.pk).update(estado=Estado.DESCONOCIDO, paso=bhe.REVISION_MANUAL)
     return emision
 
@@ -72,36 +68,6 @@ class CancelarTests(EntornoBHE, TestCase):
         self.cobro.refresh_from_db()
         self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.EN_EMISION)
 
-    def test_cancelar_anulacion(self):
-        emitir(self.cobro, self.user, self)
-        anulacion = bhe.solicitar_anulacion(self.cobro, CausaAnulacion.ERROR_DIGITACION, self.user)
-        bhe.cancelar_emision(self.cobro)
-        anulacion.refresh_from_db()
-        self.cobro.refresh_from_db()
-        self.assertEqual(anulacion.estado, Estado.CANCELADA)
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.EMITIDA)
-        nueva = bhe.solicitar_anulacion(self.cobro, CausaAnulacion.ERROR_DIGITACION, self.user)
-        self.assertEqual(nueva.idempotency_key, f"cobro:{self.cobro.pk}:anulacion:v2")
-
-
-class PlazoAnulacionTests(EntornoBHE, TestCase):
-    def setUp(self):
-        super().setUp()
-        self.user = preparar_psicologo()
-        self.cobro = crear_cobro(self.user)
-        emitir(self.cobro, self.user, self)
-
-    def test_fuera_de_plazo(self):
-        Cobro.objects.filter(pk=self.cobro.pk).update(boleta_fecha_emision=timezone.localdate() - timedelta(days=45))
-        with self.assertRaises(bhe.EmisionNoPermitida) as ctx:
-            bhe.solicitar_anulacion(self.cobro, CausaAnulacion.ERROR_DIGITACION, self.user)
-        self.assertEqual(ctx.exception.codigo, "fuera_de_plazo")
-        self.assertIn("2117", ctx.exception.detalle)
-        self.assertFalse(self.cobro.emisiones.filter(tipo=EmisionBHE.Tipo.ANULACION).exists())
-
-    def test_dentro_de_plazo(self):
-        anulacion = bhe.solicitar_anulacion(self.cobro, CausaAnulacion.ERROR_DIGITACION, self.user)
-        self.assertEqual(anulacion.estado, Estado.PENDIENTE)
 
 
 class ResolverManualTests(EntornoBHE, TestCase):
@@ -151,21 +117,6 @@ class ResolverManualTests(EntornoBHE, TestCase):
         self.assertEqual(emision.error_codigo, "no_esta_en_sii")
         self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.PENDIENTE)
         self.assertEqual(self.cobro.version_emision, 2)
-
-    def test_anulacion_hecha(self):
-        emitir(self.cobro, self.user, self)
-        anulacion = emision_por_confirmar(self.cobro, self.user, EmisionBHE.Tipo.ANULACION)
-        self.resolver(anulacion, hecha=True)
-        self.cobro.refresh_from_db()
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.ANULADA)
-        self.assertIsNotNone(self.cobro.boleta_anulada_at)
-
-    def test_anulacion_no_hecha_deja_la_boleta_emitida(self):
-        emitir(self.cobro, self.user, self)
-        anulacion = emision_por_confirmar(self.cobro, self.user, EmisionBHE.Tipo.ANULACION)
-        self.resolver(anulacion, hecha=False)
-        self.cobro.refresh_from_db()
-        self.assertEqual(self.cobro.estado_boleta, Cobro.EstadoBoleta.EMITIDA)
 
     def test_solo_por_confirmar(self):
         emision = bhe.solicitar_emision(self.cobro, self.user)
@@ -256,28 +207,6 @@ class ApiBHETests(EntornoBHE, TestCase):
             self.assertEqual(self.client.post(self.url(accion, ajeno), {"confirmado": True}, format="json").status_code, 404)
         self.assertEqual(self.client.get(self.url("emisiones", ajeno)).status_code, 404)
 
-    def test_anular(self):
-        emitir(self.cobro, self.user, self)
-        datos = {"causa": CausaAnulacion.ERROR_DIGITACION, "confirmado": True}
-        respuesta = self.client.post(self.url("anular-sii"), datos, format="json")
-        self.assertEqual(respuesta.status_code, 202)
-        self.assertEqual(respuesta.data["ultima_emision"]["tipo"], EmisionBHE.Tipo.ANULACION)
-
-    def test_anular_causa_invalida(self):
-        emitir(self.cobro, self.user, self)
-        respuesta = self.client.post(self.url("anular-sii"), {"causa": "PORQUE_SI", "confirmado": True}, format="json")
-        self.assertEqual(respuesta.status_code, 400)
-        self.assertIn("causa", respuesta.data)
-
-    def test_anular_fuera_de_plazo(self):
-        emitir(self.cobro, self.user, self)
-        Cobro.objects.filter(pk=self.cobro.pk).update(boleta_fecha_emision=timezone.localdate() - timedelta(days=45))
-        datos = {"causa": CausaAnulacion.ERROR_DIGITACION, "confirmado": True}
-        respuesta = self.client.post(self.url("anular-sii"), datos, format="json")
-        self.assertEqual(respuesta.status_code, 400)
-        self.assertEqual(respuesta.data["code"], "fuera_de_plazo")
-        self.assertFalse(self.cobro.emisiones.filter(tipo=EmisionBHE.Tipo.ANULACION).exists())
-
     def test_cancelar(self):
         self.client.post(self.url("emitir-sii"), {"confirmado": True}, format="json")
         respuesta = self.client.post(self.url("cancelar-sii"))
@@ -307,13 +236,6 @@ class ApiBHETests(EntornoBHE, TestCase):
             self.assertNotIn("evidencias", fila)
         self.assertEqual(respuesta.data[1]["id"], emision.pk)
         self.assertEqual(respuesta.data[1]["folio"], self.cobro.boleta_folio)
-
-    def test_marcar_anulada_con_anulacion_en_curso(self):
-        emitir(self.cobro, self.user, self)
-        bhe.solicitar_anulacion(self.cobro, CausaAnulacion.ERROR_DIGITACION, self.user)
-        respuesta = self.client.post(self.url("marcar-anulada"))
-        self.assertEqual(respuesta.status_code, 400)
-        self.assertEqual(respuesta.data["code"], "anulacion_en_curso")
 
     def test_limite_por_minuto(self):
         for _ in range(10):

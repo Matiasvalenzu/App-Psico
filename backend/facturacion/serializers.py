@@ -5,9 +5,8 @@ from pacientes.documentos import TIPO_RUT, formatear_documento, normalizar_docum
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 
-from .emisores import CausaAnulacion
 from .models import Cobro, DelegacionSII, EmisionBHE
-from .services import anulable_hasta, calcular_retencion, validar_glosa
+from .services import anulable_hasta, calcular_retencion, plazo_anulacion_vencido, validar_glosa
 
 GLOSA_POR_DEFECTO = "Atención psicológica"
 CAMPOS_RECEPTOR = (
@@ -53,6 +52,7 @@ class CobroSerializer(serializers.ModelSerializer):
     glosa = serializers.CharField(max_length=200, required=False)
     paciente_nombre = serializers.SerializerMethodField()
     anulable_hasta = serializers.SerializerMethodField()
+    plazo_anulacion_vencido = serializers.SerializerMethodField()
     ultima_emision = serializers.SerializerMethodField()
 
     class Meta:
@@ -62,11 +62,11 @@ class CobroSerializer(serializers.ModelSerializer):
             "medio_pago", "estado_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulable_hasta",
-            "ultima_emision", "notas", "created_at", "updated_at",
+            "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "notas", "created_at", "updated_at",
         ]
         read_only_fields = [
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
-            "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at",
+            "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulacion_solicitada_at",
             "created_at", "updated_at",
         ]
 
@@ -75,6 +75,9 @@ class CobroSerializer(serializers.ModelSerializer):
 
     def get_anulable_hasta(self, obj):
         return anulable_hasta(obj.boleta_fecha_emision) if obj.boleta_fecha_emision else None
+
+    def get_plazo_anulacion_vencido(self, obj):
+        return plazo_anulacion_vencido(obj.boleta_fecha_emision) if obj.boleta_fecha_emision else None
 
     def get_ultima_emision(self, obj):
         # Recorre la lista ya precargada por la vista en vez de hacer una consulta por cobro.
@@ -184,11 +187,6 @@ class EmisionBHESerializer(serializers.ModelSerializer):
 
     def get_tiene_pdf(self, obj):
         return bool(obj.pdf)
-
-
-class AnularSIISerializer(serializers.Serializer):
-    causa = serializers.ChoiceField(choices=CausaAnulacion.choices)
-    confirmado = serializers.BooleanField(default=False)
 
 
 class DelegacionSolicitudSerializer(serializers.Serializer):

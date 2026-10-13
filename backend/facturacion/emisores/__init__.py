@@ -2,7 +2,6 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import (  # noqa: F401
-    CausaAnulacion,
     DatosBoleta,
     EmisorBHE,
     ErrorAntesDeEnviar,

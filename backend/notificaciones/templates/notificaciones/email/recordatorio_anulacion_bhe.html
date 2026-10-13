@@ -1,0 +1,19 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Recuerda anular la boleta N° {{ folio }}{% endblock %}
+{% block preheader %}Puedes anularla en el SII hasta el {{ anulable_hasta }}.{% endblock %}
+{% block eyebrow %}Boletas de honorarios{% endblock %}
+{% block heading %}Recuerda anular la boleta N° {{ folio }}{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ first_name }}, pediste anular la boleta N° <strong>{{ folio }}</strong> del {{ fecha_emision }}, pero todavía no la marcas como anulada en Psiconex. La anulación se hace en el portal del SII y puedes hacerla hasta el <strong>{{ anulable_hasta }}</strong>.</p>
+<p style="margin:0 0 10px;color:#334155;font-size:16px;line-height:1.7;">Para anularla:</p>
+<ol style="margin:0 0 18px;padding-left:22px;color:#334155;font-size:15px;line-height:1.7;">
+<li>Entra a <a href="{{ sii_url }}" style="color:#2563eb;">sii.cl</a> con tu RUT y tu clave tributaria.</li>
+<li>Ve a <strong>Boletas de honorarios electrónicas &gt; Emisor de boleta de honorarios &gt; Anulación y observación &gt; Anular boletas emitidas</strong>.</li>
+<li>Escribe el número de boleta <strong>{{ folio }}</strong> y elige la causa de la anulación.</li>
+<li>Vuelve a Psiconex y marca «Ya la anulé».</li>
+</ol>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Después del {{ anulable_hasta }} ya no se puede anular de esta forma: hace falta que quien recibió la boleta confirme la anulación, o presentar el formulario 2117 en el SII. Nunca te pediremos tu clave tributaria.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ ficha_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Ya la anulé</a></td></tr></table>
+{% endblock %}

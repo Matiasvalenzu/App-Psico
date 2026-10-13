@@ -23,7 +23,7 @@ class CobroAdmin(admin.ModelAdmin):
     list_display = ["id", "psicologo", "fecha_pago", "monto_bruto", "estado_pago", "estado_boleta"]
     list_filter = ["estado_pago", "estado_boleta", "bhe_modo"]
     raw_id_fields = ["psicologo", "paciente", "sesion"]
-    readonly_fields = CAMPOS_RECEPTOR
+    readonly_fields = [*CAMPOS_RECEPTOR, "anulacion_solicitada_at", "anulacion_solicitada_por"]
 
     def get_fields(self, request, obj=None):
         campos = super().get_fields(request, obj)

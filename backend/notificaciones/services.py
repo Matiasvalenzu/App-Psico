@@ -320,6 +320,32 @@ def enqueue_delegation_expiry_notice(delegacion, dias):
     return notification
 
 
+def enqueue_cancellation_reminder(cobro):
+    """Recuerda anular en el SII una boleta que el psicólogo pidió anular y no ha marcado.
+
+    La clave incluye el plazo: un solo recordatorio por boleta.
+    """
+    from cuentas.services import get_notification_email
+    from facturacion.services import anulable_hasta
+
+    user = cobro.psicologo
+    recipient = get_notification_email(user) or (user.email or "").strip().lower()
+    if not recipient:
+        return None
+    notification, created = NotificacionEmail.objects.get_or_create(
+        clave_deduplicacion=f"anulacion_bhe:{cobro.pk}:{anulable_hasta(cobro.boleta_fecha_emision).isoformat()}",
+        defaults={
+            "tipo": NotificacionEmail.Tipo.RECORDATORIO_ANULACION_BHE,
+            "destinatario": recipient,
+            "responder_a": settings.EMAIL_SUPPORT_ADDRESS,
+            "usuario": user,
+        },
+    )
+    if created:
+        _schedule(notification)
+    return notification
+
+
 def notification_content(notification):
     if notification.tipo == NotificacionEmail.Tipo.BIENVENIDA:
         user = notification.usuario
@@ -424,6 +450,38 @@ def notification_content(notification):
                 "rut_autorizar": settings.BHE_RUT_AUTORIZADO,
                 "sii_url": "https://www.sii.cl/servicios_online/",
                 "boletas_url": f"{base_url}/dashboard/configuracion/boletas",
+            },
+        }
+
+    if notification.tipo == NotificacionEmail.Tipo.RECORDATORIO_ANULACION_BHE:
+        from facturacion.models import Cobro
+        from facturacion.services import anulable_hasta, plazo_anulacion_vencido
+
+        _, cobro_id, plazo = notification.clave_deduplicacion.split(":")
+        cobro = Cobro.objects.filter(pk=cobro_id, psicologo=notification.usuario).first()
+        if (
+            not cobro
+            or cobro.estado_boleta != Cobro.EstadoBoleta.EMITIDA
+            or not cobro.anulacion_solicitada_at
+            or not cobro.boleta_fecha_emision
+            or anulable_hasta(cobro.boleta_fecha_emision).isoformat() != plazo
+            or plazo_anulacion_vencido(cobro.boleta_fecha_emision)
+        ):
+            return None  # Ya la marcó anulada, se reemitió o pasó el plazo: el recordatorio no aplica.
+        user = cobro.psicologo
+        base_url = settings.PUBLIC_APP_URL.rstrip("/")
+        # Sin el nombre del paciente: el folio y la fecha bastan para encontrarla en el SII.
+        ficha_url = f"{base_url}/dashboard/pacientes/{cobro.paciente_id}?tab=cobros" if cobro.paciente_id else f"{base_url}/dashboard"
+        return {
+            "subject": f"Recuerda anular la boleta N° {cobro.boleta_folio} en el SII",
+            "template": "recordatorio_anulacion_bhe",
+            "context": {
+                "first_name": user.first_name.strip() or user.get_full_name().strip() or user.username,
+                "folio": cobro.boleta_folio,
+                "fecha_emision": date_format(cobro.boleta_fecha_emision, "j \\d\\e F \\d\\e Y"),
+                "anulable_hasta": date_format(anulable_hasta(cobro.boleta_fecha_emision), "j \\d\\e F \\d\\e Y"),
+                "sii_url": "https://www.sii.cl/servicios_online/1040-1287.html",
+                "ficha_url": ficha_url,
             },
         }
 

@@ -16,6 +16,7 @@ class NotificacionEmail(models.Model):
         AVISO_PURGA_1D = "AVISO_PURGA_1D", "Aviso de eliminación (1 día)"
         RECORDATORIO_CITA = "RECORDATORIO_CITA", "Recordatorio de cita"
         DELEGACION_POR_VENCER = "DELEGACION_POR_VENCER", "Autorización SII por vencer"
+        RECORDATORIO_ANULACION_BHE = "RECORDATORIO_ANULACION_BHE", "Recordatorio de anular boleta"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"

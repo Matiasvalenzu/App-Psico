@@ -177,6 +177,7 @@ CELERY_TASK_ROUTES = {
     "notificaciones.tasks.enqueue_appointment_reminders_task": {"queue": "email"},
     # Corre aunque worker-bhe esté apagado (la ruta exacta gana a la de facturacion.tasks.*).
     "facturacion.tasks.revisar_vencimientos_bhe": {"queue": "email"},
+    "facturacion.tasks.recordar_anulaciones_bhe": {"queue": "email"},
     # Boletas en el SII: worker propio con concurrencia 1.
     "facturacion.tasks.*": {"queue": "bhe"},
 }
@@ -205,6 +206,10 @@ CELERY_BEAT_SCHEDULE = {
     "revisar-vencimientos-bhe": {
         "task": "facturacion.tasks.revisar_vencimientos_bhe",
         "schedule": crontab(hour=8, minute=15),
+    },
+    "recordar-anulaciones-bhe": {
+        "task": "facturacion.tasks.recordar_anulaciones_bhe",
+        "schedule": crontab(hour=8, minute=20),
     },
 }
 

@@ -26,3 +26,8 @@ def purgar_evidencias_bhe():
 @shared_task
 def revisar_vencimientos_bhe():
     bhe.revisar_vencimientos()
+
+
+@shared_task
+def recordar_anulaciones_bhe():
+    bhe.recordar_anulaciones()

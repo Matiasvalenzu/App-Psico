@@ -1,6 +1,9 @@
 import re
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from zoneinfo import ZoneInfo
+
+from django.utils import timezone
 
 from rest_framework import serializers
 
@@ -37,6 +40,18 @@ def anulable_hasta(fecha_emision):
     if fecha_emision.month == 12:
         return date(fecha_emision.year + 1, 1, 10)
     return date(fecha_emision.year, fecha_emision.month + 1, 10)
+
+
+# Los plazos del SII van en hora de Chile: el día 10 a las 23:00 todavía se anula, aunque en UTC ya sea el 11.
+HORA_CHILE = ZoneInfo("America/Santiago")
+
+
+def hoy_chile():
+    return timezone.localdate(timezone=HORA_CHILE)
+
+
+def plazo_anulacion_vencido(fecha_emision):
+    return hoy_chile() > anulable_hasta(fecha_emision)
 
 
 def validar_glosa(glosa):

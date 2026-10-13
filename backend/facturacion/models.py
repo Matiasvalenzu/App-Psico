@@ -79,8 +79,13 @@ class Cobro(models.Model):
     boleta_folio = models.CharField(max_length=30, blank=True, default="")
     boleta_fecha_emision = models.DateField(null=True, blank=True)
     boleta_anulada_at = models.DateTimeField(null=True, blank=True)
+    # El psicólogo anula a mano en el SII (la cuenta autorizada no puede): queda pedida hasta que marca «Ya la anulé».
+    anulacion_solicitada_at = models.DateTimeField(null=True, blank=True)
+    anulacion_solicitada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
     notas = models.TextField(blank=True, default="")
-    # Sube cuando una emisión automática falla y se vuelve a intentar.
+    # Sube cuando una emisión automática falla y se vuelve a intentar, o se reemite una anulada.
     version_emision = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -161,7 +166,7 @@ def _ruta_archivo_bhe(instance, filename):
 
 
 class EmisionBHE(models.Model):
-    """Un intento del robot de emitir o anular la boleta de un cobro.
+    """Un intento del robot de emitir la boleta de un cobro, o el registro de una anulación hecha a mano.
 
     Los datos del receptor van solo en `payload`, cifrado; no deben salir en logs ni en el admin.
     """
@@ -173,12 +178,15 @@ class EmisionBHE(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "En cola"
         EN_CURSO = "EN_CURSO", "En curso"
-        # En una anulación, EMITIDA significa que la anulación quedó hecha en el SII.
         EMITIDA = "EMITIDA", "Emitida"
+        # Anulación que el psicólogo hizo en el SII y marcó con «Ya la anulé». No se puede verificar.
+        REGISTRADA = "REGISTRADA", "Registrada por el psicólogo"
         # El robot cayó después de enviar: nunca se reintenta solo, se confirma en el SII.
         DESCONOCIDO = "DESCONOCIDO", "Por confirmar"
         FALLIDA = "FALLIDA", "Fallida"
         CANCELADA = "CANCELADA", "Cancelada"
+        # Emisión cuya boleta se anuló después: deja de contar como activa y el cobro puede reemitirse.
+        ANULADA = "ANULADA", "Emitida y anulada"
 
     ESTADOS_ACTIVOS = (Estado.PENDIENTE, Estado.EN_CURSO, Estado.EMITIDA, Estado.DESCONOCIDO)
 

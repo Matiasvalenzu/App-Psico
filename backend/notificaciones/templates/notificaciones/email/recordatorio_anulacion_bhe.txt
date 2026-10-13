@@ -1,0 +1,17 @@
+Hola {{ first_name }},
+
+Pediste anular la boleta N° {{ folio }} del {{ fecha_emision }}, pero todavía no la marcas como anulada en Psiconex. La anulación se hace en el portal del SII y puedes hacerla hasta el {{ anulable_hasta }}.
+
+Para anularla:
+1. Entra a {{ sii_url }} con tu RUT y tu clave tributaria.
+2. Ve a Boletas de honorarios electrónicas > Emisor de boleta de honorarios > Anulación y observación > Anular boletas emitidas.
+3. Escribe el número de boleta {{ folio }} y elige la causa de la anulación.
+4. Vuelve a Psiconex y marca «Ya la anulé»: {{ ficha_url }}
+
+Después del {{ anulable_hasta }} ya no se puede anular de esta forma: hace falta que quien recibió la boleta confirme la anulación, o presentar el formulario 2117 en el SII.
+
+Nunca te pediremos tu clave tributaria.
+
+Si necesitas ayuda, escribe a {{ support_email }}.
+
+Equipo Psiconex

@@ -14,7 +14,6 @@ from django.conf import settings
 
 from ..services import calcular_retencion
 from .base import (
-    CausaAnulacion,
     EmisorBHE,
     ErrorAntesDeEnviar,
     ErrorCredencial,
@@ -134,26 +133,6 @@ class FakeEmisor(EmisorBHE):
         if self.escenario in ("caida_despues", "caida_despues_demora"):
             raise ErrorDespuesDeEnviar("sin_respuesta", "Se perdió la conexión después de enviar.")
         return self._resultado(boleta, con_pdf=True)
-
-    def anular(self, rut_emisor, folio, causa):
-        if causa not in CausaAnulacion.values:
-            raise ErrorNegocio("causa_invalida", "Causa de anulación desconocida.")
-        self._fallar_antes()
-        if self.escenario == "caida_despues_sin_boleta":
-            raise ErrorDespuesDeEnviar("sin_respuesta", "Se perdió la conexión después de enviar.")
-        with self._registro() as registro:
-            boleta = next(
-                (b for b in registro["boletas"] if b["rut_emisor"] == _rut(rut_emisor) and b["folio"] == str(folio)),
-                None,
-            )
-            if boleta is None:
-                raise ErrorNegocio("folio_inexistente", "El SII no encontró la boleta.")
-            if boleta["anulada"]:
-                raise ErrorNegocio("ya_anulada", "La boleta ya estaba anulada.")
-            boleta["anulada"] = True
-            boleta["causa_anulacion"] = causa
-        if self.escenario in ("caida_despues", "caida_despues_demora"):
-            raise ErrorDespuesDeEnviar("sin_respuesta", "Se perdió la conexión después de enviar.")
 
     def buscar(self, rut_emisor, rut_receptor, fecha, monto_bruto):
         self._login()

@@ -8,7 +8,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings
 
 from .emisores import (
-    CausaAnulacion,
     DatosBoleta,
     ErrorAntesDeEnviar,
     ErrorDespuesDeEnviar,
@@ -113,17 +112,6 @@ class FakeEmisorTests(SimpleTestCase):
         FakeEmisor().emitir(datos())
         FakeEmisor().emitir(datos())
         self.assertEqual(len(self.buscar()), 2)
-
-    def test_anular_con_causa(self):
-        folio = FakeEmisor().emitir(datos()).folio
-        with self.assertRaises(ErrorNegocio):
-            FakeEmisor().anular(RUT_EMISOR, folio, "OTRA")
-        FakeEmisor().anular(RUT_EMISOR, folio, CausaAnulacion.ERROR_DIGITACION)
-        self.assertTrue(self.buscar()[0].anulada)
-        with self.assertRaises(ErrorNegocio):
-            FakeEmisor().anular(RUT_EMISOR, folio, CausaAnulacion.NO_PAGO)
-        with self.assertRaises(ErrorNegocio):
-            FakeEmisor().anular(RUT_EMISOR, "999", CausaAnulacion.NO_PAGO)
 
     def test_sin_delegacion(self):
         self.assertFalse(FakeEmisor("sin_delegacion").verificar_delegacion(RUT_EMISOR))
