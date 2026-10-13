@@ -149,7 +149,15 @@ export default function DashboardLayout({
           <DashboardInner>{children}</DashboardInner>
         </div>
         <TutorialModal />
-        <Toaster richColors closeButton position="top-right" className={inter.className} />
+        {/* Debajo del header (h-14 / md:h-16) para no tapar la etiqueta de la prueba. */}
+        <Toaster
+          richColors
+          closeButton
+          position="top-right"
+          offset={{ top: 76 }}
+          mobileOffset={{ top: 64 }}
+          className={inter.className}
+        />
       </AudioRecordingProvider>
     </TutorialProvider>
   );
