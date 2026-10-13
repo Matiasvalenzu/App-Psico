@@ -12,6 +12,7 @@ Los mensajes de log usan solo ids: nada del receptor.
 import json
 import logging
 import re
+import unicodedata
 from dataclasses import asdict
 from datetime import date, timedelta
 from io import BytesIO
@@ -378,9 +379,13 @@ def subir_pdf(emision, contenido):
         texto = " ".join(pagina.extract_text() or "" for pagina in PdfReader(BytesIO(contenido)).pages)
     except Exception:
         raise EmisionNoPermitida("pdf_invalido")
-    # El folio como lo imprime la boleta, no el «Res. Ex. N° 83» ni un «N°» del domicilio.
-    folios = re.findall(r"ELECTR[OÓ]NICA\s*N\s*[°º]?\s*(\d+)", texto, re.I)
-    if int(emision.folio) not in {int(folio) for folio in folios}:
+    # El PDF del SII trae «BOLETA DE HONORARIOS», «ELECTRONICA» y «N ° 77» en líneas aparte: sin tildes ni
+    # espacios (los saltos de línea se quedan para no pegar el folio con la línea siguiente).
+    texto = "".join(c for c in unicodedata.normalize("NFD", texto) if not unicodedata.combining(c))
+    texto = re.sub(r"[^\S\n]+", "", texto).upper()
+    # El «N° 83» de la «Res. Ex.» del pie no es el folio.
+    folios = [folio for res, folio in re.findall(r"(RES\.?EX\.?)?N\s*[°º]\s*(\d+)", texto) if not res]
+    if "BOLETADEHONORARIOS" not in texto or int(emision.folio) not in {int(folio) for folio in folios}:
         raise EmisionNoPermitida("pdf_otro_folio", f"Este PDF no parece ser la boleta N° {emision.folio}.")
     emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(contenido), save=False)
     emision.save(update_fields=["pdf"])

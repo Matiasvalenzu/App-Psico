@@ -23,9 +23,21 @@ from .test_bhe_api import emitir
 CLAVE = "Cl4ve-Secreta!"
 
 
+# Sintética, con el formato del PDF real del SII (folio en otra línea, «N °», sin tildes) y datos inventados.
+BOLETA_PDF = """BOLETA DE HONORARIOS
+ELECTRONICA
+N ° {folio}
+JUANA PEREZ SOTO
+RUT: 11.111.111-1
+Fecha: 13 de Octubre de 2026
+Total Honorarios: $: 1.000
+Res. Ex. N° 83 de 30/08/2004"""
+
+
 def pdf_con_texto(texto):
-    """Un PDF mínimo de una página con ese texto, para que pypdf lo lea como una boleta del SII."""
-    contenido = b"BT /F1 12 Tf 50 750 Td (" + texto.encode("cp1252") + b") Tj ET"
+    """Un PDF mínimo de una página con ese texto (una línea por renglón), para que pypdf lo lea como del SII."""
+    lineas = b" 0 -14 Td ".join(b"(" + linea.encode("cp1252") + b") Tj" for linea in texto.split("\n"))
+    contenido = b"BT /F1 12 Tf 50 750 Td " + lineas + b" ET"
     objetos = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -141,7 +153,12 @@ class ArchivosTests(EntornoBHE, TestCase):
 
     def test_psicologo_sube_el_pdf_que_bajo_de_su_sii(self):
         emision = self.sin_pdf()
-        contenido = pdf_con_texto(f"BOLETA DE HONORARIOS ELECTRONICA N° {emision.folio}")
+        # También si el texto sale con tilde o «N°» junto.
+        for texto in ("BOLETA DE HONORARIOS ELECTRÓNICA N° {folio}", "Boleta de Honorarios\nElectrónica Nº{folio}"):
+            self.assertEqual(self.subir(emision, pdf_con_texto(texto.format(folio=emision.folio))).status_code, 200)
+            emision.refresh_from_db()
+            emision.pdf.delete(save=True)
+        contenido = pdf_con_texto(BOLETA_PDF.format(folio=emision.folio))
         respuesta = self.subir(emision, contenido)
         self.assertEqual(respuesta.status_code, 200)
         self.assertTrue(respuesta.json()["ultima_emision"]["tiene_pdf"])
@@ -149,8 +166,10 @@ class ArchivosTests(EntornoBHE, TestCase):
 
     def test_pdf_de_otra_boleta(self):
         emision = self.sin_pdf()
-        # Otro folio, o el número solo en la resolución del pie: no es esta boleta.
-        for texto in (f"BOLETA DE HONORARIOS ELECTRONICA N° {int(emision.folio) + 1}", f"Res. Ex. N° {emision.folio}"):
+        # Otro folio, el número solo en la «Res. Ex.» del pie, o un documento que no es boleta de honorarios.
+        otro_folio = BOLETA_PDF.format(folio=int(emision.folio) + 1)
+        for texto in (otro_folio, otro_folio.replace("N° 83", f"N° {emision.folio}"),
+                      BOLETA_PDF.format(folio=emision.folio).replace("BOLETA DE HONORARIOS", "FACTURA")):
             respuesta = self.subir(emision, pdf_con_texto(texto))
             self.assertEqual(respuesta.status_code, 400)
             self.assertEqual(respuesta.json()["detail"], f"Este PDF no parece ser la boleta N° {emision.folio}.")
@@ -163,14 +182,14 @@ class ArchivosTests(EntornoBHE, TestCase):
             respuesta = self.subir(emision, contenido)
             self.assertEqual((respuesta.status_code, respuesta.json()["code"]), (400, "pdf_invalido"))
         with override_settings(DOCUMENT_UPLOAD_MAX_BYTES=10):
-            respuesta = self.subir(emision, pdf_con_texto(f"BOLETA DE HONORARIOS ELECTRONICA N° {emision.folio}"))
+            respuesta = self.subir(emision, pdf_con_texto(BOLETA_PDF.format(folio=emision.folio)))
         self.assertEqual((respuesta.status_code, respuesta.json()["code"]), (400, "pdf_invalido"))
         emision.refresh_from_db()
         self.assertFalse(emision.pdf)
 
     def test_no_reemplaza_el_pdf_ni_sube_sin_plus_o_ajeno(self):
         emision = self.emitida()  # ya trae el PDF que bajó el robot
-        contenido = pdf_con_texto(f"BOLETA DE HONORARIOS ELECTRONICA N° {emision.folio}")
+        contenido = pdf_con_texto(BOLETA_PDF.format(folio=emision.folio))
         respuesta = self.subir(emision, contenido)
         self.assertEqual((respuesta.status_code, respuesta.json()["code"]), (400, "estado_invalido"))
 
