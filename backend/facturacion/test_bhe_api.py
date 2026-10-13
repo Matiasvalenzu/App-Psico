@@ -192,10 +192,10 @@ class ApiBHETests(EntornoBHE, TestCase):
         self.assertEqual(self.cobro.emisiones.count(), 1)
 
     def test_emitir_bloqueado(self):
-        DelegacionSII.objects.filter(psicologo=self.user).update(piloto=False)
+        DelegacionSII.objects.filter(psicologo=self.user).update(verificada=False)
         respuesta = self.client.post(self.url("emitir-sii"), {"confirmado": True}, format="json")
         self.assertEqual(respuesta.status_code, 403)
-        self.assertEqual(respuesta.data["code"], "no_piloto")
+        self.assertEqual(respuesta.data["code"], "delegacion_inactiva")
 
     def test_emitir_cola_pausada(self):
         ConfiguracionBHE.objects.filter(pk=1).update(pausada=True)

@@ -65,7 +65,6 @@ RETENCION_POR_MODO = {
 MENSAJES = {
     "plan_required": "Las boletas de honorarios están disponibles en el Plan Plus.",
     "bhe_no_disponible": "La emisión automática de boletas todavía no está disponible.",
-    "no_piloto": "La emisión automática de boletas está en piloto y tu cuenta no participa.",
     "delegacion_inactiva": "Psiconex no tiene una autorización vigente para emitir tus boletas en el SII.",
     "bhe_pausada": "La emisión automática está pausada. Inténtalo más tarde o emite en el portal del SII.",
     "estado_invalido": "La boleta de este cobro no está en un estado que permita esta acción.",
@@ -85,7 +84,7 @@ MENSAJES = {
 }
 
 # Códigos que se responden con 403: el usuario no puede usar la emisión automática.
-CODIGOS_BLOQUEO = {"plan_required", "bhe_no_disponible", "no_piloto", "delegacion_inactiva", "bhe_pausada"}
+CODIGOS_BLOQUEO = {"plan_required", "bhe_no_disponible", "delegacion_inactiva", "bhe_pausada"}
 
 Estado = EmisionBHE.Estado
 Tipo = EmisionBHE.Tipo
@@ -175,8 +174,6 @@ def motivo_bloqueo(usuario):
     if not settings.BHE_AUTO_DISPONIBLE:
         return "bhe_no_disponible"
     delegacion = DelegacionSII.objects.filter(psicologo=usuario).first()
-    if not delegacion or not delegacion.piloto:
-        return "no_piloto"
     if not delegacion_vigente(delegacion):
         return "delegacion_inactiva"
     if ConfiguracionBHE.cola_pausada():

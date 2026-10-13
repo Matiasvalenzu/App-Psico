@@ -86,6 +86,14 @@ class MotivoBloqueoTests(EntornoBHE, TestCase):
     def test_habilitado(self):
         self.assertIsNone(bhe.motivo_bloqueo(self.user))
 
+    def test_abierto_a_toda_delegacion_verificada(self):
+        DelegacionSII.objects.update(piloto=False)
+        self.assertIsNone(bhe.motivo_bloqueo(self.user))
+        DelegacionSII.objects.update(verificada=False)
+        self.assertEqual(bhe.motivo_bloqueo(self.user), "delegacion_inactiva")
+        DelegacionSII.objects.all().delete()
+        self.assertEqual(bhe.motivo_bloqueo(self.user), "delegacion_inactiva")
+
     def test_codigos(self):
         with self.settings(BHE_AUTO_DISPONIBLE=False):
             self.assertEqual(bhe.motivo_bloqueo(self.user), "bhe_no_disponible")
@@ -93,8 +101,6 @@ class MotivoBloqueoTests(EntornoBHE, TestCase):
         self.assertEqual(bhe.motivo_bloqueo(self.user), "bhe_pausada")
         DelegacionSII.objects.update(estado=DelegacionSII.Estado.VENCIDA)
         self.assertEqual(bhe.motivo_bloqueo(self.user), "delegacion_inactiva")
-        DelegacionSII.objects.update(piloto=False)
-        self.assertEqual(bhe.motivo_bloqueo(self.user), "no_piloto")
         self.user.suscripcion.plan = "estandar"
         self.user.suscripcion.save()
         self.assertEqual(bhe.motivo_bloqueo(self.user), "plan_required")
@@ -160,11 +166,11 @@ class SolicitarEmisionTests(EntornoBHE, TestCase):
         self.assertEqual(len(self.encoladas), 1)
 
     def test_bloqueos(self):
-        DelegacionSII.objects.update(piloto=False)
+        DelegacionSII.objects.update(verificada=False)
         with self.assertRaises(bhe.EmisionNoPermitida) as ctx:
             bhe.solicitar_emision(self.cobro, self.user)
-        self.assertEqual(ctx.exception.codigo, "no_piloto")
-        DelegacionSII.objects.update(piloto=True)
+        self.assertEqual(ctx.exception.codigo, "delegacion_inactiva")
+        DelegacionSII.objects.update(verificada=True)
         emitido = crear_cobro(self.user, estado_boleta=Cobro.EstadoBoleta.EMITIDA, boleta_folio="7")
         with self.assertRaises(bhe.EmisionNoPermitida) as ctx:
             bhe.solicitar_emision(emitido, self.user)
