@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "motion/react"
-import { ArrowRight, PlayCircle, Sparkles } from "lucide-react"
+import { ArrowRight, PlayCircle, Receipt, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { HeroVideoPreview } from "@/components/sections/hero-video-preview"
 import { ROUTES } from "@/lib/config"
@@ -58,6 +58,24 @@ export function HeroSection() {
               Escucha al paciente,{" "}
               <span className="gradient-primary-text">no a tu cuaderno</span>
             </motion.h1>
+
+            <motion.div
+              initial={false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-5"
+            >
+              <Link
+                href="#boletas"
+                className="inline-flex items-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/10 sm:rounded-full"
+              >
+                <Receipt className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Y emite tu boleta de honorarios sin salir de Psiconex.{" "}
+                  <span className="font-semibold">Plan Plus.</span>
+                </span>
+              </Link>
+            </motion.div>
 
             <motion.p
               initial={false}

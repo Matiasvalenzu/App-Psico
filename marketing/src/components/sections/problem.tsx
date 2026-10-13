@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { Clock, FileText, Brain } from "lucide-react"
+import { Clock, FileText, Brain, Receipt } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 
 const PAINS = [
@@ -19,6 +19,11 @@ const PAINS = [
     icon: FileText,
     title: "Fichas incompletas, informes que cansan",
     body: "Meses después ya no recuerdas todo lo que se trabajó. Cuando llega el informe, reconstruyes de memoria lo que debía estar registrado.",
+  },
+  {
+    icon: Receipt,
+    title: "Emitir boletas y perseguir pagos a fin de mes",
+    body: "Horas de trámite que podrías dedicar a tus pacientes.",
   },
 ]
 
@@ -43,10 +48,10 @@ export function ProblemSection() {
               <span className="gradient-primary-text">te quita la clínica</span>
             </>
           }
-          description="Tres situaciones que se repiten en la consulta de muchos psicólogos."
+          description="Cuatro situaciones que se repiten en la consulta de muchos psicólogos."
         />
 
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
+        <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PAINS.map((pain, i) => {
             const Icon = pain.icon
             const num = String(i + 1).padStart(2, "0")

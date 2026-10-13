@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         <article className="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-24">
           <p className="text-sm font-medium text-primary">Información legal</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">Política de privacidad</h1>
-          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 11 de octubre de 2026</p>
+          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 13 de octubre de 2026</p>
 
           <div className="mt-12 space-y-10 text-base leading-7 text-muted-foreground">
             <section>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
                 Tratamos los datos necesarios para crear y administrar la cuenta, prestar las funciones contratadas y brindar soporte. Esto puede incluir datos de identificación y contacto del profesional, datos de agenda, fichas y notas clínicas, audios, transcripciones, documentos, resultados de evaluaciones y perfiles de voz que el usuario incorpore voluntariamente a la plataforma.
               </p>
               <p className="mt-3">
-                El audio de las sesiones se usa solo para generar la transcripción: se elimina en cuanto termina. Si el procesamiento falla, lo conservamos hasta 7 días para reintentarlo y luego se elimina. Para separar las voces, el audio se envía a Deepgram por una conexión cifrada. Cuando usas el chat, los informes o la observación de tests con IA, enviamos a DeepSeek el texto necesario con el nombre del paciente reemplazado y la ficha sin nombre.
+                El audio de las sesiones se usa solo para generar la transcripción: se elimina en cuanto termina. Si el procesamiento falla, lo conservamos hasta 7 días para reintentarlo y luego se elimina. Para separar las voces, el audio se envía a Deepgram por una conexión cifrada; Deepgram lo procesa en Estados Unidos. Cuando usas el chat, los informes o la observación de tests con IA, enviamos a DeepSeek el texto necesario con el nombre del paciente reemplazado y la ficha sin nombre.
               </p>
               <p className="mt-3">
                 El profesional es responsable de contar con la base legal y los consentimientos que correspondan antes de incorporar datos de pacientes o de terceros. Psiconex ofrece una plantilla de consentimiento informado editable que nombra a los proveedores que intervienen, y avisa cuando un paciente no tiene un consentimiento registrado.
@@ -110,12 +110,12 @@ export default function PrivacyPage() {
               <p className="mt-3">
                 Si la suscripción se cancela o vence, la cuenta queda en modo de solo lectura durante 30 días: puedes consultar y exportar tus datos, pero no agregar nuevos. Te avisamos por correo 7 días y 1 día antes del plazo. Al cumplirse, la cuenta y sus datos se eliminan de forma permanente, salvo que reactives la suscripción.
               </p>
-              {/* TODO(revisión legal/backups): mantener solo si el backup cifrado diario con rotación de 30 días está activo en el servidor y se borraron las copias antiguas. */}
+              {/* TODO(revisión legal/backups): volver a indicar "cifradas" y "máximo 30 días" cuando el backup diario con GPG (docker/scripts/backup.sh) tenga cron y clave activos en el servidor. */}
               <p className="mt-3">
-                Los datos eliminados pueden permanecer en copias de seguridad cifradas hasta que estas se eliminen, en un plazo máximo de 30 días naturales.
+                Los datos eliminados pueden permanecer en copias de seguridad hasta que estas se eliminen al rotar.
               </p>
               <p className="mt-3">
-                El registro de accesos a datos clínicos se conserva durante 12 meses.
+                El registro de accesos a datos clínicos se conserva durante 12 meses; una purga semanal elimina los registros más antiguos.
               </p>
             </section>
 
@@ -136,7 +136,7 @@ export default function PrivacyPage() {
                 Para saber si nuestra publicidad funciona, y solo si tú lo aceptas, usamos el Meta Pixel de Meta Platforms y la etiqueta de Google Ads (gtag.js) de Google en las páginas públicas de Psiconex (psiconex.cl) y en la pantalla de acceso y registro y de confirmación de suscripción de la aplicación (app.psiconex.cl). Un solo aviso cubre ambas herramientas. Si lo rechazas, o no eliges, no se cargan y no se envía nada a Meta ni a Google.
               </p>
               <p className="mt-3">
-                Qué medimos: la visita a esas páginas (Meta), el clic en los botones &ldquo;Probar gratis&rdquo;, el registro completado y la contratación de la suscripción (con el monto del plan, $4.990 CLP, y un identificador técnico de la suscripción). Meta y Google también reciben de forma estándar la dirección de la página, el navegador, la dirección IP y cookies propias de cada herramienta (en Meta, _fbp y _fbc; en Google Ads, cookies de medición de conversiones como _gcl_aw).
+                Qué medimos: la visita a esas páginas (Meta), el clic en los botones &ldquo;Probar gratis&rdquo;, el registro completado y la contratación de la suscripción (con el monto del plan, $4.990 CLP en el plan Estándar o $9.990 CLP en el Plan Plus, y un identificador técnico de la suscripción). Meta y Google también reciben de forma estándar la dirección de la página, el navegador, la dirección IP y cookies propias de cada herramienta (en Meta, _fbp y _fbc; en Google Ads, cookies de medición de conversiones como _gcl_aw).
               </p>
               <p className="mt-3">
                 Cómo configuramos Google Ads: usamos la etiqueta solo para medir conversiones de nuestros anuncios. Mientras no aceptes, el consentimiento para almacenamiento publicitario y datos de usuario permanece denegado; al aceptar concedemos solo esos dos permisos de medición, y no activamos la personalización de anuncios ni Google Analytics.
@@ -154,8 +154,29 @@ export default function PrivacyPage() {
               <ConsentPreferences />
             </section>
 
+            <section id="boletas">
+              <h2 className="text-xl font-semibold text-foreground">9. Boletas de honorarios (Plan Plus)</h2>
+              <p className="mt-3">
+                El Plan Plus ($9.990 CLP al mes) permite registrar los cobros de tus sesiones y emitir boletas de honorarios electrónicas. Si usas esta función, tratamos además estos datos:
+              </p>
+              <ul className="mt-3 list-disc space-y-2 pl-5">
+                <li>
+                  Del receptor de cada boleta, que puede ser el paciente o su tutor: nombre, RUT, dirección y comuna, y el correo si lo ingresas. Junto a cada cobro guardamos el monto, la fecha, el medio de pago, si está pagado y la retención calculada.
+                </li>
+                <li>
+                  Psiconex emite la boleta en el SII como usuario autorizado por ti: tú autorizas a Psiconex una vez desde tu propio SII y nosotros verificamos esa autorización antes de activar la emisión. Nunca pedimos ni guardamos tu clave del SII, y puedes revocar la autorización desde tu SII cuando quieras. Al emitir, enviamos al SII los datos del receptor y el monto de la boleta. Cada boleta la confirmas tú.
+                </li>
+                <li>
+                  Guardamos el folio, el estado y el PDF de cada boleta en un almacenamiento privado, para que puedas descargarlos desde la plataforma.
+                </li>
+              </ul>
+              <p className="mt-3">
+                Las boletas se anulan en el SII; luego lo marcas en Psiconex para dejar registro.
+              </p>
+            </section>
+
             <section>
-              <h2 className="text-xl font-semibold text-foreground">9. Cambios a esta política</h2>
+              <h2 className="text-xl font-semibold text-foreground">10. Cambios a esta política</h2>
               <p className="mt-3">
                 Podemos actualizar esta política cuando cambien el servicio, las integraciones o las obligaciones aplicables. Publicaremos la fecha de actualización en esta página.
               </p>

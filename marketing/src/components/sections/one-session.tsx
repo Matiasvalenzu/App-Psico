@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { Caveat } from "next/font/google"
 import Image from "next/image"
-import { AudioLines, FileText, Mic, RotateCcw, TrendingUp } from "lucide-react"
+import { AudioLines, FileText, Mic, Receipt, RotateCcw, TrendingUp } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { cn } from "@/lib/utils"
 import styles from "./one-session.module.css"
@@ -38,6 +38,11 @@ const RESULTADOS = [
     icon: FileText,
     title: "Informe para revisar y firmar",
     body: "Descárgalo en PDF o Word y edítalo antes de firmarlo.",
+  },
+  {
+    icon: Receipt,
+    title: "Boleta emitida · Folio guardado",
+    body: "Plan Plus. Registras el cobro y confirmas la boleta con un clic.",
   },
 ]
 

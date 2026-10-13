@@ -31,7 +31,7 @@ export default function TermsPage() {
         <article className="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-24">
           <p className="text-sm font-medium text-primary">Información legal</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">Términos del servicio</h1>
-          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 14 de agosto de 2026</p>
+          <p className="mt-5 text-sm text-muted-foreground">Última actualización: 13 de octubre de 2026</p>
 
           <div className="mt-12 space-y-10 text-base leading-7 text-muted-foreground">
             <section>
@@ -45,7 +45,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-xl font-semibold text-foreground">2. Servicio</h2>
               <p className="mt-3">
-                Psiconex ofrece herramientas digitales de apoyo para profesionales de la salud mental, incluyendo gestión de agenda, registro de sesiones, transcripción, búsqueda y generación de borradores de informes. La plataforma apoya el trabajo profesional, pero no reemplaza el juicio clínico, la evaluación profesional ni la relación terapéutica.
+                Psiconex ofrece herramientas digitales de apoyo para profesionales de la salud mental, incluyendo gestión de agenda, registro de sesiones, transcripción, búsqueda y generación de borradores de informes. En el Plan Plus incluye además el registro de cobros y la emisión de boletas de honorarios electrónicas en el SII. La plataforma apoya el trabajo profesional, pero no reemplaza el juicio clínico, la evaluación profesional ni la relación terapéutica.
               </p>
             </section>
 
@@ -67,28 +67,51 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-foreground">5. Uso aceptable</h2>
+              <h2 className="text-xl font-semibold text-foreground">5. Planes y cobro</h2>
+              <p className="mt-3">
+                Psiconex ofrece el plan Estándar, a $4.990 CLP al mes, y el Plan Plus, a $9.990 CLP al mes. Los pagos de la suscripción se procesan con Mercado Pago.
+              </p>
+              <p className="mt-3">
+                Si pasas al Plan Plus durante la prueba gratuita, el cobro de Plus parte de inmediato y se pierden los días de prueba que te quedaban.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-semibold text-foreground">6. Boletas de honorarios (Plan Plus)</h2>
+              <p className="mt-3">
+                Para emitir boletas de honorarios, el usuario autoriza a Psiconex desde su propio SII y Psiconex emite cada boleta como usuario autorizado. Psiconex nunca pide ni guarda la clave del SII del usuario. Cada boleta corresponde a un cobro y el usuario la confirma antes de emitirla.
+              </p>
+              <p className="mt-3">
+                El usuario es responsable de la veracidad de los datos del receptor y del monto de cada boleta, y de otorgar y mantener vigente la autorización a Psiconex en el SII.
+              </p>
+              <p className="mt-3">
+                Las boletas se anulan en el SII. Después, el usuario marca la anulación en Psiconex para dejar registro.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-semibold text-foreground">7. Uso aceptable</h2>
               <p className="mt-3">
                 No está permitido usar la plataforma para actividades ilícitas, vulnerar derechos de terceros, eludir controles de seguridad, compartir credenciales, introducir software malicioso ni utilizar el servicio de una forma que afecte su disponibilidad o integridad.
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-foreground">6. Disponibilidad y modificaciones</h2>
+              <h2 className="text-xl font-semibold text-foreground">8. Disponibilidad y modificaciones</h2>
               <p className="mt-3">
                 Podemos actualizar, mantener, modificar o suspender funciones de la plataforma para mejorar el servicio, resolver incidencias o cumplir obligaciones aplicables. Procuraremos comunicar cambios relevantes cuando corresponda.
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-foreground">7. Propiedad intelectual</h2>
+              <h2 className="text-xl font-semibold text-foreground">9. Propiedad intelectual</h2>
               <p className="mt-3">
                 Psiconex, su software, marca, diseño y contenidos son propiedad de sus respectivos titulares. El usuario conserva los derechos sobre los datos y contenidos que incorpora a la plataforma, otorgando solo las autorizaciones necesarias para prestar el servicio.
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-foreground">8. Contacto, vigencia y ley aplicable</h2>
+              <h2 className="text-xl font-semibold text-foreground">10. Contacto, vigencia y ley aplicable</h2>
               <p className="mt-3">
                 Para consultas sobre estos términos, contáctanos en{" "}
                 <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com">matias@datnexia.com</a>. Estos términos se rigen por las leyes de la República de Chile, sin perjuicio de los derechos irrenunciables que correspondan a los usuarios.

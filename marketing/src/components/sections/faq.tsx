@@ -35,6 +35,14 @@ const FAQS = [
     a: "Tus datos son tuyos. Desde la sección Privacidad de la app descargas cuando quieras un ZIP con fichas, consentimientos, sesiones, transcripciones, tests, informes y agenda, en JSON y PDF. Si cancelas, tu cuenta queda 30 días en solo lectura para que exportes lo que necesites; te avisamos por correo 7 días y 1 día antes, y luego eliminamos tus datos. También puedes eliminar tu cuenta de inmediato desde la app.",
   },
   {
+    q: "¿Necesito entregar mi clave del SII?",
+    a: "No. Autorizas a Psiconex una vez desde tu propio SII y puedes revocar ese permiso cuando quieras. Psiconex nunca pide ni guarda tu clave.",
+  },
+  {
+    q: "¿Puedo anular una boleta?",
+    a: "Sí, desde tu SII. En la app tienes una guía paso a paso.",
+  },
+  {
     q: "¿Reemplaza al psicólogo?",
     a: "No. Psiconex es un asistente administrativo y de análisis. El juicio clínico, la relación terapéutica y las decisiones de tratamiento son tuyas, siempre.",
   },

@@ -10,7 +10,7 @@ const PROVIDERS = [
     name: "Deepgram",
     receives: "El audio de las sesiones grabadas o subidas desde el navegador, por HTTPS.",
     purpose: "Separar las voces (quién habla). Solo usamos los turnos de habla.",
-    when: "Automáticamente, al procesar cada sesión de audio. Le indicamos que no use el audio para mejorar sus modelos.",
+    when: "Automáticamente, al procesar cada sesión de audio. Procesa el audio en Estados Unidos. Le indicamos que no lo use para mejorar sus modelos.",
   },
   {
     name: "DeepSeek",
@@ -31,10 +31,16 @@ const PROVIDERS = [
     when: "Al suscribirte. Psiconex no almacena los datos de tu tarjeta.",
   },
   {
+    name: "SII",
+    receives: "Nombre, RUT y dirección del receptor de la boleta (paciente o tutor) y el monto.",
+    purpose: "Emitir tus boletas de honorarios. Psiconex actúa como usuario autorizado por ti; nunca pide ni guarda tu clave del SII.",
+    when: "Solo en el Plan Plus, cuando confirmas cada boleta.",
+  },
+  {
     name: "Brevo",
-    receives: "Nombre y correo del destinatario, y el contenido del aviso (por ejemplo la fecha y hora de una cita).",
+    receives: "Nombre y correo del destinatario, y el contenido del aviso (por ejemplo la fecha y hora de una cita, el nombre de un test enviado o el mensaje que tú escribas).",
     purpose: "Enviar correos: recordatorios de citas, consentimientos, tests y avisos de tu cuenta.",
-    when: "Al enviar cada correo. Sin datos clínicos.",
+    when: "Al enviar cada correo. No incluye fichas, notas, diagnósticos ni transcripciones.",
   },
 ]
 

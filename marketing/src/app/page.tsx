@@ -6,6 +6,7 @@ import { OneSessionSection } from "@/components/sections/one-session"
 import { ProblemSection } from "@/components/sections/problem"
 import { FeaturesBentoSection } from "@/components/sections/features-bento"
 import { HowItWorksSection } from "@/components/sections/how-it-works"
+import { BoletasSection } from "@/components/sections/boletas"
 import { VoiceBiometricsSection } from "@/components/sections/voice-biometrics"
 import { SecuritySection } from "@/components/sections/security"
 import { TeamSection } from "@/components/sections/team"
@@ -23,6 +24,7 @@ export default function Home() {
         <ProblemSection />
         <FeaturesBentoSection />
         <HowItWorksSection />
+        <BoletasSection />
         <VoiceBiometricsSection />
         <SecuritySection />
         <TeamSection />

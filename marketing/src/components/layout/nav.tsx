@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 const NAV_LINKS = [
   { href: "/#producto", label: "Producto" },
   { href: "/#como-funciona", label: "Cómo funciona" },
+  { href: "/#boletas", label: "Boletas" },
   { href: "/#seguridad", label: "Seguridad" },
   { href: "/#equipo", label: "Equipo" },
   { href: "/#precios", label: "Precios" },
@@ -44,13 +45,13 @@ export function Nav() {
 
         <nav
           aria-label="Navegación principal"
-          className="hidden items-center gap-8 md:flex"
+          className="hidden items-center gap-3.5 lg:flex xl:gap-8"
         >
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
             </Link>
@@ -66,7 +67,7 @@ export function Nav() {
           </Button>
           <button
             type="button"
-            className="md:hidden sm:ml-1 inline-flex items-center justify-center rounded-md p-1.5 sm:p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="lg:hidden sm:ml-1 inline-flex items-center justify-center rounded-md p-1.5 sm:p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
@@ -78,7 +79,7 @@ export function Nav() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute left-0 top-[64px] w-full border-b border-border/60 bg-background/95 px-6 py-6 shadow-xl backdrop-blur-xl animate-in slide-in-from-top-2">
+        <div className="lg:hidden absolute left-0 top-[64px] w-full border-b border-border/60 bg-background/95 px-6 py-6 shadow-xl backdrop-blur-xl animate-in slide-in-from-top-2">
           <nav className="flex flex-col gap-5">
             {NAV_LINKS.map((link) => (
               <Link

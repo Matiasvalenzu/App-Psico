@@ -10,6 +10,9 @@ import {
   Calendar,
   Video,
   ShieldCheck,
+  Receipt,
+  CircleCheck,
+  Percent,
 } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { cn } from "@/lib/utils"
@@ -70,6 +73,14 @@ const FEATURES: Feature[] = [
     title: "Cifrado y control de tus datos",
     body: "La información viaja cifrada mediante HTTPS y los datos clínicos sensibles se guardan cifrados. Exportas o eliminas tu cuenta cuando quieras.",
   },
+  {
+    icon: Receipt,
+    title: "Cobros y boletas",
+    body: "Emite tu boleta, revisa qué sesiones están pagadas y conoce tu retención, todo junto a tus fichas.",
+    className: "md:col-span-3",
+    visual: <BoletasVisual />,
+    badge: "Plus",
+  },
 ]
 
 function WaveformVisual() {
@@ -124,6 +135,43 @@ function WaveformVisual() {
         <span>00:00</span>
         <span>50:00</span>
       </div>
+    </div>
+  )
+}
+
+const BOLETAS_ITEMS = [
+  { icon: Receipt, title: "Boleta emitida", detail: "Folio y PDF guardados" },
+  { icon: CircleCheck, title: "Sesión pagada", detail: "Y tus pagos pendientes" },
+  { icon: Percent, title: "Retención", detail: "Calculada por ti" },
+]
+
+function BoletasVisual() {
+  return (
+    <div className="relative mt-6 flex h-32 items-center overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background/80 to-background p-4">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,hsl(var(--primary)/0.12),transparent_70%)]"
+      />
+      <ul className="relative grid w-full grid-cols-3 gap-2 sm:gap-4">
+        {BOLETAS_ITEMS.map((item, i) => (
+          <motion.li
+            key={item.title}
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.5, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center gap-1.5 rounded-lg border border-primary/15 bg-background/80 px-2 py-3 text-center sm:flex-row sm:gap-3 sm:px-4 sm:text-left"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <item.icon className="h-4 w-4 text-primary" aria-hidden />
+            </span>
+            <span>
+              <span className="block text-[11px] font-semibold text-foreground sm:text-sm">{item.title}</span>
+              <span className="hidden text-xs text-muted-foreground sm:block">{item.detail}</span>
+            </span>
+          </motion.li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -187,7 +235,7 @@ export function FeaturesBentoSection() {
               <span className="gradient-primary-text">en un solo lugar</span>
             </>
           }
-          description="Ocho herramientas pensadas para psicólogos, no para informáticos. Diseñadas con clínicos chilenos en ejercicio."
+          description="Nueve herramientas pensadas para psicólogos, no para informáticos. Diseñadas con clínicos chilenos en ejercicio."
         />
 
         <div className="mt-16 grid auto-rows-fr gap-5 md:grid-cols-3">
