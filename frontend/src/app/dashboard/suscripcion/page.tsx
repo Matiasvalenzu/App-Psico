@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getCurrentUser, apiFetch } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
+import { FUNCIONES_ESTANDAR, FUNCIONES_PLUS_ADMINISTRACION, NOTA_PLUS, TITULO_PLUS } from "@/lib/planes";
 import {
   CreditCard,
   CheckCircle2,
@@ -12,21 +13,38 @@ import {
   Calendar,
   Sparkles,
   RefreshCw,
-  XCircle,
+  Stethoscope,
+  Receipt,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CardCheckoutModal from "@/components/suscripcion/CardCheckoutModal";
+
+const pesos = (monto: number) => `$${monto.toLocaleString("es-CL")}`;
+
+function ListaFunciones({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-2 text-sm text-muted-foreground">
+      {items.map((item) => (
+        <li key={item} className="flex items-start gap-2">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function SuscripcionPage() {
   const [user, setUser] = useState<any>(null);
   const [subData, setSubData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [planModal, setPlanModal] = useState("estandar");
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [planElegido, setPlanElegido] = useState("estandar");
   const [confirmCambio, setConfirmCambio] = useState(false);
   const [cambiando, setCambiando] = useState(false);
 
@@ -39,9 +57,7 @@ export default function SuscripcionPage() {
       setUser(userData);
 
       if (subRes.ok) {
-        const subJson = await subRes.json();
-        setSubData(subJson);
-        setPlanElegido(subJson.plan || "estandar");
+        setSubData(await subRes.json());
       }
     } catch (err) {
       console.error("Error al cargar datos de suscripción:", err);
@@ -93,6 +109,11 @@ export default function SuscripcionPage() {
     }
   };
 
+  const abrirModal = (plan: string) => {
+    setPlanModal(plan);
+    setModalOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
@@ -108,17 +129,16 @@ export default function SuscripcionPage() {
   const isActive = estado === "activa";
   const isCancelled = estado === "cancelada";
 
-  // Plan Plus: se elige solo al contratar y mientras PLAN_PLUS_DISPONIBLE esté activo.
   const plusDisponible = Boolean(subData?.plan_plus_disponible);
+  const plusUrl: string = subData?.plus_url || "";
   const planes: Record<string, { nombre: string; monto: number }> =
     subData?.planes || { estandar: { nombre: "Plan Estándar", monto: 4990 } };
-  const nombreCorto = (nombre: string) => nombre.replace(" - Psiconex", "");
-  const planMostrado = isActive ? subData?.plan || "estandar" : plusDisponible ? planElegido : "estandar";
-  const infoPlan = planes[planMostrado] || planes.estandar;
-  const nombrePlan = nombreCorto(infoPlan.nombre);
-  const precioPlan = `$${infoPlan.monto.toLocaleString("es-CL")}`;
-  const planDestino = planMostrado === "plus" ? "estandar" : "plus";
-  const infoDestino = planes[planDestino];
+  const planActual: string = subData?.plan || "estandar";
+  const montoEstandar = planes.estandar?.monto ?? 4990;
+  const montoPlus = planes.plus?.monto ?? 9990;
+  // Quien ya paga con tarjeta cambia el monto del mismo cobro; el enlace crearía una segunda suscripción.
+  const puedeCambiarPlan = isActive && Boolean(subData?.mp_preapproval_id);
+  const planDestino = planActual === "plus" ? "estandar" : "plus";
 
   const diasRestantes =
     subData?.dias_restantes_prueba ?? user?.dias_restantes_prueba ?? 0;
@@ -128,8 +148,86 @@ export default function SuscripcionPage() {
   const formattedFinPrueba = finPrueba ? formatDateCL(finPrueba) : null;
   const formattedProximoCobro = proximoCobro ? formatDateCL(proximoCobro) : null;
 
+  const confirmacionCambio = (
+    <div className="rounded-xl border border-border/70 bg-muted/40 p-3 space-y-2 text-left animate-in fade-in">
+      <p className="text-xs text-foreground font-medium">
+        Desde la próxima renovación pagarás {pesos(planDestino === "plus" ? montoPlus : montoEstandar)} CLP/mes.
+        {planDestino === "estandar" && " Tus cobros y boletas quedarán solo de lectura."}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={() => handleCambiarPlan(planDestino)} disabled={cambiando} className="text-xs h-8">
+          {cambiando ? "Cambiando..." : "Confirmar"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setConfirmCambio(false)} disabled={cambiando} className="text-xs h-8">
+          Volver
+        </Button>
+      </div>
+    </div>
+  );
+
+  const accionEstandar = () => {
+    if (isActive && planActual === "estandar") {
+      return <Button variant="outline" disabled className="w-full">Tu plan actual</Button>;
+    }
+    if (isActive) {
+      if (!puedeCambiarPlan) return null;
+      return confirmCambio && planDestino === "estandar" ? confirmacionCambio : (
+        <Button variant="outline" onClick={() => setConfirmCambio(true)} className="w-full">
+          Volver al Estándar ({pesos(montoEstandar)}/mes)
+        </Button>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        <Button variant="outline" onClick={() => abrirModal("estandar")} className="w-full">
+          <CreditCard className="mr-2 h-4 w-4" />
+          {isTrial ? "Activar Estándar" : "Suscribirme al Estándar"}
+        </Button>
+        <p className="text-[11px] text-center text-muted-foreground leading-tight">
+          {isTrial ? "Registras tu tarjeta sin cobro hoy: el primer cobro es al terminar la prueba." : "El acceso se reactiva al confirmarse el pago."}
+        </p>
+      </div>
+    );
+  };
+
+  const accionPlus = () => {
+    if (isActive && planActual === "plus") {
+      return <Button disabled className="w-full">Tu plan actual</Button>;
+    }
+    if (isActive) {
+      if (!puedeCambiarPlan) return null;
+      return confirmCambio && planDestino === "plus" ? confirmacionCambio : (
+        <Button onClick={() => setConfirmCambio(true)} className="w-full font-semibold shadow-lg shadow-primary/20">
+          Cambiar a Plus ({pesos(montoPlus)}/mes)
+        </Button>
+      );
+    }
+    if (!plusUrl) {
+      return (
+        <Button onClick={() => abrirModal("plus")} className="w-full font-semibold shadow-lg shadow-primary/20">
+          <CreditCard className="mr-2 h-4 w-4" />
+          Suscribirme a Plus
+        </Button>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        <Button asChild className="w-full font-semibold shadow-lg shadow-primary/20">
+          <a href={plusUrl} data-plan="plus">
+            Suscribirme a Plus
+            <ExternalLink className="ml-2 h-4 w-4" />
+          </a>
+        </Button>
+        <p className="text-[11px] text-center text-muted-foreground leading-tight">
+          Pagas en Mercado Pago y, al volver, Plus queda activo en esta cuenta.
+          {isTrial && " El primer cobro es al suscribirte."}
+        </p>
+      </div>
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
       {/* Encabezado */}
       <div className="mb-8">
         <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary mb-3">
@@ -171,16 +269,8 @@ export default function SuscripcionPage() {
                 Tu período de prueba ha finalizado
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Tus pacientes, sesiones e informes clínicos siguen guardados y puedes consultarlos o exportarlos. Para continuar utilizando la asistencia de IA y desbloquear el acceso, activa tu suscripción al {nombrePlan}.
+                Tus pacientes, sesiones e informes clínicos siguen guardados y puedes consultarlos o exportarlos. Para continuar utilizando la asistencia de IA y desbloquear el acceso, elige un plan más abajo.
               </p>
-              <div className="pt-2">
-                <Button
-                  onClick={() => setModalOpen(true)}
-                  className="shadow-md shadow-destructive/20"
-                >
-                  Reactivar mi cuenta ({precioPlan} CLP/mes)
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -189,224 +279,137 @@ export default function SuscripcionPage() {
       {/* Alerta de Trial Activo */}
       {isTrial && !isActive && (
         <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-foreground sm:p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="rounded-xl bg-amber-500/20 p-2 text-amber-600 dark:text-amber-400 shrink-0">
-                <Clock className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-amber-900 dark:text-amber-200">
-                  Período de prueba gratuito activo: {diasRestantes} {diasRestantes === 1 ? "día restante" : "días restantes"}
-                </h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-                  Disfrutas de todas las funcionalidades sin restricciones. Tu prueba finaliza el{" "}
-                  <strong>{formattedFinPrueba || "próximamente"}</strong>. Puedes registrar tu tarjeta hoy para evitar interrupciones:{" "}
-                  <span className="font-semibold text-foreground">no se cobrará nada hasta el fin de la prueba</span>.
-                </p>
-              </div>
+          <div className="flex items-start gap-3.5">
+            <div className="rounded-xl bg-amber-500/20 p-2 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock className="h-5 w-5" />
             </div>
-            <Button
-              variant="outline"
-              onClick={() => setModalOpen(true)}
-              className="border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/15 shrink-0"
-            >
-              Asegurar continuidad
-            </Button>
+            <div>
+              <h3 className="text-base font-semibold text-amber-900 dark:text-amber-200">
+                Período de prueba gratuito activo: {diasRestantes} {diasRestantes === 1 ? "día restante" : "días restantes"}
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
+                Disfrutas de todas las funcionalidades clínicas sin restricciones. Tu prueba finaliza el{" "}
+                <strong>{formattedFinPrueba || "próximamente"}</strong>. Elige tu plan para seguir sin interrupciones.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Tarjeta de Resumen del Plan */}
-      <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-8">
-          <div className="space-y-5 flex-1">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                Plan Actual
-              </span>
-              {isActive && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Activo
-                </span>
-              )}
-              {isTrial && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                  Prueba 14 días
-                </span>
-              )}
-              {isCancelled && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">
-                  Cancelado
-                </span>
-              )}
+      {/* Suscripción vigente */}
+      {isActive && (
+        <div className="mb-8 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+              Suscripción vigente · {planActual === "plus" ? "Plus" : "Estándar"}
             </div>
-
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                {nombrePlan}
-              </h2>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-4xl font-extrabold text-foreground">{precioPlan}</span>
-                <span className="text-sm text-muted-foreground">CLP / mes</span>
-              </div>
-              {plusDisponible && !isActive && (
-                <div role="radiogroup" aria-label="Elegir plan" className="mt-4 inline-flex rounded-xl border border-border/80 p-1">
-                  {Object.entries(planes).map(([clave, info]) => (
-                    <button
-                      key={clave}
-                      type="button"
-                      role="radio"
-                      aria-checked={planElegido === clave}
-                      onClick={() => setPlanElegido(clave)}
-                      className={cn(
-                        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                        planElegido === clave ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {nombreCorto(info.nombre)} · ${info.monto.toLocaleString("es-CL")}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
-              Herramienta integral de IA para psicólogos: sesiones clínicas, transcripción, diarización de hablantes y sincronización de agenda.
-            </p>
-
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground pt-2">
-              {[
-                "Sesiones ilimitadas",
-                "Transcripción + diarización",
-                "1 perfil de voz",
-                "Informes y resúmenes IA",
-                "Chat IA independiente por paciente",
-                "Agenda con Google Calendar",
-                "Test de Creencias Ellis y Rueda de la Vida",
-                "Sesiones por Meet/Zoom",
-                "Enlace privado para reserva de horas",
-                ...(planMostrado === "plus" ? ["Cobros y borrador de boletas de honorarios"] : []),
-              ].map((feature) => (
-                <li key={feature} className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> {feature}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Panel Lateral de Acciones & Tarjeta */}
-          <div className="flex flex-col items-stretch lg:items-end justify-between gap-6 border-t lg:border-t-0 lg:border-l border-border/60 pt-6 lg:pt-0 lg:pl-8 min-w-[280px]">
-            {isActive ? (
-              <div className="w-full space-y-4">
-                <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2 text-left">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Suscripción Vigente
-                  </div>
-                  {subData?.card_last_four && (
-                    <div className="flex items-center gap-2 text-sm text-foreground">
-                      <CreditCard className="h-4 w-4 text-muted-foreground" />
-                      <span className="capitalize">{subData.card_brand || "Tarjeta"}</span>
-                      <span>•••• {subData.card_last_four}</span>
-                    </div>
-                  )}
-                  {formattedProximoCobro && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>Próxima renovación: <strong>{formattedProximoCobro}</strong></span>
-                    </div>
-                  )}
-                </div>
-
-                {plusDisponible && infoDestino && subData?.mp_preapproval_id && (
-                  !confirmCambio ? (
-                    <Button variant="outline" size="sm" onClick={() => setConfirmCambio(true)} className="w-full text-xs">
-                      {planDestino === "plus" ? "Cambiar a" : "Volver al"} {nombreCorto(infoDestino.nombre)} ({`$${infoDestino.monto.toLocaleString("es-CL")}`}/mes)
-                    </Button>
-                  ) : (
-                    <div className="rounded-xl border border-border/70 bg-muted/40 p-3 space-y-2 text-left animate-in fade-in">
-                      <p className="text-xs text-foreground font-medium">
-                        Desde la próxima renovación pagarás ${infoDestino.monto.toLocaleString("es-CL")} CLP/mes.
-                        {planDestino === "estandar" && " Tus cobros y boletas quedarán solo de lectura."}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => handleCambiarPlan(planDestino)} disabled={cambiando} className="text-xs h-8">
-                          {cambiando ? "Cambiando..." : "Confirmar"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setConfirmCambio(false)} disabled={cambiando} className="text-xs h-8">
-                          Volver
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                )}
-
-                {!confirmCancel ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setConfirmCancel(true)}
-                    className="w-full text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40"
-                  >
-                    Cancelar suscripción
-                  </Button>
-                ) : (
-                  <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 space-y-2 text-left animate-in fade-in">
-                    <p className="text-xs text-foreground font-medium">
-                      ¿Seguro que deseas cancelar la renovación automática?
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={handleCancelSubscription}
-                        disabled={cancelling}
-                        className="text-xs h-8"
-                      >
-                        {cancelling ? "Cancelando..." : "Sí, cancelar"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConfirmCancel(false)}
-                        disabled={cancelling}
-                        className="text-xs h-8"
-                      >
-                        Volver
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="w-full space-y-3">
-                <Button
-                  size="lg"
-                  onClick={() => setModalOpen(true)}
-                  className="w-full font-semibold shadow-lg shadow-primary/20 h-12 text-base"
-                >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  {isTrial ? "Activar suscripción" : "Reactivar plan"}
-                </Button>
-
-                <p className="text-[11px] text-center text-muted-foreground leading-tight">
-                  {isTrial
-                    ? "Registra tu tarjeta sin cobro hoy. Cancela cuando quieras."
-                    : "El acceso se reactiva al confirmarse el pago."}
-                </p>
+            {subData?.card_last_four && (
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <span className="capitalize">{subData.card_brand || "Tarjeta"}</span>
+                <span>•••• {subData.card_last_four}</span>
               </div>
             )}
-
-            <div className="w-full pt-4 border-t border-border/50 text-left lg:text-right space-y-1 text-xs text-muted-foreground">
-              <div className="flex items-center lg:justify-end gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Cobro seguro vía Mercado Pago</span>
+            {formattedProximoCobro && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>Próxima renovación: <strong>{formattedProximoCobro}</strong></span>
               </div>
-              <div>Sin contratos ni cláusulas de permanencia.</div>
-            </div>
+            )}
+          </div>
+          <div className="sm:w-56">
+            {!confirmCancel ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmCancel(true)}
+                className="w-full text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40"
+              >
+                Cancelar suscripción
+              </Button>
+            ) : (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 space-y-2 text-left animate-in fade-in">
+                <p className="text-xs text-foreground font-medium">
+                  ¿Seguro que deseas cancelar la renovación automática?
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="destructive" onClick={handleCancelSubscription} disabled={cancelling} className="text-xs h-8">
+                    {cancelling ? "Cancelando..." : "Sí, cancelar"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmCancel(false)} disabled={cancelling} className="text-xs h-8">
+                    Volver
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Planes */}
+      <div className={cn("grid gap-6 items-stretch", plusDisponible && "md:grid-cols-2")}>
+        <div className="flex flex-col rounded-3xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">Estándar</h2>
+            {isCancelled && planActual === "estandar" && (
+              <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">Cancelado</span>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">Todo lo clínico de tu consulta.</p>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-4xl font-extrabold text-foreground">{pesos(montoEstandar)}</span>
+            <span className="text-sm text-muted-foreground">CLP / mes</span>
+          </div>
+          <div className="mt-6 flex-1">
+            <ListaFunciones items={FUNCIONES_ESTANDAR} />
+          </div>
+          <div className="mt-8">{accionEstandar()}</div>
+        </div>
+
+        {plusDisponible && (
+          <div className="relative flex flex-col rounded-3xl border-2 border-primary bg-card p-6 sm:p-8 shadow-xl shadow-primary/10">
+            <span className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">
+              <Sparkles className="h-3.5 w-3.5" />
+              Recomendado
+            </span>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">Plus</h2>
+              {isCancelled && planActual === "plus" && (
+                <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">Cancelado</span>
+              )}
+            </div>
+            <p className="mt-1 text-sm font-medium text-foreground">{TITULO_PLUS}</p>
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-4xl font-extrabold text-foreground">{pesos(montoPlus)}</span>
+              <span className="text-sm text-muted-foreground">CLP / mes</span>
+            </div>
+            <div className="mt-6 flex-1 space-y-5">
+              <div>
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Stethoscope className="h-4 w-4 text-primary" /> Clínico
+                </h3>
+                <p className="text-sm text-muted-foreground">Todo lo del plan Estándar.</p>
+              </div>
+              <div>
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Receipt className="h-4 w-4 text-primary" /> Administración y cobros
+                </h3>
+                <ListaFunciones items={FUNCIONES_PLUS_ADMINISTRACION} />
+                <p className="mt-3 text-xs text-muted-foreground">{NOTA_PLUS}</p>
+              </div>
+            </div>
+            <div className="mt-8">{accionPlus()}</div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          Cobro seguro vía Mercado Pago
+        </span>
+        <span>Sin contratos ni cláusulas de permanencia.</span>
       </div>
 
       {/* Modal de checkout con tarjeta */}
@@ -422,9 +425,9 @@ export default function SuscripcionPage() {
         finPrueba={finPrueba}
         diasRestantes={diasRestantes}
         publicKey={subData?.public_key}
-        plan={planMostrado}
-        monto={infoPlan.monto}
-        nombre={nombrePlan}
+        plan={planModal}
+        monto={planes[planModal]?.monto ?? montoEstandar}
+        nombre={planModal === "plus" ? "Plan Plus" : "Plan Estándar"}
       />
     </div>
   );
