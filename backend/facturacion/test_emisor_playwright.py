@@ -1,11 +1,12 @@
 import re
 from datetime import date
 from unittest import mock, skipUnless
+from urllib.parse import parse_qs, urlsplit
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .emisores import (
-    DatosBoleta, ErrorCredencial, ErrorDespuesDeEnviar, ErrorNegocio, LineaBoleta, Receptor, Retencion,
+    DatosBoleta, ErrorAntesDeEnviar, ErrorCredencial, ErrorDespuesDeEnviar, ErrorNegocio, LineaBoleta, Receptor, Retencion,
 )  # fmt: skip
 from .emisores import playwright as robot
 
@@ -125,6 +126,11 @@ PAGINAS = {
         <input type="submit" value="Emitir Boleta de Honorarios Electrónica"></form>""",
     "TMBEUS_BoletaHonorariosElectronica.cgi": """<p>Paso 4 de 4</p><p>BOLETA DE HONORARIOS ELECTRONICA</p>
         <iframe name="prueba" src="/IMT/pdf/bhe_12345678-81.html"></iframe><button>Ver Boleta</button>""",
+    # El día con cero adelante y el mes en número, para que el robot use los valores del formulario.
+    "TMBCOT_MenuConsultasTerceros.cgi": """<form method="post" action="TMBCOT_ConsultaBoletaPdf.cgi">
+<select name="cbo_dia_boleta"><option value="">Día</option><option value="09">9</option><option value="13">13</option></select>
+<select name="cbo_mes_boleta"><option value="">Mes</option><option value="10">Octubre</option></select>
+<select name="cbo_anio_boleta"><option value="2026">2026</option></select></form>""",
 }
 CODIGO = "12345678000008112AB3"
 # Como la del 13-10 (§K): folio en el recuadro, código bajo el código de barras, otros «N°» y números largos.
@@ -144,7 +150,7 @@ class PortalSimulado(robot.PlaywrightEmisor):
             "tras_login": PASO_1 + "&ok=1" if clave_ok else LOGIN, "rut_autorizador": rut_autorizador,
         }  # fmt: skip
         self.con_sesion = False
-        self.pedidas, self.envios = [], []
+        self.pedidas, self.envios, self.urls = [], [], []
 
     def _nueva_pagina(self, navegador):
         contexto = navegador.new_context()
@@ -154,6 +160,7 @@ class PortalSimulado(robot.PlaywrightEmisor):
     def _responder(self, route):
         pagina = route.request.url.split("?")[0].rsplit("/", 1)[-1]
         self.pedidas.append(pagina)
+        self.urls.append(route.request.url)
         if route.request.post_data:
             self.envios.append(route.request.post_data)
         cookie = {}
@@ -275,6 +282,50 @@ class PortalSimuladoTests(SimpleTestCase):
             emisor.emitir(datos())
         self.assertFalse(emisor.enviado)
         self.assertNotIn("TMBEUS_BoletaHonorariosElectronica.cgi", emisor.pedidas)
+
+    def consulta(self, emisor):
+        return parse_qs(urlsplit([url for url in emisor.urls if "TMBCOT_ConsultaBoletaPdf" in url][-1]).query)
+
+    def test_recupera_el_pdf_con_el_codigo_y_un_solo_login(self):
+        emisor = PortalSimulado()
+        self.assertEqual(emisor.recuperar_pdf(RUT_EMISOR, "81", "11.111.111-1", date(2026, 10, 9), CODIGO), PDF)
+        self.assertEqual(self.consulta(emisor), {"origen": ["TERCEROS"], "txt_codigobarras": [CODIGO]})
+        self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
+        self.assertEqual(emisor.pedidas.count("TMBCOT_ConsultaBoletaPdf.cgi"), 1)
+        self.assertNotIn("TMBEUS_PresentaDatosBoleta.cgi", emisor.pedidas)
+
+    def test_sin_codigo_usa_la_comprobacion_con_los_valores_del_formulario(self):
+        emisor = PortalSimulado()
+        self.assertEqual(emisor.recuperar_pdf(RUT_EMISOR, "81", "11.111.111-1", date(2026, 10, 9)), PDF)
+        self.assertEqual(self.consulta(emisor), {
+            "origen": ["TERCEROS"], "txt_nroboleta_comprobacion": ["81"],
+            "txt_rutctr_comprobacion": ["12345678"], "txt_dvctr_comprobacion": ["5"],
+            "txt_rutreceptor_comprobacion": ["11111111"], "txt_dvreceptor_comprobacion": ["1"],
+            "cbo_dia_boleta": ["09"], "cbo_mes_boleta": ["10"], "cbo_anio_boleta": ["2026"],
+        })  # fmt: skip
+        self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
+
+    def test_fecha_que_no_ofrece_el_formulario_no_consulta(self):
+        emisor = PortalSimulado()
+        with self.assertRaises(ErrorAntesDeEnviar) as ctx:
+            emisor.recuperar_pdf(RUT_EMISOR, "81", "11.111.111-1", date(2026, 10, 20))
+        self.assertEqual(ctx.exception.codigo, "pantalla_desconocida")
+        self.assertNotIn("TMBCOT_ConsultaBoletaPdf.cgi", emisor.pedidas)
+
+    def test_recuperacion_fallida_no_reintenta(self):
+        for pdf, error in ((None, ErrorAntesDeEnviar), (b"<html>No ha sido posible</html>", ErrorNegocio)):
+            emisor = PortalSimulado(pdf=pdf)
+            with self.subTest(error.__name__), self.assertRaises(error):
+                emisor.recuperar_pdf(RUT_EMISOR, "81", "11.111.111-1", date(2026, 10, 9), CODIGO)
+            self.assertEqual(emisor.pedidas.count("TMBCOT_ConsultaBoletaPdf.cgi"), 1)
+            self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
+
+    def test_recuperacion_con_clave_rechazada_no_consulta(self):
+        emisor = PortalSimulado(clave_ok=False)
+        with self.assertRaises(ErrorCredencial):
+            emisor.recuperar_pdf(RUT_EMISOR, "81", "11.111.111-1", date(2026, 10, 9), CODIGO)
+        self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
+        self.assertNotIn("TMBCOT_ConsultaBoletaPdf.cgi", emisor.pedidas)
 
     def test_paso_4_que_no_llega_queda_despues_de_enviar(self):
         emisor = PortalSimulado(paso_4="abortar")

@@ -14,6 +14,11 @@ def conciliar_emision_bhe(emision_id, busqueda):
 
 
 @shared_task
+def recuperar_pdf_bhe(emision_id):
+    bhe.recuperar_pdf(emision_id)
+
+
+@shared_task
 def rescatar_emisiones_bhe():
     bhe.rescatar_colgadas()
 

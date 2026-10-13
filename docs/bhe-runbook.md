@@ -101,11 +101,13 @@ Un `DESCONOCIDO` significa: el formulario pudo quedar enviado y **no sabemos si 
    - **«No, no está en el SII»** → la emisión queda `FALLIDA` y el cobro vuelve a «Por emitir». El psicólogo puede emitir de nuevo.
 5. Si no puedes confirmar ninguna de las dos cosas, **no resuelvas**. Déjala en `DESCONOCIDO` hasta tener la respuesta del psicólogo. Un «No» equivocado abre la puerta a una segunda boleta.
 
+Tras un «Sí» con folio, el worker intenta **una vez** bajar el PDF por la consulta de terceros (ver §6): con el código si lo anotaste, si no con RUT del emisor, folio, RUT del receptor y fecha. Por eso la fecha debe ser la que imprime la boleta.
+
 Si «Resolver» responde «Ese folio ya está registrado en otro cobro.», ese folio ya corresponde a otra boleta: revisa con el psicólogo que te haya dado el folio correcto.
 
 ### Decisión tras la T7c
 
-No hay consulta que la cuenta autorizada pueda usar para **encontrar** una boleta sin conocer su folio. La «Consulta de boletas por terceros» (`TMBCOT_MenuConsultasTerceros.cgi`) exige sesión y pide RUT del emisor, **folio**, RUT del receptor y fecha, o el código de barras: sirve para comprobar una boleta conocida, no para buscarla. Por eso un `DESCONOCIDO` va **siempre** directo a revisión manual, **nunca** a una búsqueda o reintento automático.
+No hay consulta que la cuenta autorizada pueda usar para **encontrar** una boleta sin conocer su folio. La «Consulta de boletas por terceros» (`TMBCOT_MenuConsultasTerceros.cgi`) exige sesión y pide RUT del emisor, **folio**, RUT del receptor y fecha, o el código de barras: sirve para comprobar una boleta conocida (y bajar su PDF, §6), no para buscarla. Por eso un `DESCONOCIDO` va **siempre** directo a revisión manual, **nunca** a una búsqueda o reintento automático.
 
 ---
 
@@ -149,6 +151,7 @@ El robot depende de las pantallas del portal. Si el SII las cambia, el robot dej
 ## 6. Datos guardados
 
 - **PDF de cada boleta:** en el volumen `bhe_data` (`/data/bhe`), fuera de la carpeta de medios. **No se borra** cuando el psicólogo elimina su cuenta: se conserva el plazo que defina el contador (pendiente legal). Ese volumen debe estar en el respaldo.
+- **PDF que no llegó al emitir:** el robot lo baja tras el paso 4 en la misma sesión (con un reintento). Si no llega, o si la boleta se resolvió a mano con su folio (§3), el worker hace **un solo intento** más con la consulta de terceros: un login aparte, sin reintentos (`pdf_recuperacion_at` en la emisión marca que ya se intentó). No corre con la cola pausada o el flag apagado. Un rechazo de la clave pausa la cola como siempre (§1). Si falla, el log dice «no se recuperó el PDF (código)» y el psicólogo lo sube desde la ficha (se exige que sea la boleta con ese folio).
 - **Capturas del portal:** se borran solas a los **90 días** (tarea diaria a las 4:40). Solo los superusuarios las ven, desde Archivos.
 - El admin nunca muestra el RUT completo del psicólogo ni el payload con los datos del receptor.
 
@@ -194,4 +197,4 @@ Requisitos: A desplegado y estable, el checklist legal del plan (§9) firmado, y
 6. Si algo falla: **pausar** la cola (§2) y apagar el worker (`dc stop worker-bhe`). Para volver a A: `BHE_AUTO_DISPONIBLE=False` y `BHE_BACKEND` vacío.
 7. Piloto: durante la primera semana Matías revisa cada boleta en su SII. Agregar otros psicólogos como piloto requiere un OK nuevo.
 
-> Pendiente aparte (aprobado por Troy el 2026-10-13, aún no implementado): recuperar el PDF con la consulta de terceros, con un solo login y solo cuando falla la descarga del paso 4 o cuando se resuelve una boleta a mano con su folio.
+> La recuperación del PDF por la consulta de terceros (§6) va incluida en este despliegue; con el flag apagado no corre.

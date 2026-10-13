@@ -39,15 +39,16 @@ def _rut(valor):
 
 
 def _pdf_simulado(folio):
-    texto = f"BOLETA SIMULADA - folio {folio} - sin validez tributaria"
-    contenido = f"BT /F1 14 Tf 40 760 Td ({texto}) Tj ET".encode()
+    # Con «BOLETA DE HONORARIOS» y «N° folio» pasa la misma revisión que el PDF del SII.
+    texto = f"BOLETA DE HONORARIOS SIMULADA - N° {folio} - sin validez tributaria"
+    contenido = f"BT /F1 14 Tf 40 760 Td ({texto}) Tj ET".encode("cp1252")
     objetos = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
         b"/Resources << /Font << /F1 5 0 R >> >> >>",
         b"<< /Length %d >>\nstream\n%s\nendstream" % (len(contenido), contenido),
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
     ]
     salida = bytearray(b"%PDF-1.4\n")
     offsets = []
@@ -153,6 +154,10 @@ class FakeEmisor(EmisorBHE):
                     continue
                 encontradas.append(self._resultado(boleta))
         return encontradas
+
+    def recuperar_pdf(self, rut_emisor, folio, rut_receptor, fecha, codigo=""):
+        self._login()
+        return _pdf_simulado(folio)
 
     def verificar_delegacion(self, rut_emisor):
         self._login()

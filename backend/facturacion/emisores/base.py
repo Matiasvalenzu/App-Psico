@@ -115,3 +115,7 @@ class EmisorBHE(ABC):
     @abstractmethod
     def verificar_delegacion(self, rut_emisor: str) -> bool:
         ...
+
+    def recuperar_pdf(self, rut_emisor: str, folio: str, rut_receptor: str, fecha: date, codigo: str = "") -> bytes:
+        """El PDF de una boleta ya emitida, con el código o con emisor + folio + receptor + fecha."""
+        raise NotImplementedError

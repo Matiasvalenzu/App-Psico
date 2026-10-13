@@ -332,7 +332,7 @@ def cancelar_emision(cobro):
 def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None, codigo=""):
     """El operador revisó en el portal del SII una emisión por confirmar.
 
-    `hecha` dice si la boleta aparece en el SII; si aparece, se necesita el folio. Con el código se baja el PDF.
+    `hecha` dice si la boleta aparece en el SII; si aparece, se necesita el folio y después se intenta bajar el PDF.
     """
     with transaction.atomic():
         emision = _bloquear(emision_id, Estado.DESCONOCIDO)
@@ -365,14 +365,24 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None, codigo="")
         emision.finished_at = ahora
         emision.save()
         cobro.save()
+        if hecha and emision.tipo == Tipo.EMISION and not emision.pdf:
+            transaction.on_commit(lambda: _programar_recuperacion_pdf(emision_id))
     logger.info("Emisión BHE %s resuelta a mano por el usuario %s: %s.", emision_id, usuario.pk, emision.estado)
     return emision
 
 
 def subir_pdf(emision, contenido):
-    """El PDF que el psicólogo bajó de su SII, si la emisión quedó sin él (la empresa solo lo baja al emitir)."""
+    """El PDF que el psicólogo bajó de su SII, si la emisión quedó sin él."""
     if emision.tipo != Tipo.EMISION or emision.estado != Estado.EMITIDA or emision.pdf:
         raise EmisionNoPermitida("estado_invalido")
+    revisar_pdf(emision, contenido)
+    emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(contenido), save=False)
+    emision.save(update_fields=["pdf"])
+    logger.info("Emisión BHE %s: PDF subido por el psicólogo.", emision.pk)
+
+
+def revisar_pdf(emision, contenido):
+    """Que sea un PDF de boleta de honorarios con el folio de la emisión."""
     if not contenido.startswith(b"%PDF"):
         raise EmisionNoPermitida("pdf_invalido")
     try:
@@ -387,9 +397,58 @@ def subir_pdf(emision, contenido):
     folios = [folio for res, folio in re.findall(r"(RES\.?EX\.?)?N\s*[°º]\s*(\d+)", texto) if not res]
     if "BOLETADEHONORARIOS" not in texto or int(emision.folio) not in {int(folio) for folio in folios}:
         raise EmisionNoPermitida("pdf_otro_folio", f"Este PDF no parece ser la boleta N° {emision.folio}.")
-    emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(contenido), save=False)
-    emision.save(update_fields=["pdf"])
-    logger.info("Emisión BHE %s: PDF subido por el psicólogo.", emision.pk)
+
+
+def _programar_recuperacion_pdf(emision_id):
+    from .tasks import recuperar_pdf_bhe
+
+    recuperar_pdf_bhe.delay(emision_id)
+
+
+def recuperar_pdf(emision_id):
+    """Baja el PDF por la consulta de terceros del SII cuando la emisión quedó EMITIDA sin él.
+
+    Se programa solo si falló la descarga tras el paso 4 o al resolver a mano con folio. Es un login
+    aparte: un solo intento por emisión, marcado antes de tocar el SII. Si falla, el psicólogo lo sube.
+    """
+    with transaction.atomic():
+        emision = _bloquear(emision_id, Estado.EMITIDA)
+        if emision is None or emision.tipo != Tipo.EMISION or emision.pdf or not emision.folio:
+            return
+        if emision.pdf_recuperacion_at:
+            return
+        if _cola_detenida():
+            logger.info("Emisión BHE %s: la cola está pausada, no se recupera el PDF.", emision.pk)
+            return
+        emision.pdf_recuperacion_at = timezone.now()
+        emision.save(update_fields=["pdf_recuperacion_at"])
+
+    payload = json.loads(emision.payload)
+    cobro = emision.cobro
+    try:
+        contenido = get_emisor().recuperar_pdf(
+            payload["rut_emisor"],
+            emision.folio,
+            payload["receptor"]["rut"],
+            cobro.boleta_fecha_emision or date.fromisoformat(payload["fecha"]),
+            emision.codigo_sii,
+        )
+        revisar_pdf(emision, contenido)
+    except ErrorCredencial as exc:
+        pausar_por_credencial(exc)
+        return
+    except Exception as exc:
+        # Solo el código: el detalle de Playwright puede traer la URL con RUT y código.
+        logger.warning("Emisión BHE %s: no se recuperó el PDF (%s).", emision.pk, getattr(exc, "codigo", type(exc).__name__))
+        return
+
+    with transaction.atomic():
+        emision = _bloquear(emision_id, Estado.EMITIDA)
+        if emision is None or emision.pdf:
+            return
+        emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(contenido), save=False)
+        emision.save(update_fields=["pdf"])
+    logger.info("Emisión BHE %s: PDF recuperado por la consulta de terceros.", emision.pk)
 
 
 def _bloquear(emision_id, *estados):
@@ -574,6 +633,8 @@ def _completar(emision_id, resultado, estado_esperado):
         cobro.boleta_fecha_emision = resultado.fecha
         emision.save()
         cobro.save()
+        if emision.tipo == Tipo.EMISION and not emision.pdf:
+            transaction.on_commit(lambda: _programar_recuperacion_pdf(emision_id))
     logger.info("Emisión BHE %s completada.", emision_id)
 
 

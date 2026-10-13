@@ -11,7 +11,7 @@ import base64
 import re
 import unicodedata
 from contextlib import contextmanager
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 
@@ -28,6 +28,8 @@ from .base import (
 
 PORTAL = "https://www.sii.cl/servicios_online/1040-1287.html"
 ESPERA_MS = 30_000
+# Consultas de terceros: con la sesión de la empresa entregan el PDF de una boleta emitida (T7c).
+CONSULTAS = "https://loa.sii.cl/cgi_IMT/"
 MESES = (
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -144,7 +146,7 @@ class PlaywrightEmisor(EmisorBHE):
         with self._navegador() as page:
             self._llegar_a_vista_previa(page, datos)
             folio, codigo = self._paso_4(page)
-            # Solo esta sesión puede bajar el PDF (con un login nuevo el SII lo rechaza): un reintento aquí mismo.
+            # En esta sesión con un reintento; si falla, bhe.recuperar_pdf prueba una vez la consulta de terceros.
             pdf = self._descargar_pdf(page, codigo) or self._descargar_pdf(page, codigo)
         return ResultadoEmision(
             folio=folio,
@@ -164,6 +166,23 @@ class PlaywrightEmisor(EmisorBHE):
 
     def verificar_delegacion(self, rut_emisor):
         raise NotImplementedError
+
+    def recuperar_pdf(self, rut_emisor, folio, rut_receptor, fecha, codigo=""):
+        """El PDF por la consulta de terceros, con un login aparte y un solo intento.
+
+        Con el código basta; sin él va la comprobación (emisor, folio, receptor y fecha).
+        """
+        _credenciales()
+        with self._navegador() as page:
+            self._abrir_paso_1(page)  # el único login
+            if codigo:
+                datos = {"origen": "TERCEROS", "txt_codigobarras": codigo}
+            else:
+                datos = self._comprobacion(page, rut_emisor, folio, rut_receptor, fecha)
+            pdf = self._bajar(page, urljoin(CONSULTAS, "TMBCOT_ConsultaBoletaPdf.cgi?" + urlencode(datos)))
+        if not pdf.startswith(b"%PDF"):
+            raise ErrorNegocio("pdf_no_disponible", "La consulta de terceros del SII no entregó el PDF.")
+        return pdf
 
     @contextmanager
     def _navegador(self):
@@ -329,6 +348,34 @@ class PlaywrightEmisor(EmisorBHE):
         boleta = page.frame(name="prueba")
         self.evidencias.append((f"{len(self.evidencias) // 2:02d}-paso-4-boleta.html", boleta.content().encode()))
         return leer_paso_4(boleta.locator("body").inner_text(), page.locator(MARCO_BOLETA).get_attribute("src"))
+
+    def _comprobacion(self, page, rut_emisor, folio, rut_receptor, fecha):
+        page.goto(urljoin(CONSULTAS, "TMBCOT_MenuConsultasTerceros.cgi"))
+        datos = {"origen": "TERCEROS", "txt_nroboleta_comprobacion": folio}
+        for sufijo, rut in (("ctr", rut_emisor), ("receptor", rut_receptor)):
+            limpio = _rut_limpio(rut)
+            datos[f"txt_rut{sufijo}_comprobacion"], datos[f"txt_dv{sufijo}_comprobacion"] = limpio[:-1], limpio[-1:]
+        # Día, mes y año tal como los ofrece el formulario (no se sabe si el día lleva cero adelante).
+        for campo, numero in (("cbo_dia_boleta", fecha.day), ("cbo_mes_boleta", fecha.month), ("cbo_anio_boleta", fecha.year)):
+            valores = page.locator(f"select[name={campo}] option").evaluate_all("os => os.map(o => o.value)")
+            elegidos = [valor for valor in valores if valor.strip().isdigit() and int(valor) == numero]
+            if len(elegidos) != 1:
+                raise ErrorAntesDeEnviar("pantalla_desconocida", f"La consulta de terceros no ofrece {campo}={numero}.")
+            datos[campo] = elegidos[0]
+        return datos
+
+    def _bajar(self, page, url):
+        """El SII responde la consulta de terceros con una descarga, no con una página."""
+        from playwright.sync_api import Error as ErrorPlaywright
+
+        with page.expect_download() as descarga:
+            try:
+                page.goto(url)
+            except ErrorPlaywright as exc:
+                if "Download is starting" not in str(exc):
+                    raise
+        with open(descarga.value.path(), "rb") as archivo:
+            return archivo.read()
 
     def _descargar_pdf(self, page, codigo):
         """El PDF con la misma sesión. Si falla la boleta igual quedó emitida: el psicólogo lo sube desde la ficha."""

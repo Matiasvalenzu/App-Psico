@@ -63,7 +63,13 @@ class EntornoBHE:
         ConfiguracionBHE.objects.update_or_create(pk=1, defaults={"pausada": False})
         self.encoladas = []
         self.busquedas = []
-        for nombre, destino in (("_encolar", self.encoladas), ("_programar_busqueda", self.busquedas)):
+        self.recuperaciones = []
+        parches = (
+            ("_encolar", self.encoladas),
+            ("_programar_busqueda", self.busquedas),
+            ("_programar_recuperacion_pdf", self.recuperaciones),
+        )
+        for nombre, destino in parches:
             parche = mock.patch.object(bhe, nombre, side_effect=lambda *a, d=destino, **k: d.append((a, k)))
             parche.start()
             self.addCleanup(parche.stop)

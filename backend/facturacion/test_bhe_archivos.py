@@ -1,7 +1,10 @@
 import io
+import json
 import logging
 import os
 import time
+from dataclasses import replace
+from datetime import date
 from pathlib import Path
 from unittest import mock
 
@@ -15,10 +18,11 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from . import bhe
+from .emisores import ErrorAntesDeEnviar
 from .emisores.fake import FakeEmisor
-from .models import EmisionBHE
+from .models import ConfiguracionBHE, EmisionBHE
 from .test_bhe import RUT_EMISOR, EntornoBHE, User, crear_cobro, preparar_psicologo
-from .test_bhe_api import emitir
+from .test_bhe_api import emision_por_confirmar, emitir
 
 CLAVE = "Cl4ve-Secreta!"
 
@@ -295,3 +299,97 @@ class ArchivosTests(EntornoBHE, TestCase):
         self.assertTrue(storage.exists(nueva))
         self.assertTrue(storage.exists(emision.pdf.name))
         self.assertEqual(emision.evidencias, [nueva])
+
+
+class RecuperarPdfTests(EntornoBHE, TestCase):
+    """Si el PDF no llegó al emitir, se pide una sola vez a la consulta de terceros del SII."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = preparar_psicologo()
+        self.cobro = crear_cobro(self.user)
+
+    def emitida(self, con_pdf=True):
+        original = FakeEmisor.emitir
+        with self.captureOnCommitCallbacks(execute=True):
+            emision = bhe.solicitar_emision(self.cobro, self.user)
+        sin_pdf = lambda emisor, datos: replace(original(emisor, datos), pdf=b"")  # noqa: E731
+        with mock.patch.object(FakeEmisor, "emitir", original if con_pdf else sin_pdf):
+            with self.captureOnCommitCallbacks(execute=True):
+                bhe.procesar(emision.pk)
+        emision.refresh_from_db()
+        self.cobro.refresh_from_db()
+        return emision
+
+    def test_se_programa_solo_si_falta_el_pdf(self):
+        emision = self.emitida()
+        self.assertTrue(emision.pdf)
+        self.assertEqual(self.recuperaciones, [])
+        self.cobro = crear_cobro(self.user)
+        emision = self.emitida(con_pdf=False)
+        self.assertEqual((emision.estado, bool(emision.pdf)), (EmisionBHE.Estado.EMITIDA, False))
+        self.assertEqual(self.recuperaciones, [((emision.pk,), {})])
+
+    def test_recupera_el_pdf_una_sola_vez(self):
+        emision = self.emitida(con_pdf=False)
+        with mock.patch.object(FakeEmisor, "recuperar_pdf", autospec=True, side_effect=FakeEmisor.recuperar_pdf) as consulta:
+            bhe.recuperar_pdf(emision.pk)
+            bhe.recuperar_pdf(emision.pk)
+        payload = json.loads(emision.payload)
+        consulta.assert_called_once_with(
+            mock.ANY, RUT_EMISOR, emision.folio, payload["receptor"]["rut"], self.cobro.boleta_fecha_emision, emision.codigo_sii
+        )
+        emision.refresh_from_db()
+        self.assertTrue(emision.pdf.name.endswith(f"boleta-{emision.folio}.pdf"))
+        self.assertIsNotNone(emision.pdf_recuperacion_at)
+
+    def test_si_falla_no_se_reintenta_y_el_psicologo_lo_sube(self):
+        emision = self.emitida(con_pdf=False)
+        for respuesta in (b"<html>No ha sido posible completar su solicitud</html>", pdf_con_texto("FACTURA N° 1")):
+            EmisionBHE.objects.filter(pk=emision.pk).update(pdf_recuperacion_at=None)
+            with mock.patch.object(FakeEmisor, "recuperar_pdf", return_value=respuesta):
+                bhe.recuperar_pdf(emision.pk)
+            emision.refresh_from_db()
+            self.assertFalse(emision.pdf)
+        with mock.patch.object(FakeEmisor, "recuperar_pdf") as consulta:
+            bhe.recuperar_pdf(emision.pk)
+        consulta.assert_not_called()
+        bhe.subir_pdf(emision, pdf_con_texto(BOLETA_PDF.format(folio=emision.folio)))
+        self.assertTrue(emision.pdf)
+
+    def test_error_del_robot_se_loguea_sin_la_url(self):
+        emision = self.emitida(con_pdf=False)
+        error = ErrorAntesDeEnviar("portal_sin_respuesta", "page.goto: net::ERR_FAILED at https://loa.sii.cl/?txt_rutctr=12345678")
+        with mock.patch.object(FakeEmisor, "recuperar_pdf", side_effect=error), self.assertLogs("facturacion", "WARNING") as logs:
+            bhe.recuperar_pdf(emision.pk)
+        self.assertIn("portal_sin_respuesta", logs.output[0])
+        self.assertNotIn("12345678", "".join(logs.output))
+
+    def test_con_la_cola_pausada_no_va_al_sii(self):
+        emision = self.emitida(con_pdf=False)
+        ConfiguracionBHE.objects.filter(pk=1).update(pausada=True)
+        with mock.patch.object(FakeEmisor, "recuperar_pdf") as consulta:
+            bhe.recuperar_pdf(emision.pk)
+        consulta.assert_not_called()
+        emision.refresh_from_db()
+        self.assertIsNone(emision.pdf_recuperacion_at)
+
+    def test_clave_rechazada_pausa_la_cola(self):
+        emision = self.emitida(con_pdf=False)
+        with self.escenario("credencial_rechazada"):
+            bhe.recuperar_pdf(emision.pk)
+        emision.refresh_from_db()
+        self.assertFalse(emision.pdf)
+        self.assertTrue(ConfiguracionBHE.cola_pausada())
+
+    def test_tras_resolver_a_mano_usa_la_comprobacion(self):
+        emision = emision_por_confirmar(self.cobro, self.user)
+        operador = User.objects.create_superuser(username="operador", email="op@psiconex.cl", password="x")
+        with self.captureOnCommitCallbacks(execute=True):
+            bhe.resolver_manual(emision.pk, operador, hecha=True, folio="555", fecha=date(2026, 10, 9))
+        self.assertEqual(self.recuperaciones, [((emision.pk,), {})])
+        with mock.patch.object(FakeEmisor, "recuperar_pdf", autospec=True, side_effect=FakeEmisor.recuperar_pdf) as consulta:
+            bhe.recuperar_pdf(emision.pk)
+        self.assertEqual(consulta.call_args.args[2:], ("555", mock.ANY, date(2026, 10, 9), ""))
+        emision.refresh_from_db()
+        self.assertTrue(emision.pdf)

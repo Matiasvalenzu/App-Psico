@@ -94,13 +94,20 @@ class ResolverManualTests(EntornoBHE, TestCase):
         self.assertEqual(self.cobro.boleta_fecha_emision, timezone.localdate())
 
     def test_emision_hecha_guarda_el_codigo_sin_ir_al_sii(self):
-        # Con un login nuevo el SII no entrega el PDF: el psicólogo lo sube desde la ficha.
+        # El PDF se pide aparte, después del commit (bhe.recuperar_pdf), y una sola vez.
         emision = emision_por_confirmar(self.cobro, self.user)
-        with mock.patch.object(FakeEmisor, "emitir") as emitir_sii:
+        with mock.patch.object(FakeEmisor, "emitir") as emitir_sii, self.captureOnCommitCallbacks(execute=True):
             self.resolver(emision, hecha=True, folio="555", codigo="12345678000055512AB3")
         emitir_sii.assert_not_called()
         emision.refresh_from_db()
         self.assertEqual((emision.codigo_sii, bool(emision.pdf)), ("12345678000055512AB3", False))
+        self.assertEqual(self.recuperaciones, [((emision.pk,), {})])
+
+    def test_no_hecha_no_pide_el_pdf(self):
+        emision = emision_por_confirmar(self.cobro, self.user)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.resolver(emision, hecha=False)
+        self.assertEqual(self.recuperaciones, [])
 
     def test_emision_hecha_sin_folio(self):
         emision = emision_por_confirmar(self.cobro, self.user)

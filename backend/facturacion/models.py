@@ -208,6 +208,8 @@ class EmisionBHE(models.Model):
     monto_retencion_sii = models.PositiveIntegerField(null=True, blank=True)
     monto_liquido_sii = models.PositiveIntegerField(null=True, blank=True)
     pdf = models.FileField(storage=_storage_bhe, upload_to=_ruta_archivo_bhe, blank=True)
+    # Único intento de bajar el PDF por la consulta de terceros si no llegó al emitir (bhe.recuperar_pdf).
+    pdf_recuperacion_at = models.DateTimeField(null=True, blank=True)
     evidencias = models.JSONField(default=list, blank=True)
     solicitado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
