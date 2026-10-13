@@ -154,15 +154,44 @@ El robot depende de las pantallas del portal. Si el SII las cambia, el robot dej
 
 ---
 
-## 7. Antes del primer despliegue (checklist)
+## 7. Despliegue y activación (checklist)
 
-Nada de esto se hace sin el OK explícito de Matías.
+Son **dos momentos con OK separados de Matías**: primero se despliega con todo apagado (A) y, después, con un OK aparte, se enciende la emisión solo para la cuenta de Matías (B). Ninguno se hace por iniciativa propia.
 
-1. El checklist legal del plan (§9) está firmado.
-2. `docker compose version` en el VPS ≥ **2.24**. El compose usa `env_file` con `required: false`; con una versión anterior falla. Si no se puede actualizar, reemplazar por `env_file: [.env.bhe]` y crear el archivo antes del `up`.
-3. Crear `.env.bhe` a partir de `.env.bhe.example`, con `BHE_SII_CLAVE`, y dejarlo con `chmod 600`.
-4. En el `.env` principal (sin secretos): `BHE_AUTO_DISPONIBLE=False` y `BHE_BACKEND=playwright` **solo cuando el robot real (T7) esté listo**. `BHE_BACKEND=fake` está prohibido en producción (el backend no arranca). `BHE_RUT_AUTORIZADO` ya trae en el compose el RUT de la cuenta de Psiconex; solo se define en el `.env` si esa cuenta cambia. Si llega vacío, el robot se detiene con `sin_rut_autorizado` sin intentar el login.
-5. Migrar y recrear los servicios (`dc up -d`). Beat lee `BHE_BACKEND` para programar el rescate y la purga.
-6. Encender el worker a propósito: `dc --profile bhe up -d worker-bhe`. Sin `BHE_BACKEND` no hay que encenderlo.
-7. Revisar que Configuración BHE esté **pausada** (es lo que trae por defecto). Reanudar solo cuando el piloto esté listo.
-8. Piloto: solo delegaciones verificadas y marcadas «piloto». Matías revisa cada boleta en el SII durante la primera semana.
+### A. Desplegar con los flags apagados
+
+Se sigue el procedimiento habitual (`.agents/skills/psiconex-vps-deploy`), con estos puntos:
+
+1. **Revisión en el VPS, solo lectura** (no se actualiza Docker): `docker compose version` debe ser **≥ 2.24** porque el compose usa `env_file` con `required: false`. Revisado el 2026-10-13: **v5.3.0**, sirve. Si alguna vez fuera menor, se cambia el compose (`env_file: [.env.bhe]` y crear el archivo vacío con `chmod 600` antes del `up`), no el Docker del VPS.
+2. **Flags en el `.env` de producción** (antes de sincronizar `.env.production`, revisar solo los **nombres** de variables, nunca los valores):
+   - `BHE_BACKEND` **ausente o vacío**. `fake` está prohibido: el backend no arranca. `playwright` recién en B.
+   - `BHE_AUTO_DISPONIBLE` ausente o `False`.
+   - `PLAN_PLUS_DISPONIBLE` ausente o `False` (hasta que el contador valide).
+   - `BHE_RUT_AUTORIZADO` no se define: el compose ya trae el RUT de la cuenta de Psiconex.
+   - Todavía **no** se crea `.env.bhe` en el VPS.
+3. **Respaldos antes del build**, igual que en los deploys anteriores:
+   - BD: `dc exec -T db pg_dump -U psicologo psicologo | gzip > /srv/psiconex-docker/backups/postgres-pre-bhe-fase2-$(date +%Y%m%d%H%M).sql.gz`, y comprobar que el archivo no pesa 0.
+   - Imágenes: `for s in backend frontend celery celery-beat celery-email; do docker image tag psiconex-$s:latest psiconex-$s:rollback-pre-bhe-fase2; done`. `worker-bhe` no tiene imagen anterior: es nuevo.
+4. **Migraciones nuevas**: `facturacion` 0002–0007 (agregan tablas y campos, amplían `choices` y crean la fila de Configuración BHE **pausada**; ninguna borra datos de la Fase 1). El backend las aplica al arrancar. Después, verificar con `dc exec -T backend python manage.py showmigrations facturacion` que quedaron todas aplicadas.
+5. **Build y `up` sin el perfil `bhe`**: `dc up -d --build --remove-orphans`. `worker-bhe` **no** debe quedar corriendo (`dc ps` no lo lista). La imagen Playwright (`target: bhe`) solo se construye en B.
+6. **Prueba de humo**:
+   - la app carga, el login funciona y la ficha del paciente muestra los cobros a un usuario Plus;
+   - Admin → Facturación muestra **Configuración BHE** con su única fila **pausada**, **Delegaciones SII** vacío y **Emisiones BHE** vacío;
+   - un usuario Plus que intenta «Emitir en el SII» recibe «bhe_no_disponible» (no se crea ninguna emisión);
+   - el borrador y «Marcar emitida» de la Fase 1 siguen funcionando igual.
+7. **Rollback**: volver a etiquetar `rollback-pre-bhe-fase2` como `latest` y hacer `dc up -d`. Las tablas nuevas pueden quedar (el código anterior no las usa); el `pg_dump` del punto 3 solo se restaura si hay daño en los datos.
+
+### B. Encender la emisión solo para la cuenta de Matías (OK aparte)
+
+Requisitos: A desplegado y estable, el checklist legal del plan (§9) firmado, y **un OK explícito de Matías para esta etapa**. La primera boleta real desde producción la emite **Matías**, desde **su** cuenta.
+
+1. Matías crea `.env.bhe` en el VPS **él mismo** (la clave nunca pasa por el chat ni por un commit), a partir de `.env.bhe.example`, con `chmod 600`.
+2. En el `.env`: `BHE_BACKEND=playwright` y `BHE_AUTO_DISPONIBLE=True`. `dc up -d` (beat y backend leen los flags) y `dc --profile bhe up -d --build worker-bhe`.
+   - El flag es global, pero solo emiten las delegaciones marcadas **piloto**. Además hay que tener Plus, y hoy nadie puede contratar Plus por su cuenta (`PLAN_PLUS_DISPONIBLE=False`).
+3. Matías registra su delegación en **Configuración → Boletas** y da su consentimiento. Un superusuario la deja **verificada** y **piloto** en el admin. Ninguna otra delegación queda piloto.
+4. Admin → Configuración BHE → **reanudar** la cola.
+5. **Primera boleta real**: un cobro pequeño de Matías (receptor real que acepte la prueba). Se revisa el resultado en el admin (folio, código, PDF) y en el SII de Matías. Si queda `DESCONOCIDO`, **no se reintenta**: se resuelve según §3.
+6. Si algo falla: **pausar** la cola (§2) y apagar el worker (`dc stop worker-bhe`). Para volver a A: `BHE_AUTO_DISPONIBLE=False` y `BHE_BACKEND` vacío.
+7. Piloto: durante la primera semana Matías revisa cada boleta en su SII. Agregar otros psicólogos como piloto requiere un OK nuevo.
+
+> Pendiente aparte (aprobado por Troy el 2026-10-13, aún no implementado): recuperar el PDF con la consulta de terceros, con un solo login y solo cuando falla la descarga del paso 4 o cuando se resuelve una boleta a mano con su folio.
