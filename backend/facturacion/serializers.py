@@ -209,14 +209,19 @@ class DelegacionSolicitudSerializer(serializers.Serializer):
             raise serializers.ValidationError("La fecha no puede ser futura.")
         return value
 
+    def validate_rut(self, value):
+        # Validado aquí para que el error quede asociado al campo «rut».
+        if not value:
+            return value
+        return formatear_documento(TIPO_RUT, normalizar_documento(TIPO_RUT, value))
+
     def validate(self, attrs):
         perfil = self.context["perfil"]
         rut = perfil.rut_profesional
         if not rut:
             if not attrs.get("rut"):
                 raise serializers.ValidationError({"rut": "Indica tu RUT. Quedará fijo en tu perfil."})
-            rut = formatear_documento(TIPO_RUT, normalizar_documento(TIPO_RUT, attrs["rut"]))
-            attrs["rut"] = rut
+            rut = attrs["rut"]
         # Si otra cuenta ya declaró este RUT, podría ser alguien suplantando al psicólogo.
         if DelegacionSII.objects.filter(rut_emisor=rut).exclude(psicologo_id=perfil.user_id).exists():
             raise serializers.ValidationError(

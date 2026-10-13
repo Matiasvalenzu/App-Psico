@@ -26,6 +26,8 @@ interface Delegacion {
   fecha_vencimiento: string | null;
   numero_transaccion: string;
   rut_autorizar: string;
+  consentimiento_version: string;
+  consentimiento_version_vigente: string;
   mensaje_bloqueo: string;
 }
 
@@ -96,7 +98,7 @@ export default function BoletasAutomaticasPage() {
 
       <EstadoActual delegacion={delegacion} />
 
-      {estado !== "ACTIVA" && (
+      {estado !== "ACTIVA" && estado !== "POR_VENCER" && (
         <Alert variant="warning">
           <TriangleAlert />
           <AlertDescription>
@@ -132,7 +134,7 @@ function EstadoActual({ delegacion }: { delegacion: Delegacion }) {
         {estado === "ACTIVA" && (
           <p>
             Tu autorización está activa{delegacion.fecha_vencimiento && <> hasta el {formatDateCL(delegacion.fecha_vencimiento)}</>}.
-            Ya puedes emitir boletas con el SII desde los cobros de tus pacientes.
+            {!delegacion.mensaje_bloqueo && " Ya puedes emitir boletas con el SII desde los cobros de tus pacientes."}
           </p>
         )}
         {estado === "POR_VENCER" && (
@@ -150,7 +152,10 @@ function EstadoActual({ delegacion }: { delegacion: Delegacion }) {
 }
 
 function Autorizacion({ delegacion, renovar, onListo }: { delegacion: Delegacion; renovar: boolean; onListo: () => Promise<void> }) {
-  const [acepta, setAcepta] = useState(false);
+  // Al renovar se vuelve a registrar el consentimiento; viene marcado si la versión no cambió.
+  const [acepta, setAcepta] = useState(
+    renovar && delegacion.consentimiento_version === delegacion.consentimiento_version_vigente,
+  );
   const [numeroTransaccion, setNumeroTransaccion] = useState("");
   const [rut, setRut] = useState("");
   const [errores, setErrores] = useState<Record<string, string>>({});
