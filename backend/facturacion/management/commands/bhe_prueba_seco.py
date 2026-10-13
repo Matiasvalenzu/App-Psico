@@ -30,7 +30,9 @@ class Command(BaseCommand):
         except ErrorEmisor as exc:
             resultado = f"Se detuvo antes de emitir ({type(exc).__name__}): {exc}"
         finally:
-            salida.mkdir(parents=True, exist_ok=True)
+            # Las capturas tienen datos reales: solo el dueño las lee; se borran tras revisarlas.
+            salida.mkdir(mode=0o700, parents=True, exist_ok=True)
             for nombre, contenido in emisor.evidencias:
                 (salida / nombre).write_bytes(contenido)
-        self.stdout.write(f"{resultado}\nCapturas: {salida}")
+                (salida / nombre).chmod(0o600)
+        self.stdout.write(f"{resultado}\nCapturas: {salida} (borrarlas después de revisarlas)")
