@@ -47,6 +47,7 @@ export default function SuscripcionPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [confirmCambio, setConfirmCambio] = useState(false);
   const [cambiando, setCambiando] = useState(false);
+  const [confirmPlusPrueba, setConfirmPlusPrueba] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -210,6 +211,31 @@ export default function SuscripcionPage() {
         </Button>
       );
     }
+    // El plan Plus de Mercado Pago no tiene prueba: cobra al suscribirse y la prueba en curso se pierde.
+    if (isTrial && diasRestantes > 0 && !confirmPlusPrueba) {
+      return (
+        <Button onClick={() => setConfirmPlusPrueba(true)} className="w-full font-semibold shadow-lg shadow-primary/20">
+          Suscribirme a Plus
+        </Button>
+      );
+    }
+    if (isTrial && diasRestantes > 0) {
+      return (
+        <div className="rounded-xl border border-border/70 bg-muted/40 p-3 space-y-2 text-left animate-in fade-in">
+          <p className="text-xs text-foreground font-medium">
+            El cobro de {pesos(montoPlus)} CLP parte de inmediato y {diasRestantes === 1 ? "el día de prueba que te queda se pierde" : `los ${diasRestantes} días de prueba que te quedan se pierden`}.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" className="text-xs h-8">
+              <a href={plusUrl} data-plan="plus">Ir a pagar</a>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmPlusPrueba(false)} className="text-xs h-8">
+              Volver
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="space-y-2">
         <Button asChild className="w-full font-semibold shadow-lg shadow-primary/20">
@@ -219,8 +245,7 @@ export default function SuscripcionPage() {
           </a>
         </Button>
         <p className="text-[11px] text-center text-muted-foreground leading-tight">
-          Pagas en Mercado Pago y, al volver, Plus queda activo en esta cuenta.
-          {isTrial && " El primer cobro es al suscribirte."}
+          Pagas en Mercado Pago (el primer cobro es al suscribirte) y, al volver, Plus queda activo en esta cuenta.
         </p>
       </div>
     );
