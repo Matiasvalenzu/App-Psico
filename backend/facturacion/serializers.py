@@ -6,7 +6,7 @@ from pacientes.models import Paciente
 from sesiones.models import Sesion
 
 from .models import Cobro, DelegacionSII, EmisionBHE
-from .services import anulable_hasta, calcular_retencion, plazo_anulacion_vencido, validar_glosa
+from .services import anulable_hasta, calcular_retencion, hoy_chile, plazo_anulacion_vencido, validar_glosa
 
 GLOSA_POR_DEFECTO = "Atención psicológica"
 CAMPOS_RECEPTOR = (
@@ -65,19 +65,20 @@ class CobroSerializer(serializers.ModelSerializer):
     plazo_anulacion_vencido = serializers.SerializerMethodField()
     ultima_emision = serializers.SerializerMethodField()
     receptor_desactualizado = serializers.SerializerMethodField()
+    ultimo_cambio_pago = serializers.SerializerMethodField()
 
     class Meta:
         model = Cobro
         fields = [
             "id", "paciente", "paciente_nombre", "sesion", "fecha_pago", "monto_bruto",
-            "medio_pago", "estado_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
+            "medio_pago", "estado_pago", "pagado_el", "ultimo_cambio_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulable_hasta",
             "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "receptor_desactualizado", "notas",
             "created_at", "updated_at",
         ]
         read_only_fields = [
-            "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
+            "pagado_el", "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulacion_solicitada_at",
             "created_at", "updated_at",
         ]
@@ -98,6 +99,18 @@ class CobroSerializer(serializers.ModelSerializer):
 
     def get_receptor_desactualizado(self, obj):
         return bool(receptor_desde_ficha(obj))
+
+    def get_ultimo_cambio_pago(self, obj):
+        # Lista precargada por la vista, de la más reciente a la más antigua.
+        cambios = list(obj.cambios_pago.all())
+        if not cambios:
+            return None
+        cambio = cambios[0]
+        return {
+            "estado": cambio.estado_nuevo,
+            "usuario": cambio.usuario.username if cambio.usuario else "",
+            "fecha": cambio.created_at,
+        }
 
     def validate_paciente(self, value):
         if value and value.psicologo_id != self.context["request"].user.id:
@@ -166,6 +179,15 @@ class CobroSerializer(serializers.ModelSerializer):
         tasa, retencion, liquido = calcular_retencion(monto, fecha)
         attrs.update(tasa_retencion=tasa, monto_retencion=retencion, monto_liquido=liquido)
         return attrs
+
+
+class MarcarPagadoSerializer(serializers.Serializer):
+    fecha = serializers.DateField(required=False)
+
+    def validate_fecha(self, value):
+        if value > hoy_chile():
+            raise serializers.ValidationError("La fecha de pago no puede ser futura.")
+        return value
 
 
 class MarcarEmitidaSerializer(serializers.Serializer):

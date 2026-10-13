@@ -27,6 +27,8 @@ import InformesIA from "./_components/InformesIA";
 import PacienteHeader from "./_components/PacienteHeader";
 import PacienteLateral from "./_components/PacienteLateral";
 import PacienteResumen from "./_components/PacienteResumen";
+import { cambiarPago, MarcarPagadoDialog } from "./_components/PagoCobro";
+import type { Cobro } from "./_components/cobros";
 import SesionesLista from "./_components/SesionesLista";
 import TestDialog, { type TestMode } from "./_components/TestDialog";
 import { fetchAllPages, getDateTimeInputValue, tieneRiesgo, type InformeIA, type Paciente, type Sesion } from "./_components/utils";
@@ -83,6 +85,7 @@ export default function PacienteDetailPage() {
   const [boletas, setBoletas] = useState<{ habilitadas: boolean; visibles: boolean }>({ habilitadas: false, visibles: false });
   const [sesionCobro, setSesionCobro] = useState<Sesion | null>(null);
   const [cobrosRefresh, setCobrosRefresh] = useState(0);
+  const [cobroPorPagar, setCobroPorPagar] = useState<number | null>(null);
 
   const [remoteModalOpen, setRemoteModalOpen] = useState(false);
   const [psiconexModalOpen, setPsiconexModalOpen] = useState(false);
@@ -93,6 +96,38 @@ export default function PacienteDetailPage() {
 
   const tabParam = searchParams.get("tab");
   const tabSolicitada = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "resumen";
+  // Refleja en la lista de sesiones un cobro creado o cambiado en otra parte de la ficha.
+  const actualizarCobroSesion = useCallback((cobro: Cobro) => {
+    setSesiones((prev) =>
+      prev.map((s) =>
+        s.cobro?.id === cobro.id || (!s.cobro && cobro.sesion === s.id)
+          ? {
+              ...s,
+              cobro: {
+                id: cobro.id,
+                monto_bruto: cobro.monto_bruto,
+                estado_pago: cobro.estado_pago,
+                pagado_el: cobro.pagado_el,
+                estado_boleta: cobro.estado_boleta,
+                boleta_folio: cobro.boleta_folio,
+              },
+            }
+          : s,
+      ),
+    );
+  }, []);
+
+  async function volverAPendiente(sesion: Sesion) {
+    if (!sesion.cobro) return;
+    try {
+      actualizarCobroSesion(await cambiarPago(sesion.cobro.id, null));
+      setCobrosRefresh((n) => n + 1);
+      toast.success("El cobro volvió a pendiente.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo actualizar el pago.");
+    }
+  }
+
   const tab: Tab = tabSolicitada === "cobros" && !boletas.visibles ? "resumen" : tabSolicitada;
 
   useEffect(() => {
@@ -316,6 +351,9 @@ export default function PacienteDetailPage() {
               onNewRemote={() => setRemoteModalOpen(true)}
               onDelete={setSesionToDelete}
               onCobro={boletas.habilitadas ? setSesionCobro : undefined}
+              mostrarCobro={boletas.visibles}
+              onMarcarPagado={boletas.habilitadas ? (s) => setCobroPorPagar(s.cobro?.id ?? null) : undefined}
+              onVolverPendiente={boletas.habilitadas ? volverAPendiente : undefined}
             />
           </TabsContent>
 
@@ -338,7 +376,9 @@ export default function PacienteDetailPage() {
 
           {boletas.visibles && (
             <TabsContent value="cobros">
-              <CobrosPaciente pacienteId={Number(id)} soloLectura={!boletas.habilitadas} refreshKey={cobrosRefresh} />
+              <CobrosPaciente pacienteId={Number(id)} soloLectura={!boletas.habilitadas} refreshKey={cobrosRefresh}
+                onCobroChanged={actualizarCobroSesion}
+              />
             </TabsContent>
           )}
         </Tabs>
@@ -351,13 +391,23 @@ export default function PacienteDetailPage() {
           sesionId={sesionCobro?.id}
           fechaInicial={sesionCobro ? getDateTimeInputValue(new Date(sesionCobro.fecha_hora_inicio)).slice(0, 10) : undefined}
           onOpenChange={(open) => !open && setSesionCobro(null)}
-          onSaved={() => {
+          onSaved={(cobro) => {
+            actualizarCobroSesion(cobro);
             toast.success("Cobro registrado. Revisa el borrador de la boleta en Cobros.");
             setCobrosRefresh((n) => n + 1);
             changeTab("cobros");
           }}
         />
       )}
+
+      <MarcarPagadoDialog
+        cobroId={cobroPorPagar}
+        onClose={() => setCobroPorPagar(null)}
+        onDone={(cobro) => {
+          actualizarCobroSesion(cobro);
+          setCobrosRefresh((n) => n + 1);
+        }}
+      />
 
       <DeleteSesionDialog
         sesion={sesionToDelete}

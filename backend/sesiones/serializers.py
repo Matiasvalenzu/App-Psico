@@ -135,6 +135,7 @@ class SesionSerializer(serializers.ModelSerializer):
 class SesionListSerializer(serializers.ModelSerializer):
     paciente_nombre = serializers.CharField(source="paciente.nombre_completo", read_only=True)
     psicologo_username = serializers.CharField(source="psicologo.username", read_only=True)
+    cobro = serializers.SerializerMethodField()
 
     class Meta:
         model = Sesion
@@ -144,6 +145,7 @@ class SesionListSerializer(serializers.ModelSerializer):
             "paciente_nombre",
             "psicologo",
             "psicologo_username",
+            "cobro",
             "numero_sesion",
             "fecha_hora_inicio",
             "duracion_segundos",
@@ -169,6 +171,21 @@ class SesionListSerializer(serializers.ModelSerializer):
             "estado",
             "created_at",
         ]
+
+    def get_cobro(self, obj):
+        # La vista precarga los cobros ordenados del más reciente al más antiguo.
+        cobros = list(obj.cobros.all())
+        if not cobros:
+            return None
+        cobro = cobros[0]
+        return {
+            "id": cobro.id,
+            "monto_bruto": cobro.monto_bruto,
+            "estado_pago": cobro.estado_pago,
+            "pagado_el": cobro.pagado_el,
+            "estado_boleta": cobro.estado_boleta,
+            "boleta_folio": cobro.boleta_folio,
+        }
 
 
 class AudioUploadSerializer(serializers.Serializer):

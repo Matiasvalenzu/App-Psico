@@ -1,7 +1,8 @@
 from datetime import date
 
 from django.db import IntegrityError
-from django.db.models import OuterRef, Subquery
+from django.db.models import Count, IntegerField, OuterRef, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -16,6 +17,7 @@ from agenda.models import AgendaCita
 from cuentas.acceso import registrar_acceso
 from cuentas.models import RegistroAcceso
 from cuentas.exportacion import carpeta_paciente, exportar_paciente
+from facturacion.models import Cobro
 from sesiones.audio import borrar_carpeta_paciente
 from sesiones.models import Sesion
 
@@ -55,7 +57,9 @@ class PacienteViewSet(viewsets.ModelViewSet):
     ]
     filterset_fields = ["activo"]
     search_fields = ["nombre", "apellido", "motivo_consulta"]
-    ordering_fields = ["apellido", "nombre", "created_at", "updated_at", "ultima_sesion", "proxima_cita"]
+    ordering_fields = [
+        "apellido", "nombre", "created_at", "updated_at", "ultima_sesion", "proxima_cita", "deuda_pendiente",
+    ]
     ordering = ["apellido", "nombre"]
 
     def get_serializer_class(self):
@@ -66,6 +70,11 @@ class PacienteViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset().filter(psicologo=self.request.user)
         if self.action == "list":
+            cobros_pendientes = (
+                Cobro.objects.filter(paciente=OuterRef("pk"), estado_pago=Cobro.EstadoPago.PENDIENTE)
+                .order_by()
+                .values("paciente")
+            )
             # Datos de la tabla de trabajo: una subconsulta por columna, sin N+1
             qs = qs.annotate(
                 ultima_sesion=Subquery(
@@ -83,6 +92,17 @@ class PacienteViewSet(viewsets.ModelViewSet):
                     ConsentimientoInformado.objects.filter(paciente=OuterRef("pk"))
                     .order_by("-created_at")
                     .values("estado")[:1]
+                ),
+                deuda_pendiente=Coalesce(
+                    Subquery(
+                        cobros_pendientes.annotate(total=Sum("monto_bruto")).values("total"),
+                        output_field=IntegerField(),
+                    ),
+                    0,
+                ),
+                cobros_pendientes=Coalesce(
+                    Subquery(cobros_pendientes.annotate(n=Count("id")).values("n"), output_field=IntegerField()),
+                    0,
                 ),
             )
         return qs

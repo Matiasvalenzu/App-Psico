@@ -1,6 +1,7 @@
 // Tipos y helpers compartidos por la ficha del paciente.
 
 import { apiFetch } from "@/lib/api";
+import type { EstadoBoleta, EstadoPago } from "./cobros";
 
 export interface Paciente {
   id: number;
@@ -44,6 +45,15 @@ export interface Paciente {
   created_at: string;
 }
 
+export interface CobroSesion {
+  id: number;
+  monto_bruto: number;
+  estado_pago: EstadoPago;
+  pagado_el: string | null;
+  estado_boleta: EstadoBoleta;
+  boleta_folio: string;
+}
+
 export interface Sesion {
   id: number;
   numero_sesion: number | null;
@@ -52,6 +62,8 @@ export interface Sesion {
   origen: "AUDIO" | "DOCUMENTO_EXTERNO" | "VIRTUAL" | "TEST_PSICOLOGICO";
   documento_nombre_original: string;
   estado: string;
+  // Solo viene en la lista de sesiones: el cobro más reciente de la sesión.
+  cobro?: CobroSesion | null;
 }
 
 export interface SegmentoDocumento {

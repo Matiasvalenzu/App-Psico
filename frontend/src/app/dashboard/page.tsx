@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ResumenCobros from "@/components/pacientes/ResumenCobros";
 import { useTutorial } from "@/context/TutorialContext";
 
 import { Button } from "@/components/ui/button";
@@ -80,9 +81,11 @@ interface Paciente {
   ultima_sesion?: string | null;
   proxima_cita?: string | null;
   consentimiento_estado?: string | null;
+  deuda_pendiente?: number;
+  cobros_pendientes?: number;
 }
 
-type SortKey = "nombre" | "ultima_sesion" | "proxima_cita";
+type SortKey = "nombre" | "ultima_sesion" | "proxima_cita" | "deuda";
 
 const PAGE_SIZE = 25;
 
@@ -211,6 +214,15 @@ function StatusBadge({ estado }: { estado: string }) {
   );
 }
 
+function DeudaBadge({ paciente }: { paciente: Paciente }) {
+  if (!paciente.deuda_pendiente) return null;
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+      Debe ${paciente.deuda_pendiente.toLocaleString("es-CL")} ({paciente.cobros_pendientes})
+    </span>
+  );
+}
+
 function AlertChips({ paciente }: { paciente: Paciente }) {
   const riesgo = tieneRiesgo(paciente);
   if (!riesgo && !paciente.es_menor_edad) {
@@ -334,6 +346,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [sort, setSort] = useState<SortKey>("nombre");
+  const [soloDeudores, setSoloDeudores] = useState(false);
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -364,7 +377,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, sort]);
+  }, [search, statusFilter, sort, soloDeudores]);
 
   async function loadPacientes() {
     setLoading(true);
@@ -506,19 +519,21 @@ export default function DashboardPage() {
         `${p.nombre} ${p.apellido}`.toLowerCase().includes(term) ||
         (termRut.length >= 3 && (p.rut || "").toLowerCase().replace(/[^0-9k]/g, "").includes(termRut));
       const matchesStatus = statusFilter === "ALL" || (p.estado || "EN_SESION") === statusFilter;
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && (!soloDeudores || Boolean(p.deuda_pendiente));
     });
     return list.sort((a, b) => {
+      if (sort === "deuda") return (b.deuda_pendiente || 0) - (a.deuda_pendiente || 0) || (a.nombre_completo || "").localeCompare(b.nombre_completo || "", "es");
       if (sort === "ultima_sesion") return compareDates(a.ultima_sesion, b.ultima_sesion, -1);
       if (sort === "proxima_cita") return compareDates(a.proxima_cita, b.proxima_cita, 1);
       return (a.nombre_completo || "").localeCompare(b.nombre_completo || "", "es");
     });
-  }, [pacientes, search, statusFilter, sort]);
+  }, [pacientes, search, statusFilter, sort, soloDeudores]);
+  const conDeuda = pacientes.filter((p) => p.deuda_pendiente).length;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const hasFilters = Boolean(search) || statusFilter !== "ALL";
+  const hasFilters = Boolean(search) || statusFilter !== "ALL" || soloDeudores;
 
   const openFicha = (p: Paciente) => router.push(`/dashboard/pacientes/${p.id}`);
   const menuProps = (p: Paciente) => ({
@@ -552,6 +567,8 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <ResumenCobros />
 
       {/* ── Filtros ── */}
       <div className="space-y-3">
@@ -589,12 +606,24 @@ export default function DashboardPage() {
               </button>
             )}
           </div>
+          {(conDeuda > 0 || soloDeudores) && (
+            <Button
+              variant={soloDeudores ? "default" : "outline"}
+              size="sm"
+              aria-pressed={soloDeudores}
+              onClick={() => setSoloDeudores((v) => !v)}
+              className="self-start sm:self-auto"
+            >
+              Con pagos pendientes <span className="text-xs opacity-80">{conDeuda}</span>
+            </Button>
+          )}
           <div className="flex items-center gap-2 sm:ml-auto">
             <Label htmlFor="orden-pacientes" className="shrink-0 text-sm text-muted-foreground">Ordenar por</Label>
             <NativeSelect id="orden-pacientes" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-44">
               <option value="nombre">Nombre</option>
               <option value="ultima_sesion">Última sesión</option>
               <option value="proxima_cita">Próxima cita</option>
+              {(conDeuda > 0 || sort === "deuda") && <option value="deuda">Monto adeudado</option>}
             </NativeSelect>
           </div>
         </div>
@@ -624,7 +653,7 @@ export default function DashboardPage() {
             <>
               <h2 className="text-base font-semibold text-foreground">Sin resultados</h2>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">Ningún paciente coincide con la búsqueda o el filtro seleccionado.</p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => { setSearch(""); setStatusFilter("ALL"); }}>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => { setSearch(""); setStatusFilter("ALL"); setSoloDeudores(false); }}>
                 Limpiar filtros
               </Button>
             </>
@@ -658,6 +687,7 @@ export default function DashboardPage() {
                     <PacienteMeta paciente={p} />
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <StatusBadge estado={p.estado} />
+                      <DeudaBadge paciente={p} />
                       {(tieneRiesgo(p) || p.es_menor_edad) && <AlertChips paciente={p} />}
                     </div>
                   </div>
@@ -724,7 +754,12 @@ export default function DashboardPage() {
                     <TableCell className="text-sm text-muted-foreground">{formatDateCL(p.proxima_cita, true) || "—"}</TableCell>
                     <TableCell><ConsentimientoText estado={p.consentimiento_estado} /></TableCell>
                     <TableCell><AlertChips paciente={p} /></TableCell>
-                    <TableCell><StatusBadge estado={p.estado} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusBadge estado={p.estado} />
+                        <DeudaBadge paciente={p} />
+                      </div>
+                    </TableCell>
                     <TableCell className="row-action pr-4 text-right">
                       <PatientActionsMenu {...menuProps(p)} />
                     </TableCell>

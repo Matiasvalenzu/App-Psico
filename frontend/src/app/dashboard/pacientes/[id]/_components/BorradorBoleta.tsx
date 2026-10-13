@@ -19,6 +19,7 @@ import {
 import { ESTADOS_BOLETA, formatCLP, hoyISO, MODOS_BOLETA, receptorIncompleto, type Cobro, type DelegacionBHE } from "./cobros";
 import EmisionSii, { emitidaPorPsiconex } from "./EmisionSii";
 import { getApiErrorMessage } from "./utils";
+import { PagoCobro } from "./PagoCobro";
 
 const URL_SII = "https://www.sii.cl/servicios_online/";
 
@@ -158,6 +159,8 @@ export default function BorradorBoleta({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+
+          <PagoCobro cobro={actual} soloLectura={soloLectura} onChanged={onChanged} />
 
           {(delegacion || enEmision || porPsiconex) && (
             <EmisionSii

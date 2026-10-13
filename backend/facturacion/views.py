@@ -1,8 +1,11 @@
+import csv
 import mimetypes
 import os
+from datetime import date
 
 from django.conf import settings
-from django.http import FileResponse, Http404
+from django.db.models import Count, Prefetch, Sum
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -13,18 +16,50 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from cuentas.acceso import registrar_acceso
+from cuentas.models import RegistroAcceso
 from cuentas.services import get_or_create_profile
+from pacientes.models import Paciente
+from sesiones.models import Sesion
 
 from . import bhe
-from .models import Cobro, DelegacionSII
+from .models import CambioEstadoPago, Cobro, DelegacionSII
+from .pagos import cambiar_estado_pago
 from .permissions import TienePlanPlus
 from .serializers import (
     CobroSerializer,
     DelegacionSolicitudSerializer,
     EmisionBHESerializer,
     MarcarEmitidaSerializer,
+    MarcarPagadoSerializer,
     receptor_desde_ficha,
 )
+from .services import hoy_chile
+
+
+def _mes_pedido(request):
+    """Mes de ?mes=AAAA-MM; por defecto, el mes actual en Chile."""
+    valor = request.query_params.get("mes")
+    if not valor:
+        hoy = hoy_chile()
+        return hoy.year, hoy.month
+    try:
+        anio, mes = (int(parte) for parte in valor.split("-"))
+        date(anio, mes, 1)
+    except ValueError:
+        raise ValidationError({"mes": "Usa el formato AAAA-MM."})
+    return anio, mes
+
+
+def _celda_csv(valor):
+    # Evita que Excel interprete como fórmula un nombre o glosa que empiece con = + - @.
+    texto = "" if valor is None else str(valor)
+    return f"'{texto}" if texto[:1] in ("=", "+", "-", "@") else texto
+
+
+def _totales(qs):
+    datos = qs.aggregate(total=Sum("monto_bruto"), cantidad=Count("id"))
+    return {"total": datos["total"] or 0, "cantidad": datos["cantidad"]}
 
 
 class SolicitudesBHEThrottle(UserRateThrottle):
@@ -62,15 +97,34 @@ class CobroViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, TienePlanPlus]
 
     def get_queryset(self):
-        qs = Cobro.objects.select_related("paciente").prefetch_related("emisiones").filter(psicologo=self.request.user)
-        for param in ("paciente", "sesion", "estado_boleta"):
+        qs = (
+            Cobro.objects.select_related("paciente")
+            .prefetch_related("emisiones", Prefetch("cambios_pago", CambioEstadoPago.objects.select_related("usuario")))
+            .filter(psicologo=self.request.user)
+        )
+        for param in ("paciente", "sesion", "estado_boleta", "estado_pago"):
             valor = self.request.query_params.get(param)
             if valor:
                 qs = qs.filter(**{param: valor})
+        if self.request.query_params.get("mes"):
+            anio, mes = _mes_pedido(self.request)
+            qs = qs.filter(fecha_pago__year=anio, fecha_pago__month=mes)
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(psicologo=self.request.user)
+        pagado = serializer.validated_data.get("estado_pago", Cobro.EstadoPago.PAGADO) == Cobro.EstadoPago.PAGADO
+        serializer.save(
+            psicologo=self.request.user, pagado_el=serializer.validated_data["fecha_pago"] if pagado else None
+        )
+
+    def perform_update(self, serializer):
+        # El estado de pago pasa por cambiar_estado_pago para que quede registro de quién lo cambió.
+        nuevo = serializer.validated_data.pop("estado_pago", None)
+        cobro = serializer.save()
+        if nuevo and nuevo != cobro.estado_pago:
+            pagado_el = hoy_chile() if nuevo == Cobro.EstadoPago.PAGADO else None
+            cambiar_estado_pago(cobro, nuevo, self.request.user, pagado_el)
+            serializer.instance = self.get_queryset().get(pk=cobro.pk)
 
     def perform_destroy(self, instance):
         if instance.estado_boleta == Cobro.EstadoBoleta.EMITIDA:
@@ -113,6 +167,93 @@ class CobroViewSet(viewsets.ModelViewSet):
         except bhe.EmisionNoPermitida:
             return Response({"detail": "Solo se puede anular una boleta emitida."}, status=status.HTTP_400_BAD_REQUEST)
         return self._cobro_actualizado(cobro)
+
+    @action(detail=True, methods=["post"], url_path="marcar-pagado")
+    def marcar_pagado(self, request, pk=None):
+        cobro = self.get_object()
+        if cobro.estado_pago == Cobro.EstadoPago.PAGADO:
+            return Response({"detail": "El cobro ya está pagado."}, status=status.HTTP_400_BAD_REQUEST)
+        datos = MarcarPagadoSerializer(data=request.data)
+        datos.is_valid(raise_exception=True)
+        fecha = datos.validated_data.get("fecha") or hoy_chile()
+        cambiar_estado_pago(cobro, Cobro.EstadoPago.PAGADO, request.user, fecha)
+        return self._cobro_actualizado(cobro)
+
+    @action(detail=True, methods=["post"], url_path="marcar-pendiente")
+    def marcar_pendiente(self, request, pk=None):
+        cobro = self.get_object()
+        if cobro.estado_pago == Cobro.EstadoPago.PENDIENTE:
+            return Response({"detail": "El cobro ya está pendiente."}, status=status.HTTP_400_BAD_REQUEST)
+        cambiar_estado_pago(cobro, Cobro.EstadoPago.PENDIENTE, request.user)
+        return self._cobro_actualizado(cobro)
+
+    @action(detail=False, methods=["get"])
+    def resumen(self, request):
+        anio, mes = _mes_pedido(request)
+        cobros = Cobro.objects.filter(psicologo=request.user)
+        del_mes = cobros.filter(fecha_pago__year=anio, fecha_pago__month=mes)
+        pendientes = cobros.filter(estado_pago=Cobro.EstadoPago.PENDIENTE)
+        deudores = list(
+            pendientes.filter(paciente__isnull=False)
+            .values("paciente")
+            .annotate(total=Sum("monto_bruto"), cantidad=Count("id"))
+            .order_by("-total", "paciente")[:5]
+        )
+        nombres = {
+            p.id: p.nombre_completo for p in Paciente.objects.filter(id__in=[d["paciente"] for d in deudores])
+        }
+        retencion = del_mes.exclude(
+            estado_boleta__in=[Cobro.EstadoBoleta.ANULADA, Cobro.EstadoBoleta.NO_APLICA]
+        ).aggregate(total=Sum("monto_retencion"))["total"]
+        sin_cobro = Sesion.objects.filter(
+            paciente__psicologo=request.user,
+            estado=Sesion.Estado.COMPLETADO,
+            origen__in=[Sesion.Origen.AUDIO, Sesion.Origen.VIRTUAL],
+            fecha_hora_inicio__year=anio,
+            fecha_hora_inicio__month=mes,
+            cobros__isnull=True,
+        ).count()
+        return Response(
+            {
+                "mes": f"{anio}-{mes:02d}",
+                "pagado_mes": _totales(
+                    cobros.filter(estado_pago=Cobro.EstadoPago.PAGADO, pagado_el__year=anio, pagado_el__month=mes)
+                ),
+                "pendiente_mes": _totales(del_mes.filter(estado_pago=Cobro.EstadoPago.PENDIENTE)),
+                "pendiente_total": _totales(pendientes),
+                "retencion_mes": retencion or 0,
+                "top_deudores": [{**d, "nombre": nombres.get(d["paciente"], "")} for d in deudores],
+                "sesiones_sin_cobro": sin_cobro,
+            }
+        )
+
+    @action(detail=False, methods=["get"])
+    def exportar(self, request):
+        """CSV de los cobros del mes para el contador."""
+        anio, mes = _mes_pedido(request)
+        cobros = (
+            Cobro.objects.select_related("paciente")
+            .filter(psicologo=request.user, fecha_pago__year=anio, fecha_pago__month=mes)
+            .order_by("fecha_pago", "id")
+        )
+        respuesta = HttpResponse(content_type="text/csv; charset=utf-8")
+        respuesta["Content-Disposition"] = f'attachment; filename="cobros-{anio}-{mes:02d}.csv"'
+        respuesta.write("\ufeff")  # BOM: Excel abre el archivo como UTF-8.
+        escritor = csv.writer(respuesta, delimiter=";")
+        escritor.writerow([
+            "Fecha atención", "Paciente", "Receptor", "Documento receptor", "Monto bruto", "Retención",
+            "Líquido", "Medio de pago", "Estado de pago", "Fecha de pago", "Estado boleta", "Folio",
+            "Fecha emisión",
+        ])  # fmt: skip
+        for cobro in cobros:
+            escritor.writerow([_celda_csv(valor) for valor in (
+                cobro.fecha_pago, cobro.paciente.nombre_completo if cobro.paciente else "", cobro.receptor_nombre,
+                cobro.receptor_documento, cobro.monto_bruto, cobro.monto_retencion, cobro.monto_liquido,
+                cobro.get_medio_pago_display(), cobro.get_estado_pago_display(), cobro.pagado_el,
+                cobro.get_estado_boleta_display(), cobro.boleta_folio, cobro.boleta_fecha_emision,
+            )])  # fmt: skip
+        registrar_acceso(request, RegistroAcceso.Accion.EXPORTAR, objeto=f"Cobros {anio}-{mes:02d}")
+        return respuesta
 
     def _cobro_actualizado(self, cobro, estado=status.HTTP_200_OK):
         cobro = self.get_queryset().get(pk=cobro.pk)

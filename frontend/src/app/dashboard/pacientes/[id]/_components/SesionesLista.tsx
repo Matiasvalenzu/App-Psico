@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, ClipboardList, Clock, MoreHorizontal, Receipt, Trash2, Users, Video } from "lucide-react";
+import { Calendar, CircleCheck, ClipboardList, Clock, MoreHorizontal, Receipt, RotateCcw, Trash2, Users, Video } from "lucide-react";
 import { cn, formatDate, formatDuration, formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { chipBoleta, ESTADOS_PAGO } from "./cobros";
 import { getStatusBadge, getStatusLabel, type Sesion } from "./utils";
 
 const ORIGENES = {
@@ -44,6 +45,9 @@ export default function SesionesLista({
   onNewRemote,
   onDelete,
   onCobro,
+  mostrarCobro = false,
+  onMarcarPagado,
+  onVolverPendiente,
 }: {
   pacienteId: string;
   sesiones: Sesion[];
@@ -54,6 +58,9 @@ export default function SesionesLista({
   onNewRemote: () => void;
   onDelete: (sesion: Sesion) => void;
   onCobro?: (sesion: Sesion) => void;
+  mostrarCobro?: boolean;
+  onMarcarPagado?: (sesion: Sesion) => void;
+  onVolverPendiente?: (sesion: Sesion) => void;
 }) {
   const grupos: { mes: string; items: Sesion[] }[] = [];
   for (const sesion of sesiones) {
@@ -127,6 +134,9 @@ export default function SesionesLista({
                 : sesion.numero_sesion
                 ? `Sesión ${sesion.numero_sesion}`
                 : "Sesión";
+              const cobro = sesion.cobro;
+              const pago = cobro ? ESTADOS_PAGO[cobro.estado_pago] : ESTADOS_PAGO.SIN_COBRO;
+              const boleta = cobro ? chipBoleta(cobro.estado_boleta, cobro.boleta_folio) : null;
               return (
                 <li key={sesion.id} className="flex items-center gap-2 pr-2 transition-colors hover:bg-muted/40">
                   <Link
@@ -150,6 +160,16 @@ export default function SesionesLista({
                         </span>
                         {sesion.duracion_segundos ? <span>{formatDuration(sesion.duracion_segundos)}</span> : null}
                       </span>
+                      {mostrarCobro && (cobro || !isTest) && (
+                        <span className="mt-1.5 flex flex-wrap gap-1.5">
+                          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", pago.className)}>{pago.label}</span>
+                          {boleta && (
+                            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", boleta.className)}>
+                              {boleta.label}
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </span>
                     <span
                       className={cn(
@@ -167,10 +187,22 @@ export default function SesionesLista({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
-                      {onCobro && (
+                      {onCobro && !cobro && (
                         <DropdownMenuItem className="cursor-pointer" onClick={() => onCobro(sesion)}>
                           <Receipt className="mr-2 h-4 w-4" />
                           Registrar cobro
+                        </DropdownMenuItem>
+                      )}
+                      {onMarcarPagado && cobro?.estado_pago === "PENDIENTE" && (
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => onMarcarPagado(sesion)}>
+                          <CircleCheck className="mr-2 h-4 w-4" />
+                          Marcar como pagado
+                        </DropdownMenuItem>
+                      )}
+                      {onVolverPendiente && cobro?.estado_pago === "PAGADO" && (
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => onVolverPendiente(sesion)}>
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Volver a pendiente
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem variant="destructive" className="cursor-pointer" onClick={() => onDelete(sesion)}>

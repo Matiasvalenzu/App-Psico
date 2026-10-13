@@ -57,6 +57,8 @@ class Cobro(models.Model):
     estado_pago = models.CharField(
         max_length=20, choices=EstadoPago.choices, default=EstadoPago.PAGADO
     )
+    # Día en que el paciente pagó; fecha_pago es la fecha de la atención que va en la boleta.
+    pagado_el = models.DateField(null=True, blank=True)
 
     receptor_tipo_doc = models.CharField(max_length=20, choices=TIPOS_DOCUMENTO, default="RUT")
     receptor_documento = models.CharField(max_length=30, blank=True, default="")
@@ -96,6 +98,25 @@ class Cobro(models.Model):
 
     def __str__(self):
         return f"Cobro #{self.pk} - {self.fecha_pago}"
+
+
+class CambioEstadoPago(models.Model):
+    """Quién marcó un cobro como pagado o pendiente, y cuándo."""
+
+    cobro = models.ForeignKey(Cobro, on_delete=models.CASCADE, related_name="cambios_pago")
+    estado_anterior = models.CharField(max_length=20, choices=Cobro.EstadoPago.choices)
+    estado_nuevo = models.CharField(max_length=20, choices=Cobro.EstadoPago.choices)
+    pagado_el = models.DateField(null=True, blank=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"Cobro #{self.cobro_id}: {self.estado_anterior} → {self.estado_nuevo}"
 
 
 class DelegacionSII(models.Model):

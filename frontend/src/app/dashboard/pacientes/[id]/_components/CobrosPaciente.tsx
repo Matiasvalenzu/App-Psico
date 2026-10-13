@@ -7,10 +7,12 @@ import { apiFetch, getCurrentUser } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import BorradorBoleta from "./BorradorBoleta";
 import CobroDialog from "./CobroDialog";
-import { ESTADOS_BOLETA, formatCLP, type Cobro, type DelegacionBHE } from "./cobros";
+import { chipBoleta, ESTADOS_PAGO, formatCLP, hoyISO, type Cobro, type DelegacionBHE } from "./cobros";
+import { MarcarPagadoDialog } from "./PagoCobro";
 import { fetchAllPages } from "./utils";
 
 // Cobros del paciente. `refreshKey` permite recargar cuando se crea un cobro desde una sesión.
@@ -18,10 +20,12 @@ export default function CobrosPaciente({
   pacienteId,
   soloLectura,
   refreshKey = 0,
+  onCobroChanged,
 }: {
   pacienteId: number;
   soloLectura: boolean;
   refreshKey?: number;
+  onCobroChanged?: (cobro: Cobro) => void;
 }) {
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +35,9 @@ export default function CobrosPaciente({
   const [editando, setEditando] = useState<Cobro | null>(null);
   // Solo con la emisión automática disponible (flag BHE_AUTO_DISPONIBLE); si no, la ficha sigue con el flujo manual.
   const [delegacion, setDelegacion] = useState<DelegacionBHE | null>(null);
+  const [filtroPago, setFiltroPago] = useState("");
+  const [filtroBoleta, setFiltroBoleta] = useState("");
+  const [marcarPagado, setMarcarPagado] = useState<number | null>(null);
 
   const cargar = useCallback(async () => {
     setError("");
@@ -59,12 +66,29 @@ export default function CobrosPaciente({
   }, [soloLectura]);
 
   function reemplazar(cobro: Cobro) {
+    onCobroChanged?.(cobro);
     setCobros((prev) => {
       const existe = prev.some((c) => c.id === cobro.id);
       const next = existe ? prev.map((c) => (c.id === cobro.id ? cobro : c)) : [cobro, ...prev];
       return next.sort((a, b) => b.fecha_pago.localeCompare(a.fecha_pago) || b.id - a.id);
     });
   }
+
+  // Totales del mes en curso: lo pagado cuenta por el día del pago; lo pendiente, por la fecha de la atención.
+  const mes = hoyISO().slice(0, 7);
+  const sumar = (lista: Cobro[], campo: "monto_bruto" | "monto_retencion") => lista.reduce((t, c) => t + c[campo], 0);
+  const pagadoMes = sumar(cobros.filter((c) => c.estado_pago === "PAGADO" && c.pagado_el?.startsWith(mes)), "monto_bruto");
+  const pendienteMes = sumar(cobros.filter((c) => c.estado_pago === "PENDIENTE" && c.fecha_pago.startsWith(mes)), "monto_bruto");
+  const retencionMes = sumar(
+    cobros.filter((c) => c.fecha_pago.startsWith(mes) && c.estado_boleta !== "ANULADA" && c.estado_boleta !== "NO_APLICA"),
+    "monto_retencion",
+  );
+  const visibles = cobros.filter(
+    (c) =>
+      (!filtroPago || c.estado_pago === filtroPago) &&
+      (!filtroBoleta ||
+        (filtroBoleta === "SIN" ? c.estado_boleta === "PENDIENTE" || c.estado_boleta === "NO_APLICA" : c.estado_boleta === filtroBoleta)),
+  );
 
   function abrirNuevo() {
     setEditando(null);
@@ -109,7 +133,40 @@ export default function CobrosPaciente({
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
         </div>
-      ) : cobros.length === 0 ? (
+      ) : null}
+
+      {!loading && cobros.length > 0 && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: "Pagado este mes", valor: pagadoMes },
+              { label: "Pendiente este mes", valor: pendienteMes },
+              { label: "Retención estimada del mes", valor: retencionMes },
+            ].map((t) => (
+              <div key={t.label} className="rounded-xl border border-border/70 px-4 py-3">
+                <p className="text-xs text-muted-foreground">{t.label}</p>
+                <p className="text-lg font-semibold tabular-nums">{formatCLP(t.valor)}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <NativeSelect aria-label="Filtrar por pago" value={filtroPago} onChange={(e) => setFiltroPago(e.target.value)} className="w-44">
+              <option value="">Todos los pagos</option>
+              <option value="PENDIENTE">Pendientes</option>
+              <option value="PAGADO">Pagados</option>
+            </NativeSelect>
+            <NativeSelect aria-label="Filtrar por boleta" value={filtroBoleta} onChange={(e) => setFiltroBoleta(e.target.value)} className="w-44">
+              <option value="">Todas las boletas</option>
+              <option value="EMITIDA">Emitidas</option>
+              <option value="EN_EMISION">En emisión</option>
+              <option value="ANULADA">Anuladas</option>
+              <option value="SIN">Sin boleta</option>
+            </NativeSelect>
+          </div>
+        </>
+      )}
+
+      {loading ? null : cobros.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 py-10 text-center">
           <Receipt className="h-8 w-8 text-muted-foreground" />
           <p className="text-sm font-medium">Todavía no hay cobros</p>
@@ -127,11 +184,20 @@ export default function CobrosPaciente({
                 <th className="px-4 py-2 font-medium">Pago</th>
                 <th className="px-4 py-2 font-medium">Boleta</th>
                 <th className="px-4 py-2 font-medium">Folio</th>
+                {!soloLectura && <th className="px-4 py-2" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {cobros.map((cobro) => {
-                const estado = ESTADOS_BOLETA[cobro.estado_boleta];
+              {visibles.length === 0 && (
+                <tr>
+                  <td colSpan={soloLectura ? 5 : 6} className="px-4 py-6 text-center text-muted-foreground">
+                    Ningún cobro coincide con los filtros.
+                  </td>
+                </tr>
+              )}
+              {visibles.map((cobro) => {
+                const estado = chipBoleta(cobro.estado_boleta, cobro.boleta_folio);
+                const pago = ESTADOS_PAGO[cobro.estado_pago];
                 return (
                   <tr
                     key={cobro.id}
@@ -142,11 +208,33 @@ export default function CobrosPaciente({
                   >
                     <td className="px-4 py-3">{formatDateCL(cobro.fecha_pago)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCLP(cobro.monto_bruto)}</td>
-                    <td className="px-4 py-3">{cobro.estado_pago === "PAGADO" ? "Pagado" : "Pendiente"}</td>
                     <td className="px-4 py-3">
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", estado.className)}>{estado.label}</span>
+                      <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", pago.className)}>{pago.label}</span>
+                      {cobro.estado_pago === "PAGADO" && cobro.pagado_el && (
+                        <span className="ml-2 text-xs text-muted-foreground">{formatDateCL(cobro.pagado_el)}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", estado.className)}>{estado.label}</span>
                     </td>
                     <td className="px-4 py-3 tabular-nums">{cobro.boleta_folio || "—"}</td>
+                    {!soloLectura && (
+                      <td className="px-4 py-2 text-right">
+                        {cobro.estado_pago === "PENDIENTE" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMarcarPagado(cobro.id);
+                            }}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            Marcar pagado
+                          </Button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -174,6 +262,8 @@ export default function CobrosPaciente({
           setSeleccionado(null);
         }}
       />
+
+      <MarcarPagadoDialog cobroId={marcarPagado} onClose={() => setMarcarPagado(null)} onDone={reemplazar} />
 
       {!soloLectura && (
         <CobroDialog

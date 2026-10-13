@@ -1,5 +1,6 @@
 export type BheModo = "RETENCION_POR_EMISOR" | "RECEPTOR_RETIENE" | "SIN_DATOS_RECEPTOR";
 export type EstadoBoleta = "PENDIENTE" | "EN_EMISION" | "EMITIDA" | "ANULADA" | "NO_APLICA";
+export type EstadoPago = "PENDIENTE" | "PAGADO";
 export type EstadoEmision =
   | "PENDIENTE"
   | "EN_CURSO"
@@ -42,7 +43,9 @@ export interface Cobro {
   fecha_pago: string;
   monto_bruto: number;
   medio_pago: "EFECTIVO" | "TRANSFERENCIA" | "OTRO";
-  estado_pago: "PENDIENTE" | "PAGADO";
+  estado_pago: EstadoPago;
+  pagado_el: string | null;
+  ultimo_cambio_pago: { estado: EstadoPago; usuario: string; fecha: string } | null;
   receptor_tipo_doc: string;
   receptor_documento: string;
   receptor_nombre: string;
@@ -81,6 +84,21 @@ export const ESTADOS_BOLETA: Record<EstadoBoleta, { label: string; className: st
   ANULADA: { label: "Anulada", className: "bg-muted text-muted-foreground line-through" },
   NO_APLICA: { label: "No aplica", className: "bg-muted text-muted-foreground" },
 };
+
+export const ESTADOS_PAGO: Record<EstadoPago | "SIN_COBRO", { label: string; className: string }> = {
+  PAGADO: { label: "Pagado", className: ESTADOS_BOLETA.EMITIDA.className },
+  PENDIENTE: { label: "Pendiente", className: ESTADOS_BOLETA.PENDIENTE.className },
+  SIN_COBRO: { label: "Sin cobro", className: ESTADOS_BOLETA.NO_APLICA.className },
+};
+
+// Chip de boleta en las listas: la que falta emitir o no aplica cuenta como «Sin boleta».
+export function chipBoleta(estado: EstadoBoleta | null | undefined, folio = "") {
+  if (estado === "EMITIDA") {
+    return { label: folio ? `Emitida · folio ${folio}` : "Emitida", className: ESTADOS_BOLETA.EMITIDA.className };
+  }
+  if (estado === "EN_EMISION" || estado === "ANULADA") return ESTADOS_BOLETA[estado];
+  return { label: "Sin boleta", className: ESTADOS_BOLETA.NO_APLICA.className };
+}
 
 export function formatCLP(monto: number) {
   return `$${monto.toLocaleString("es-CL")}`;

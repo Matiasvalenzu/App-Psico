@@ -144,6 +144,8 @@ class PacienteListSerializer(serializers.ModelSerializer):
     ultima_sesion = serializers.DateTimeField(read_only=True, allow_null=True)
     proxima_cita = serializers.DateTimeField(read_only=True, allow_null=True)
     consentimiento_estado = serializers.CharField(read_only=True, allow_null=True)
+    deuda_pendiente = serializers.IntegerField(read_only=True)
+    cobros_pendientes = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Paciente
@@ -169,6 +171,8 @@ class PacienteListSerializer(serializers.ModelSerializer):
             "ultima_sesion",
             "proxima_cita",
             "consentimiento_estado",
+            "deuda_pendiente",
+            "cobros_pendientes",
         ]
         read_only_fields = ["id", "psicologo", "nombre_completo", "updated_at"]
 

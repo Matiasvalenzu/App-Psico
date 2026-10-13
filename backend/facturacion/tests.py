@@ -1,17 +1,18 @@
-from datetime import date
+from datetime import date, datetime
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
 from django.test import RequestFactory, TestCase
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.test import APITestCase
 
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 
-from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
-from .services import anulable_hasta, calcular_retencion, enmascarar_rut, validar_glosa
+from .models import CambioEstadoPago, Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
+from .services import anulable_hasta, calcular_retencion, enmascarar_rut, hoy_chile, validar_glosa
 
 User = get_user_model()
 URL = "/api/facturacion/cobros/"
@@ -372,3 +373,132 @@ class CobroEnEmisionTests(APITestCase):
         response = self.client.delete(f"{URL}{self.cobro.id}/", secure=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Cobro.objects.filter(pk=self.cobro.pk).exists())
+
+
+class EstadoPagoTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
+        self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.save()
+        self.paciente = Paciente.objects.create(psicologo=self.user, nombre="Ana", apellido="Rojas")
+        self.cobro = crear_cobro(self.user, paciente=self.paciente, estado_pago=Cobro.EstadoPago.PENDIENTE)
+        self.client.force_authenticate(user=self.user)
+
+    def post(self, accion, datos=None, cobro=None):
+        cobro = cobro or self.cobro
+        return self.client.post(f"{URL}{cobro.id}/{accion}/", datos or {}, format="json", secure=True)
+
+    def test_marcar_pagado_registra_fecha_y_quien(self):
+        response = self.post("marcar-pagado", {"fecha": "2026-10-10"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["estado_pago"], "PAGADO")
+        self.assertEqual(response.data["pagado_el"], "2026-10-10")
+        self.assertEqual(response.data["ultimo_cambio_pago"]["usuario"], "psi@psiconex.cl")
+        cambio = CambioEstadoPago.objects.get(cobro=self.cobro)
+        self.assertEqual((cambio.estado_anterior, cambio.estado_nuevo), ("PENDIENTE", "PAGADO"))
+        self.assertEqual(cambio.pagado_el, date(2026, 10, 10))
+        self.assertEqual(cambio.usuario, self.user)
+
+    def test_marcar_pagado_sin_fecha_usa_hoy_y_rechaza_futura(self):
+        self.assertEqual(self.post("marcar-pagado", {"fecha": "2999-01-01"}).status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.post("marcar-pagado")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["pagado_el"], hoy_chile().isoformat())
+
+    def test_volver_a_pendiente(self):
+        self.post("marcar-pagado", {"fecha": "2026-10-10"})
+        self.assertEqual(self.post("marcar-pagado").status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.post("marcar-pendiente")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["estado_pago"], "PENDIENTE")
+        self.assertIsNone(response.data["pagado_el"])
+        self.assertEqual(self.post("marcar-pendiente").status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            list(self.cobro.cambios_pago.values_list("estado_nuevo", flat=True)), ["PENDIENTE", "PAGADO"]
+        )
+
+    def test_no_toca_la_boleta_emitida(self):
+        cobro = crear_cobro(
+            self.user, estado_pago=Cobro.EstadoPago.PENDIENTE, estado_boleta=Cobro.EstadoBoleta.EMITIDA,
+            boleta_folio="77", boleta_fecha_emision=date(2026, 10, 12),
+        )  # fmt: skip
+        self.assertEqual(self.post("marcar-pagado", cobro=cobro).status_code, status.HTTP_200_OK)
+        cobro.refresh_from_db()
+        self.assertEqual((cobro.estado_boleta, cobro.boleta_folio), (Cobro.EstadoBoleta.EMITIDA, "77"))
+        self.assertFalse(EmisionBHE.objects.filter(cobro=cobro).exists())
+
+    def test_plan_estandar_no_cambia_el_pago(self):
+        self.user.suscripcion.plan = "standard"
+        self.user.suscripcion.save()
+        self.assertEqual(self.post("marcar-pagado").status_code, status.HTTP_403_FORBIDDEN)
+        self.cobro.refresh_from_db()
+        self.assertEqual(self.cobro.estado_pago, Cobro.EstadoPago.PENDIENTE)
+
+    def test_aislamiento_entre_psicologos(self):
+        otro = User.objects.create_user(username="otro@psiconex.cl", email="otro@psiconex.cl", password="x")
+        otro.suscripcion.plan = "plus"
+        otro.suscripcion.save()
+        self.client.force_authenticate(user=otro)
+        self.assertEqual(self.post("marcar-pagado").status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(f"{URL}resumen/", secure=True).data["pendiente_total"]["total"], 0)
+
+    def test_editar_estado_pago_deja_registro(self):
+        response = self.client.patch(f"{URL}{self.cobro.id}/", {"estado_pago": "PAGADO"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["estado_pago"], "PAGADO")
+        self.assertEqual(response.data["pagado_el"], hoy_chile().isoformat())
+        self.assertEqual(self.cobro.cambios_pago.get().usuario, self.user)
+        self.client.patch(f"{URL}{self.cobro.id}/", {"notas": "ok"}, format="json", secure=True)
+        self.assertEqual(self.cobro.cambios_pago.count(), 1)
+
+    def test_crear_cobro_pagado_usa_la_fecha_del_cobro(self):
+        datos = {"paciente": self.paciente.id, "fecha_pago": "2026-10-05", "monto_bruto": 30000}
+        response = self.client.post(URL, datos, format="json", secure=True)
+        self.assertEqual(response.data["pagado_el"], "2026-10-05")
+        response = self.client.post(URL, {**datos, "estado_pago": "PENDIENTE"}, format="json", secure=True)
+        self.assertIsNone(response.data["pagado_el"])
+
+    def test_filtros_por_estado_de_pago_y_mes(self):
+        crear_cobro(self.user, paciente=self.paciente, fecha_pago=date(2026, 9, 30))
+        response = self.client.get(f"{URL}?estado_pago=PENDIENTE", secure=True)
+        self.assertEqual([c["id"] for c in response.data["results"]], [self.cobro.id])
+        response = self.client.get(f"{URL}?mes=2026-09", secure=True)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(self.client.get(f"{URL}?mes=2026-13", secure=True).status_code, 400)
+
+    def test_resumen_del_mes(self):
+        crear_cobro(self.user, paciente=self.paciente, pagado_el=date(2026, 10, 3), monto_bruto=40000, monto_retencion=6100)
+        crear_cobro(self.user, estado_pago=Cobro.EstadoPago.PENDIENTE, fecha_pago=date(2026, 9, 1), monto_bruto=1000)
+        Sesion.objects.create(
+            paciente=self.paciente, psicologo=self.user, estado=Sesion.Estado.COMPLETADO,
+            fecha_hora_inicio=timezone.make_aware(datetime(2026, 10, 8, 12)),
+        )  # fmt: skip
+        datos = self.client.get(f"{URL}resumen/?mes=2026-10", secure=True).data
+        self.assertEqual(datos["pagado_mes"], {"total": 40000, "cantidad": 1})
+        self.assertEqual(datos["pendiente_mes"], {"total": 250000, "cantidad": 1})
+        self.assertEqual(datos["pendiente_total"], {"total": 251000, "cantidad": 2})
+        self.assertEqual(datos["retencion_mes"], 38125 + 6100)
+        self.assertEqual(datos["top_deudores"], [{"paciente": self.paciente.id, "nombre": "Ana Rojas", "total": 250000, "cantidad": 1}])
+        self.assertEqual(datos["sesiones_sin_cobro"], 1)
+
+    def test_exportar_csv_del_mes(self):
+        self.paciente.nombre = "=Ana"
+        self.paciente.save()
+        response = self.client.get(f"{URL}exportar/?mes=2026-10", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("cobros-2026-10.csv", response["Content-Disposition"])
+        filas = response.content.decode("utf-8-sig").splitlines()
+        self.assertTrue(filas[0].startswith("Fecha atención;Paciente"))
+        self.assertIn("2026-10-12;'=Ana Rojas;Ana Rojas;11.111.111-1;250000", filas[1])
+        self.assertEqual(len(filas), 2)
+
+    def test_listas_de_pacientes_y_sesiones(self):
+        sesion = Sesion.objects.create(paciente=self.paciente, psicologo=self.user)
+        self.cobro.sesion = sesion
+        self.cobro.save()
+        paciente = self.client.get("/api/pacientes/", secure=True).data["results"][0]
+        self.assertEqual((paciente["deuda_pendiente"], paciente["cobros_pendientes"]), (250000, 1))
+        datos = self.client.get(f"/api/sesiones/?paciente={self.paciente.id}", secure=True).data
+        filas = datos["results"] if isinstance(datos, dict) else datos
+        self.assertEqual(filas[0]["cobro"]["estado_pago"], "PENDIENTE")
+
