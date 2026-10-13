@@ -47,6 +47,29 @@ const t = (d: number, dur?: number) =>
 
 const INK = "text-[hsl(var(--os-ink))]"
 
+const PASOS = [
+  { title: "Conversas con tu paciente", delay: 0 },
+  { title: "La ficha se escribe sola", delay: 3 },
+  { title: "Queda listo para revisar", delay: 6.1 },
+]
+
+function StepCaption({ title, delay }: { title: string; delay: number }) {
+  return (
+    <p
+      className={cn(
+        styles.item,
+        styles.pop,
+        "mb-3 inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-full border border-primary/10 bg-white px-3 py-1.5 text-[13px] font-semibold leading-5 text-primary shadow-sm"
+      )}
+      style={t(delay, 0.35)}
+      data-os-item
+    >
+      <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+      {title}
+    </p>
+  )
+}
+
 function Arrow({ delay }: { delay: number }) {
   return (
     <div className="flex items-center justify-center text-primary" aria-hidden="true">
@@ -169,15 +192,13 @@ export function OneSessionSection() {
             <div key={run}>
               <div className="mt-6 flex flex-col items-center gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_72px_minmax(0,1.15fr)_72px_minmax(0,1fr)] lg:items-center lg:gap-0 xl:mt-8">
                 {/* Columna 1 — audio */}
-                <div
-                  className={cn(
-                    styles.item,
-                    styles.fadeUp,
-                    "w-full max-w-md p-2 lg:max-w-none lg:p-0"
-                  )}
-                  style={t(0)}
-                  data-os-item
-                >
+                <div className="flex w-full max-w-md flex-col items-center p-2 lg:max-w-none lg:items-start lg:p-0">
+                  <StepCaption title={PASOS[0].title} delay={PASOS[0].delay} />
+                  <div
+                    className={cn(styles.item, styles.fadeUp, "w-full")}
+                    style={t(0)}
+                    data-os-item
+                  >
                   <Image
                     src="/una-sesion-consulta.webp"
                     alt="Ilustración: una paciente conversa con su psicólogo, que toma notas en una sesión"
@@ -210,16 +231,19 @@ export function OneSessionSection() {
                   <p className="mt-3 text-center text-[13px] font-medium text-muted-foreground">
                     Audio de la sesión · 50 min
                   </p>
+                  </div>
                 </div>
 
                 <Arrow delay={2.6} />
 
                 {/* Columna 2 — ficha de sesión (borrador) */}
-                <div
+                <div className="flex w-full max-w-md flex-col items-center lg:max-w-none lg:items-start">
+                  <StepCaption title={PASOS[1].title} delay={PASOS[1].delay} />
+                  <div
                   className={cn(
                     styles.item,
                     styles.fadeUp,
-                    "w-full max-w-md rounded-2xl border border-border/70 bg-card p-5 shadow-lg shadow-primary/10 lg:max-w-none"
+                    "w-full rounded-2xl border border-border/70 bg-card p-5 shadow-lg shadow-primary/10"
                   )}
                   style={t(3, 0.45)}
                   data-os-item
@@ -262,11 +286,14 @@ export function OneSessionSection() {
                     ))}
                   </dl>
                 </div>
+                </div>
 
                 <Arrow delay={5.7} />
 
                 {/* Columna 3 — resultados reales */}
-                <div className="flex w-full max-w-md flex-col gap-3 lg:max-w-none">
+                <div className="flex w-full max-w-md flex-col items-center lg:max-w-none lg:items-start">
+                  <StepCaption title={PASOS[2].title} delay={PASOS[2].delay} />
+                  <div className="flex w-full flex-col gap-3">
                   {RESULTADOS.map((r, i) => (
                     <div
                       key={r.title}
@@ -287,6 +314,7 @@ export function OneSessionSection() {
                       </div>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
 
