@@ -2,7 +2,7 @@ import re
 from datetime import date
 from unittest import mock, skipUnless
 
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from .emisores import (
     DatosBoleta, ErrorCredencial, ErrorDespuesDeEnviar, ErrorNegocio, LineaBoleta, Receptor, Retencion,
@@ -281,3 +281,42 @@ class PortalSimuladoTests(SimpleTestCase):
         with self.assertRaises(ErrorDespuesDeEnviar):
             emisor.emitir(datos())
         self.assertEqual(emisor.pedidas.count("TMBEUS_BoletaHonorariosElectronica.cgi"), 1)
+
+
+@skipUnless(_hay_chromium(), "Sin Chromium: correr en la imagen bhe-dev (servicio worker-bhe).")
+@override_settings(BHE_RUT_AUTORIZADO="76.543.210-3", BHE_SII_CLAVE=CLAVE)
+@mock.patch.object(robot, "ESPERA_MS", 3000)
+class ExplorarConsultasTests(TestCase):
+    def test_un_login_y_bloquea_emision_y_anulacion(self):
+        import tempfile
+        from io import StringIO
+        from pathlib import Path
+
+        from django.core.management import call_command
+
+        from .management.commands import bhe_explorar_consultas as comando
+
+        portal = PortalSimulado()
+        ordenes = (
+            "ir https://loa.sii.cl/cgi_IMT/TMBEUS_BoletaHonorariosElectronica.cgi",
+            "ir https://loa.sii.cl/cgi_IMT/TMBANU_PrevalidaAnulacion.cgi",
+            "clic Confirmar Datos",
+            "descargar https://loa.sii.cl/cgi_IMT/TMBCOT_ConsultaBoletaPdf.cgi?origen=TERCEROS",
+            "ir https://loa.sii.cl/cgi_IMT/TMBCOC_MenuConsultasContrib.cgi\nver menu\nfin",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            for numero, orden in enumerate(ordenes, 1):
+                (Path(tmp) / "ordenes").mkdir(exist_ok=True)
+                (Path(tmp) / "ordenes" / f"{numero:02d}.txt").write_text(orden)
+            salida = StringIO()
+            with mock.patch.object(comando, "PlaywrightEmisor", lambda: portal), mock.patch.object(comando, "ESPERA_ORDEN_S", 15):
+                call_command("bhe_explorar_consultas", salida=tmp, stdout=salida)
+            capturas = sorted(p.name for p in Path(tmp).glob("explorar-*/*"))
+        texto = salida.getvalue()
+        self.assertEqual(texto.count("BLOQUEADA"), 2, texto)
+        self.assertIn("clic prohibido", texto)
+        self.assertIn(f"descarga: {len(PDF)} bytes, pdf=True", texto)
+        self.assertEqual(sum(CLAVE in envio for envio in portal.envios), 1)
+        self.assertFalse({"TMBEUS_BoletaHonorariosElectronica.cgi", "TMBANU_PrevalidaAnulacion.cgi"} & set(portal.pedidas))
+        self.assertIn("TMBCOC_MenuConsultasContrib.cgi", portal.pedidas)
+        self.assertIn("03-menu.png", capturas, texto)

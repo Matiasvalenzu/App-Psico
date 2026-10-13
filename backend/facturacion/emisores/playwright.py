@@ -160,7 +160,7 @@ class PlaywrightEmisor(EmisorBHE):
         )
 
     def buscar(self, rut_emisor, rut_receptor, fecha, monto_bruto):
-        raise NotImplementedError("La búsqueda llega en la T7c.")
+        raise NotImplementedError("La cuenta autorizada no ve las boletas emitidas sin su folio (T7c): DESCONOCIDO va a revisión manual.")
 
     def verificar_delegacion(self, rut_emisor):
         raise NotImplementedError

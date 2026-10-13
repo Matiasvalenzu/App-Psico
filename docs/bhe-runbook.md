@@ -85,9 +85,9 @@ dc up -d && dc --profile bhe up -d worker-bhe
 Un `DESCONOCIDO` significa: el formulario pudo quedar enviado y **no sabemos si la boleta existe**. Reenviar a ciegas puede emitir **dos boletas por el mismo cobro**. Por eso:
 
 - El psicólogo ve «Estamos confirmando con el SII… No la emitas a mano todavía» y no puede volver a emitir.
-- Hoy el sistema hace dos búsquedas automáticas en el SII (a los 2 y a los 10 minutos). Si no la encuentra, la deja en **revisión manual** y avisa por correo: «Boleta por confirmar a mano (emisión #N)».
+- Con el robot real (`BHE_BACKEND=playwright`) **no hay búsqueda automática**: queda en **revisión manual** de inmediato y avisa por correo: «Boleta por confirmar a mano (emisión #N)». (Solo el emisor de prueba `fake` simula búsquedas.)
 
-> **Importante (prueba real del 2026-10):** desde la sesión de la cuenta de Psiconex, los informes de boletas del SII salieron **«Sin Datos»**, aunque la boleta (folio 77) sí se emitió. Es probable que el robot **no pueda** confirmar buscando por RUT, fecha y monto. Hasta que la T7 demuestre lo contrario, cuenta con que **todo DESCONOCIDO termina en revisión manual**. **No uses el informe de la cuenta de Psiconex para concluir que «no está».**
+> **Importante (T7c, 2026-10-13):** la sesión de la cuenta de Psiconex **no ve** las boletas que emite por los psicólogos: los informes anual, mensual y diario muestran solo las boletas propias de la empresa (en cero o «Sin Datos»), y «Destinatarios de últimos 30 días» y «Basarse en última boleta» salen vacíos. **No uses ningún informe de la cuenta de Psiconex para concluir que «no está».**
 
 ### Cómo confirmar
 
@@ -103,9 +103,9 @@ Un `DESCONOCIDO` significa: el formulario pudo quedar enviado y **no sabemos si 
 
 Si «Resolver» responde «Ese folio ya está registrado en otro cobro.», ese folio ya corresponde a otra boleta: revisa con el psicólogo que te haya dado el folio correcto.
 
-### Pendiente para la T7 (robot real)
+### Decisión tras la T7c
 
-En la T7 hay que revisar si existe **alguna consulta del portal que la cuenta autorizada sí pueda usar** para encontrar una boleta emitida. Si no existe, un `DESCONOCIDO` va **siempre** directo a revisión manual, **nunca** a una búsqueda o reintento automático, para no emitir dos veces. Actualizar este runbook cuando se decida.
+No hay consulta que la cuenta autorizada pueda usar para **encontrar** una boleta sin conocer su folio. La «Consulta de boletas por terceros» (`TMBCOT_MenuConsultasTerceros.cgi`) exige sesión y pide RUT del emisor, **folio**, RUT del receptor y fecha, o el código de barras: sirve para comprobar una boleta conocida, no para buscarla. Por eso un `DESCONOCIDO` va **siempre** directo a revisión manual, **nunca** a una búsqueda o reintento automático.
 
 ---
 
