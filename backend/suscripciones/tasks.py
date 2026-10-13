@@ -49,3 +49,23 @@ def ciclo_suscripciones():
         elif dias <= 7:
             avisos += bool(enqueue_purge_notice(suscripcion, 7))
     return {"avisos": avisos, "purgadas": purgadas}
+
+
+@shared_task
+def avisar_pago_plus_sin_vincular(pendiente_id):
+    """Si a la media hora del webhook nadie reclamó el pago de Plus, se avisa a los admins para no perderlo."""
+    from facturacion.bhe import avisar_admins
+    from .models import PagoPlusPendiente
+
+    pendiente = PagoPlusPendiente.objects.filter(pk=pendiente_id, vinculado_a__isnull=True).first()
+    if not pendiente or Suscripcion.objects.filter(mp_preapproval_id=pendiente.mp_preapproval_id).exists():
+        return
+    enlace = f"{settings.PUBLIC_APP_URL.rstrip('/')}/suscripcionok?preapproval_id={pendiente.mp_preapproval_id}"
+    avisar_admins(
+        "Pago de Plan Plus sin cuenta asociada",
+        "Alguien se suscribió a Plus con el enlace de Mercado Pago y no volvió a la app, así que el pago no quedó "
+        f"asociado a ninguna cuenta (estado en MP: {pendiente.estado_mp}). Cuando la persona escriba, pídele que "
+        f"abra este enlace con su sesión iniciada y Plus queda activo:\n\n{enlace}\n\n"
+        "Lo ves también en el admin, en «Pagos Plus sin vincular».",
+    )
+    logger.warning(f"Pago Plus sin vincular #{pendiente.pk} ({pendiente.estado_mp})")

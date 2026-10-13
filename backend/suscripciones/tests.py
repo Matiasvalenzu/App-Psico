@@ -5,7 +5,8 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from .models import Suscripcion
+from .models import PagoPlusPendiente, Suscripcion
+from .tasks import avisar_pago_plus_sin_vincular
 
 User = get_user_model()
 
@@ -463,9 +464,41 @@ class EnlacePlusTests(APITestCase):
         self.suscripcion.refresh_from_db()
         self.assertEqual((self.suscripcion.plan, self.suscripcion.estado), ("plus", "past_due"))
 
+    @patch("suscripciones.tasks.avisar_pago_plus_sin_vincular.apply_async")
     @patch("suscripciones.views._get_mp_sdk")
-    def test_webhook_ignora_preapproval_plus_sin_vincular(self, mock_sdk_fn):
+    def test_webhook_deja_pendiente_el_pago_plus_sin_vincular(self, mock_sdk_fn, mock_aviso):
         self._mp(mock_sdk_fn)
-        self.client.post("/api/suscripciones/webhook/",
-                         {"type": "subscription_preapproval", "data": {"id": "prePlus9"}}, format="json", secure=True)
+        for _ in range(2):
+            self.client.post("/api/suscripciones/webhook/",
+                             {"type": "subscription_preapproval", "data": {"id": "prePlus9"}}, format="json", secure=True)
         self.assertFalse(Suscripcion.objects.filter(mp_preapproval_id="prePlus9").exists())
+        pendiente = PagoPlusPendiente.objects.get(mp_preapproval_id="prePlus9")
+        self.assertEqual(pendiente.estado_mp, "authorized")
+        mock_aviso.assert_called_once_with(args=[pendiente.pk], countdown=1800)
+
+        # Si vuelve después a /suscripcionok, el pago queda vinculado y no se avisa.
+        self.assertEqual(self._vincular("prePlus9").status_code, status.HTTP_200_OK)
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.vinculado_a, self.user)
+        with patch("facturacion.bhe.send_mail") as mock_mail:
+            avisar_pago_plus_sin_vincular(pendiente.pk)
+        mock_mail.assert_not_called()
+
+    @patch("suscripciones.tasks.avisar_pago_plus_sin_vincular.apply_async")
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_webhook_no_deja_pendiente_otro_plan(self, mock_sdk_fn, mock_aviso):
+        self._mp(mock_sdk_fn, preapproval_plan_id="otro")
+        self.client.post("/api/suscripciones/webhook/",
+                         {"type": "subscription_preapproval", "data": {"id": "preOtro"}}, format="json", secure=True)
+        self.assertFalse(PagoPlusPendiente.objects.exists())
+        mock_aviso.assert_not_called()
+
+    def test_aviso_de_pago_plus_sin_vincular_a_los_admins(self):
+        User.objects.create_superuser(username="jefe", email="jefe@psiconex.cl", password="x")
+        pendiente = PagoPlusPendiente.objects.create(mp_preapproval_id="prePlus9", estado_mp="authorized")
+        with patch("facturacion.bhe.send_mail") as mock_mail:
+            avisar_pago_plus_sin_vincular(pendiente.pk)
+        asunto, mensaje, _, correos = mock_mail.call_args.args
+        self.assertIn("Plan Plus", asunto)
+        self.assertIn("/suscripcionok?preapproval_id=prePlus9", mensaje)
+        self.assertEqual(correos, ["jefe@psiconex.cl"])

@@ -173,6 +173,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Santiago"
 CELERY_TASK_ROUTES = {
     "notificaciones.tasks.send_notification": {"queue": "email"},
+    "suscripciones.tasks.avisar_pago_plus_sin_vincular": {"queue": "email"},
     "notificaciones.tasks.dispatch_pending_notifications": {"queue": "email"},
     "notificaciones.tasks.enqueue_appointment_reminders_task": {"queue": "email"},
     # Corre aunque worker-bhe esté apagado (la ruta exacta gana a la de facturacion.tasks.*).

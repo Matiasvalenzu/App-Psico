@@ -113,3 +113,21 @@ class Suscripcion(models.Model):
         if fecha is None:
             return None
         return max(0, math.ceil((fecha - timezone.now()).total_seconds() / 86400))
+
+
+class PagoPlusPendiente(models.Model):
+    """Suscripción del enlace de Plus que llegó por webhook sin cuenta asociada (se pagó y no se volvió a la app)."""
+
+    mp_preapproval_id = models.CharField(max_length=100, unique=True)
+    estado_mp = models.CharField(max_length=20, blank=True)
+    vinculado_a = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    vinculado_en = models.DateTimeField(null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "pago Plus sin vincular"
+        verbose_name_plural = "pagos Plus sin vincular"
+
+    def __str__(self):
+        return f"Pago Plus {self.mp_preapproval_id}"

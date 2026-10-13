@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
-from .models import PLANES, Suscripcion
+from .models import PLANES, PagoPlusPendiente, Suscripcion
 
 logger = logging.getLogger(__name__)
 
@@ -348,6 +348,9 @@ class VincularPreapprovalView(APIView):
         suscripcion.card_last_four = None
         suscripcion.proximo_cobro = parse_datetime(data.get("next_payment_date") or "") or suscripcion.proximo_cobro
         suscripcion.save()
+        PagoPlusPendiente.objects.filter(mp_preapproval_id=preapproval_id, vinculado_a__isnull=True).update(
+            vinculado_a=request.user, vinculado_en=timezone.now()
+        )
         logger.info(f"Preapproval Plus vinculado a user={request.user.id} ({data.get('status')})")
         return Response({"status": "ok", "plan": "plus", "estado": suscripcion.estado})
 
@@ -455,6 +458,15 @@ class WebhookView(APIView):
 
                             suscripcion.mp_preapproval_id = mp_id
                             suscripcion.save()
+                        elif not suscripcion and settings.MERCADOPAGO_PLUS_PLAN_ID and data.get("preapproval_plan_id") == settings.MERCADOPAGO_PLUS_PLAN_ID:
+                            # Pagó con el enlace de Plus y no volvió a /suscripcionok: queda pendiente de revisión.
+                            pendiente, creado = PagoPlusPendiente.objects.update_or_create(
+                                mp_preapproval_id=mp_id, defaults={"estado_mp": mp_status or ""}
+                            )
+                            if creado:
+                                from .tasks import avisar_pago_plus_sin_vincular
+
+                                avisar_pago_plus_sin_vincular.apply_async(args=[pendiente.pk], countdown=1800)
                 except Exception as e:
                     logger.error(f"Error procesando webhook Mercado Pago: {e}")
 
