@@ -77,6 +77,15 @@ def revisar_vista_previa(texto, datos):
         raise ErrorNegocio("vista_previa_distinta", "La vista previa no muestra: " + ", ".join(faltan) + ".")
 
 
+def _credenciales():
+    rut, clave = settings.BHE_RUT_AUTORIZADO.strip(), settings.BHE_SII_CLAVE
+    if not rut:
+        raise ErrorCredencial("sin_rut_autorizado", "BHE_RUT_AUTORIZADO está vacío: no se intenta el login.")
+    if not clave:
+        raise ErrorCredencial("sin_clave", "BHE_SII_CLAVE está vacía: no se intenta el login.")
+    return rut, clave
+
+
 def _rut_formateado(rut):
     limpio = _rut_limpio(rut)
     return f"{limpio[:-1]}-{limpio[-1]}"
@@ -92,6 +101,7 @@ class PlaywrightEmisor(EmisorBHE):
     def vista_previa(self, datos):
         """Llena la boleta hasta la vista previa (paso 3) y sale sin emitir."""
         validar(datos)
+        _credenciales()  # sin RUT o sin clave ni se abre el navegador
         with self._navegador() as page:
             self._llegar_a_vista_previa(page, datos)
         return self.evidencias
@@ -183,9 +193,7 @@ class PlaywrightEmisor(EmisorBHE):
         from playwright.sync_api import Error as ErrorPlaywright
 
         self._capturar(page, "login")  # antes de escribir: la captura nunca lleva la clave
-        rut, clave = settings.BHE_RUT_AUTORIZADO, settings.BHE_SII_CLAVE
-        if not rut or not clave:
-            raise ErrorCredencial("sin_clave", "Faltan BHE_RUT_AUTORIZADO o BHE_SII_CLAVE.")
+        rut, clave = _credenciales()
         campo_rut = page.locator("input#rutcntr, input[name=rutcntr]")
         campo_clave = page.locator("input[type=password]")
         boton = page.locator("#bt_ingresar")

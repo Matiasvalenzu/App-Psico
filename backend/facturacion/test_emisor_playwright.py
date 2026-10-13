@@ -64,6 +64,14 @@ class ValidacionesTests(SimpleTestCase):
             robot.revisar_vista_previa(texto.replace("12.345.678-5", "76.543.210-3"), datos())
         self.assertIn("RUT del emisor", ctx.exception.detalle)
 
+    @override_settings(BHE_RUT_AUTORIZADO=" ", BHE_SII_CLAVE=CLAVE)
+    def test_sin_rut_autorizado_ni_abre_el_navegador(self):
+        emisor = robot.PlaywrightEmisor()
+        with mock.patch.object(emisor, "_navegador") as navegador, self.assertRaises(ErrorCredencial) as ctx:
+            emisor.vista_previa(datos())
+        self.assertEqual(ctx.exception.codigo, "sin_rut_autorizado")
+        navegador.assert_not_called()
+
 
 # Portal simulado con los nombres de campos del mapa (§K); el HTML real es otro.
 PAGINAS = {

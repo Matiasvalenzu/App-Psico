@@ -15,7 +15,9 @@ x-backend-env: &backend-env
   DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
   BHE_BACKEND: ${BHE_BACKEND:-fake}
   BHE_AUTO_DISPONIBLE: ${BHE_AUTO_DISPONIBLE:-False}
-  BHE_RUT_AUTORIZADO: ${BHE_RUT_AUTORIZADO:-}
+  # Cuenta de Psiconex que el psicólogo autoriza en el SII (no es secreto). Con default para que
+  # nunca quede vacío: environment pisa a env_file.
+  BHE_RUT_AUTORIZADO: ${BHE_RUT_AUTORIZADO:-77.781.977-1}
   BHE_STORAGE_PATH: /data/bhe
   BHE_FAKE_ESCENARIO: ${BHE_FAKE_ESCENARIO:-exito}
   DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}

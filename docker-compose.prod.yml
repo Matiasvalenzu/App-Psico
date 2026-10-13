@@ -38,7 +38,9 @@ x-backend-env: &backend-env
   AUDIO_STORAGE_PATH: /data/audio
   BHE_AUTO_DISPONIBLE: ${BHE_AUTO_DISPONIBLE:-False}
   BHE_BACKEND: ${BHE_BACKEND:-}
-  BHE_RUT_AUTORIZADO: ${BHE_RUT_AUTORIZADO:-}
+  # Cuenta de Psiconex que el psicólogo autoriza en el SII (no es secreto). Con default para que
+  # nunca quede vacío: environment pisa a env_file.
+  BHE_RUT_AUTORIZADO: ${BHE_RUT_AUTORIZADO:-77.781.977-1}
   BHE_STORAGE_PATH: /data/bhe
   DOCUMENT_UPLOAD_MAX_BYTES: ${DOCUMENT_UPLOAD_MAX_BYTES:-10485760}
   WHISPER_MODEL: ${WHISPER_MODEL:-base}

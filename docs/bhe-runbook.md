@@ -161,7 +161,7 @@ Nada de esto se hace sin el OK explícito de Matías.
 1. El checklist legal del plan (§9) está firmado.
 2. `docker compose version` en el VPS ≥ **2.24**. El compose usa `env_file` con `required: false`; con una versión anterior falla. Si no se puede actualizar, reemplazar por `env_file: [.env.bhe]` y crear el archivo antes del `up`.
 3. Crear `.env.bhe` a partir de `.env.bhe.example`, con `BHE_SII_CLAVE`, y dejarlo con `chmod 600`.
-4. En el `.env` principal (sin secretos): `BHE_AUTO_DISPONIBLE=False`, `BHE_RUT_AUTORIZADO=<RUT de la cuenta de Psiconex>`, y `BHE_BACKEND=playwright` **solo cuando el robot real (T7) esté listo**. `BHE_BACKEND=fake` está prohibido en producción (el backend no arranca).
+4. En el `.env` principal (sin secretos): `BHE_AUTO_DISPONIBLE=False` y `BHE_BACKEND=playwright` **solo cuando el robot real (T7) esté listo**. `BHE_BACKEND=fake` está prohibido en producción (el backend no arranca). `BHE_RUT_AUTORIZADO` ya trae en el compose el RUT de la cuenta de Psiconex; solo se define en el `.env` si esa cuenta cambia. Si llega vacío, el robot se detiene con `sin_rut_autorizado` sin intentar el login.
 5. Migrar y recrear los servicios (`dc up -d`). Beat lee `BHE_BACKEND` para programar el rescate y la purga.
 6. Encender el worker a propósito: `dc --profile bhe up -d worker-bhe`. Sin `BHE_BACKEND` no hay que encenderlo.
 7. Revisar que Configuración BHE esté **pausada** (es lo que trae por defecto). Reanudar solo cuando el piloto esté listo.
