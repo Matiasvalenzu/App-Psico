@@ -33,11 +33,11 @@ export function emitidaPorPsiconex(cobro: Cobro) {
   return cobro.estado_boleta === "EMITIDA" && emision?.tipo === "EMISION" && emision.estado === "EMITIDA";
 }
 
-function Fila({ label, value }: { label: string; value: string }) {
+function Fila({ label, value, destacado = false }: { label: string; value: string; destacado?: boolean }) {
   return (
-    <div className="flex justify-between gap-4 py-1.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value || "—"}</span>
+    <div className={destacado ? "flex justify-between gap-4 py-2 text-base" : "flex justify-between gap-4 py-1.5"}>
+      <span className={destacado ? "font-medium" : "text-muted-foreground"}>{label}</span>
+      <span className={destacado ? "text-right font-semibold tabular-nums" : "text-right font-medium"}>{value || "—"}</span>
     </div>
   );
 }
@@ -414,9 +414,21 @@ export default function EmisionSii({
             <Fila label="Dirección" value={`${cobro.receptor_direccion}, ${cobro.receptor_comuna}`} />
             <Fila label="Glosa" value={cobro.glosa} />
             <Fila label="Fecha de la boleta" value="Hoy" />
-            <Fila label="Monto bruto" value={formatCLP(cobro.monto_bruto)} />
-            <Fila label={`Retención (${tasa} %)`} value={`−${formatCLP(cobro.monto_retencion)}`} />
-            <Fila label="Líquido" value={formatCLP(cobro.monto_liquido)} />
+            {porEmisor ? (
+              <>
+                <Fila label="Monto de la boleta en el SII" value={formatCLP(cobro.monto_bruto)} destacado />
+                <Fila
+                  label={`Retención que declaras en tu F29 (${tasa} %)`}
+                  value={`${formatCLP(cobro.monto_retencion)} (no aparece en la boleta)`}
+                />
+              </>
+            ) : (
+              <>
+                <Fila label="Monto bruto" value={formatCLP(cobro.monto_bruto)} />
+                <Fila label={`Retención (${tasa} %)`} value={`−${formatCLP(cobro.monto_retencion)}`} />
+                <Fila label="Líquido" value={formatCLP(cobro.monto_liquido)} />
+              </>
+            )}
             <Fila label="Retención" value={MODOS_BOLETA[cobro.bhe_modo]} />
           </div>
           {porEmisor && (
