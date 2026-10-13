@@ -6,11 +6,13 @@ import { Footer } from "@/components/layout/footer"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
 import { SubscribeTracker } from "@/components/analytics/subscribe-tracker"
+import { VincularPlus } from "@/components/suscripcion/VincularPlus"
+import { FUNCIONES_PLUS_ADMINISTRACION } from "@/lib/planes"
 import { ROUTES, SITE } from "@/lib/config"
 
 export const metadata: Metadata = {
   title: "Suscripción confirmada · Psiconex",
-  description: "¡Gracias por suscribirte al Plan Estándar de Psiconex! Tu suscripción quedó registrada.",
+  description: "¡Gracias por suscribirte a Psiconex! Tu suscripción quedó registrada.",
   robots: {
     index: false,
     follow: false,
@@ -29,7 +31,17 @@ const INCLUDED_FEATURES = [
   "Enlace privado para reserva de horas",
 ]
 
-export default function SubscriptionSuccessPage() {
+export default function SubscriptionSuccessPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
+  // Mercado Pago vuelve del enlace de Plus con ?preapproval_id=…; el checkout de la app con Plus usa ?plan=plus.
+  const preapprovalId = typeof searchParams.preapproval_id === "string" ? searchParams.preapproval_id : ""
+  const esPlus = Boolean(preapprovalId) || searchParams.plan === "plus"
+  const nombrePlan = esPlus ? "Plan Plus" : "Plan Estándar"
+  const funciones = esPlus ? ["Todo lo del Plan Estándar", ...FUNCIONES_PLUS_ADMINISTRACION] : INCLUDED_FEATURES
+
   return (
     <>
       <SubscribeTracker />
@@ -59,11 +71,14 @@ export default function SubscriptionSuccessPage() {
             ¡Gracias por suscribirte a Psiconex!
           </h1>
           <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Tu suscripción al <strong className="text-foreground font-semibold">Plan Estándar</strong> quedó registrada y ya tienes acceso inmediato a todas las herramientas de asistencia clínica e inteligencia artificial diseñadas para devolverle tiempo a tu consulta.
+            Tu suscripción al <strong className="text-foreground font-semibold">{nombrePlan}</strong> quedó registrada y ya tienes acceso inmediato a todas las herramientas de asistencia clínica e inteligencia artificial diseñadas para devolverle tiempo a tu consulta.
           </p>
-          <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Si estás en tu período de prueba de 14 días, no se te cobra hoy: el primer cobro de $4.990 CLP se realiza al terminar la prueba. Puedes ver la fecha en la sección Suscripción de tu cuenta.
-          </p>
+          {!preapprovalId && (
+            <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              Si estás en tu período de prueba de 14 días, no se te cobra hoy: el primer cobro de {esPlus ? "$9.990" : "$4.990"} CLP se realiza al terminar la prueba. Puedes ver la fecha en la sección Suscripción de tu cuenta.
+            </p>
+          )}
+          {preapprovalId && <VincularPlus preapprovalId={preapprovalId} />}
 
           {/* Card Resumen del Plan */}
           <div className="mt-8 rounded-2xl border border-border/80 bg-card/60 p-6 sm:p-8 backdrop-blur-md shadow-sm text-left">
@@ -73,10 +88,10 @@ export default function SubscriptionSuccessPage() {
                   <Sparkles className="h-3.5 w-3.5" />
                   <span>Suscripción activa</span>
                 </div>
-                <h2 className="text-xl font-semibold text-foreground">Plan Estándar</h2>
+                <h2 className="text-xl font-semibold text-foreground">{nombrePlan}</h2>
               </div>
               <div className="text-left sm:text-right">
-                <span className="text-2xl font-bold text-foreground">$4.990</span>
+                <span className="text-2xl font-bold text-foreground">{esPlus ? "$9.990" : "$4.990"}</span>
                 <span className="text-xs text-muted-foreground ml-1">CLP / mes</span>
               </div>
             </div>
@@ -86,7 +101,7 @@ export default function SubscriptionSuccessPage() {
                 Beneficios incluidos en tu plan:
               </p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
-                {INCLUDED_FEATURES.map((feature) => (
+                {funciones.map((feature) => (
                   <li key={feature} className="flex items-start gap-2.5">
                     <span className="rounded-full bg-emerald-500/10 p-0.5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0">
                       <Check className="h-3.5 w-3.5" />

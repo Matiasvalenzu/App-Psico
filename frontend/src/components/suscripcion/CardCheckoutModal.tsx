@@ -230,7 +230,7 @@ export default function CardCheckoutModal({
       setTimeout(() => {
         onSuccess(data);
         onClose();
-        window.location.assign("/suscripcionok");
+        window.location.assign(plan === "plus" ? "/suscripcionok?plan=plus" : "/suscripcionok");
       }, 1600);
     } catch (err: any) {
       console.error("Error al contratar suscripción:", err);

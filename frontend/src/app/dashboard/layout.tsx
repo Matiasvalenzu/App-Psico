@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Inter } from "next/font/google";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { useRouter, usePathname } from "next/navigation";
 import { getAccessToken, getCurrentUser } from "@/lib/api";
+import { leerPreapprovalPendiente, vincularPreapproval } from "@/lib/vincularPlus";
 import {
   CalendarDays,
   ChevronLeft,
@@ -177,6 +178,7 @@ function DashboardInner({
   const [suscripcionEstado, setSuscripcionEstado] = useState<string | null>(null);
   const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
   const [fechaPurga, setFechaPurga] = useState<string | null>(null);
+  const [plusUrl, setPlusUrl] = useState("");
   const [usuario, setUsuario] = useState<{ nombre: string; email: string } | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -197,6 +199,14 @@ function DashboardInner({
       }
 
       try {
+        // Pagó Plus por el enlace sin sesión iniciada: se activa en cuanto entra.
+        const pendiente = leerPreapprovalPendiente();
+        if (pendiente) {
+          const mensaje = await vincularPreapproval(pendiente);
+          if (mensaje) toast.error(mensaje);
+          else toast.success("El Plan Plus quedó activo en tu cuenta.");
+        }
+
         const user = await getCurrentUser();
         const isAdm = user.username === "Admin" || user.is_admin === true;
         const isSuper = user.is_superuser === true;
@@ -215,6 +225,7 @@ function DashboardInner({
 
         // Suscripción inactiva: la cuenta queda en solo lectura (el backend bloquea escrituras)
         setFechaPurga(user.solo_lectura ? user.fecha_purga || null : null);
+        setPlusUrl(user.plan_plus_disponible ? user.plus_url || "" : "");
 
         setReady(true);
       } catch {
@@ -465,6 +476,11 @@ function DashboardInner({
               <Link href="/dashboard/suscripcion" className="underline underline-offset-2 hover:no-underline">
                 Reactivar plan
               </Link>
+              {plusUrl && (
+                <a href={plusUrl} className="underline underline-offset-2 hover:no-underline">
+                  Suscribirme a Plus
+                </a>
+              )}
             </span>
           </div>
         )}
