@@ -36,6 +36,8 @@ BOTON_EMITIR = "Emitir Boleta de Honorarios Electrónica"
 # El paso 2 trae 4 prestaciones visibles; las demás se agregan con JS y su numeración salta el 5.
 MAX_PRESTACIONES = 4
 MAX_MONTO = 99_999_999  # valor_prestacion tiene maxlength 8
+CODIGO_SII = r"[0-9A-F]{18,22}"  # RUT del titular sin DV + folio (7) + 5 hex (mapa §K)
+MARCO_BOLETA = "iframe[name=prueba]"
 
 
 def _rut_limpio(rut):
@@ -97,13 +99,20 @@ def _credenciales():
     return rut, clave
 
 
-def leer_paso_4(texto):
-    """Folio y código tal como los muestra el paso 4, cada uno por su lado (no se deduce uno del otro)."""
-    folios = set(re.findall(r"N\s*[°º]\s*(\d+)", texto))
-    codigos = set(re.findall(r"[Cc][óoÓO][Dd][Ii][Gg][Oo]\s*:?\s*([0-9A-Z]{12,})", texto))
-    if len(folios) != 1 or len(codigos) != 1:
+def leer_paso_4(texto, src):
+    """Folio y código del paso 4, tal como los muestra la boleta (cada uno por su lado, sin deducir uno del otro).
+
+    La boleta viene en un iframe: se lee su texto y se compara con el archivo del iframe, bhe_<RUT sin DV>-<folio>.html.
+    """
+    folios = set(re.findall(r"ELECTR[OÓ]NICA\s*N\s*[°º]\s*(\d+)", texto, re.I))  # no el «Res. Ex. N° 83»
+    codigos = set(re.findall(rf"(?<![0-9A-Z])({CODIGO_SII})(?![0-9A-Z])", texto))  # el que va bajo el código de barras
+    archivo = re.search(r"bhe_(\d{7,8})-(\d+)\.html", src or "")
+    if len(folios) != 1 or len(codigos) != 1 or not archivo:
         raise ErrorDespuesDeEnviar("paso_4_ilegible", "No se leyó un folio y un código únicos en el paso 4.")
-    return folios.pop(), codigos.pop()
+    folio, codigo = folios.pop(), codigos.pop()
+    if int(folio) != int(archivo[2]) or not codigo.startswith(archivo[1]):
+        raise ErrorDespuesDeEnviar("paso_4_inconsistente", "El folio o el código de la boleta no calzan con su archivo.")
+    return folio, codigo
 
 
 def _rut_formateado(rut):
@@ -214,7 +223,23 @@ class PlaywrightEmisor(EmisorBHE):
         opciones = select.locator("option").evaluate_all("os => os.map(o => [o.value, o.textContent])")
         select.select_option(value=elegir_opcion(opciones, texto))
 
+    def descargar_pdf(self, codigo):
+        """El PDF de una boleta ya emitida (p. ej. resuelta a mano): un login, sin pasar por el formulario."""
+        if not re.fullmatch(CODIGO_SII, codigo or ""):
+            raise ErrorNegocio("codigo_invalido", "El código del SII no tiene el formato esperado.")
+        _credenciales()
+        with self._navegador() as page:
+            self._abrir_paso_1(page)
+            self._en(page, "TMBEUS_ValidaAutoriz.cgi")
+            return self._descargar_pdf(page, codigo)
+
     def _llegar_a_vista_previa(self, page, datos):
+        self._abrir_paso_1(page)
+        self._paso_1(page, datos)
+        self._paso_2(page, datos)
+        self._paso_3(page, datos)
+
+    def _abrir_paso_1(self, page):
         page.goto(PORTAL)
         # Los enlaces del menú son javascript:linkVisita(...) dentro de acordeones: hay que hacer clic.
         # «Por usuario autorizado» (modo=2 es «...con datos usados anteriormente»).
@@ -225,9 +250,6 @@ class PlaywrightEmisor(EmisorBHE):
         page.wait_for_load_state()
         if self._es_login(page):
             self._login(page)
-        self._paso_1(page, datos)
-        self._paso_2(page, datos)
-        self._paso_3(page, datos)
 
     def _es_login(self, page):
         return "AUT2000" in page.url or page.locator("input[type=password]").count() > 0
@@ -309,8 +331,13 @@ class PlaywrightEmisor(EmisorBHE):
         self.enviado = True  # antes del clic: si se cae justo ahí, igual pudo llegar al SII
         page.get_by_role("button", name=BOTON_EMITIR).click()  # un solo clic; el JS del SII lo deshabilita
         self._en(page, "TMBEUS_BoletaHonorariosElectronica.cgi", espera=ESPERA_MS * 2)
+        # La boleta va en un iframe que el JS del SII escribe al cargar.
+        marco = page.frame_locator(MARCO_BOLETA)
+        marco.get_by_text(re.compile("Total Honorarios", re.I)).wait_for()
         self._capturar(page, "paso-4-emitida")
-        return leer_paso_4(page.locator("body").inner_text())
+        boleta = page.frame(name="prueba")
+        self.evidencias.append((f"{len(self.evidencias) // 2:02d}-paso-4-boleta.html", boleta.content().encode()))
+        return leer_paso_4(boleta.locator("body").inner_text(), page.locator(MARCO_BOLETA).get_attribute("src"))
 
     def _descargar_pdf(self, page, codigo):
         """El PDF con la misma sesión. Si falla la boleta igual quedó emitida: el psicólogo lo baja del SII."""

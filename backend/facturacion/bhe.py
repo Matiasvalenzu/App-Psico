@@ -323,10 +323,10 @@ def cancelar_emision(cobro):
     return emision
 
 
-def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None):
+def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None, codigo=""):
     """El operador revisó en el portal del SII una emisión por confirmar.
 
-    `hecha` dice si la boleta aparece en el SII; si aparece, se necesita el folio.
+    `hecha` dice si la boleta aparece en el SII; si aparece, se necesita el folio. Con el código se baja el PDF.
     """
     with transaction.atomic():
         emision = _bloquear(emision_id, Estado.DESCONOCIDO)
@@ -340,6 +340,9 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None):
             if _folio_ocupado(emision, folio):
                 raise EmisionNoPermitida("folio_ocupado")
             emision.folio = folio
+            emision.codigo_sii = codigo
+            if codigo:
+                transaction.on_commit(lambda: _programar_pdf(emision_id))
             cobro.estado_boleta = Cobro.EstadoBoleta.EMITIDA
             cobro.boleta_folio = folio
             cobro.boleta_fecha_emision = fecha or date.fromisoformat(json.loads(emision.payload)["fecha"])
@@ -360,6 +363,33 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None):
         cobro.save()
     logger.info("Emisión BHE %s resuelta a mano por el usuario %s: %s.", emision_id, usuario.pk, emision.estado)
     return emision
+
+
+def _programar_pdf(emision_id):
+    from .tasks import descargar_pdf_bhe
+
+    descargar_pdf_bhe.apply_async((emision_id,))
+
+
+def descargar_pdf(emision_id):
+    """Baja el PDF de una emisión resuelta a mano con su código. Si falla, la boleta sigue registrada sin PDF."""
+    emision = EmisionBHE.objects.select_related("cobro").get(pk=emision_id)
+    if emision.estado != Estado.EMITIDA or emision.pdf or not emision.codigo_sii:
+        return False
+    try:
+        pdf = get_emisor().descargar_pdf(emision.codigo_sii)
+    except ErrorCredencial as exc:
+        pausar_por_credencial(exc)
+        return False
+    except Exception as exc:
+        logger.warning("Emisión BHE %s: no se bajó el PDF (%s).", emision_id, getattr(exc, "codigo", type(exc).__name__))
+        return False
+    if not pdf:
+        logger.warning("Emisión BHE %s: el SII no devolvió el PDF.", emision_id)
+        return False
+    emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(pdf), save=False)
+    emision.save(update_fields=["pdf"])
+    return True
 
 
 def _bloquear(emision_id, *estados):

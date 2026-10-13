@@ -66,12 +66,19 @@ class ValidacionesTests(SimpleTestCase):
             robot.revisar_vista_previa(texto.replace("12.345.678-5", "76.543.210-3"), datos())
         self.assertIn("RUT del emisor", ctx.exception.detalle)
 
-    def test_leer_paso_4_tal_cual(self):
-        texto = "Boleta de Honorarios Electrónica N° 81\nFecha 13/10/2026 12:05\nCódigo: 12345678000008112AB3"
-        self.assertEqual(robot.leer_paso_4(texto), ("81", "12345678000008112AB3"))
-        for malo in ("Código: 12345678000008112AB3", "N° 81 N° 82 Código: 12345678000008112AB3", "N° 81"):
-            with self.subTest(malo), self.assertRaises(ErrorDespuesDeEnviar):
-                robot.leer_paso_4(malo)
+    def test_leer_paso_4_y_comparar_con_el_archivo(self):
+        src = "/IMT/pdf/bhe_12345678-81.html"
+        self.assertEqual(robot.leer_paso_4(BOLETA, src), ("81", CODIGO))
+        casos = {
+            "paso_4_ilegible": [(BOLETA.replace(CODIGO, ""), src), (BOLETA, "/IMT/pdf/otra.html"),
+                                (BOLETA + f" {CODIGO[:-1]}F", src)],
+            "paso_4_inconsistente": [(BOLETA, src.replace("-81", "-82")), (BOLETA, src.replace("12345678", "12345679"))],
+        }  # fmt: skip
+        for codigo, pares in casos.items():
+            for texto, archivo in pares:
+                with self.subTest(codigo, archivo=archivo), self.assertRaises(ErrorDespuesDeEnviar) as ctx:
+                    robot.leer_paso_4(texto, archivo)
+                self.assertEqual(ctx.exception.codigo, codigo)
 
     @override_settings(BHE_RUT_AUTORIZADO=" ", BHE_SII_CLAVE=CLAVE)
     def test_sin_rut_autorizado_ni_abre_el_navegador(self):
@@ -116,19 +123,25 @@ PAGINAS = {
         <p>ATENCION PSICOLOGICA 250.000</p><p>Total Honorarios $ 250.000</p>
         <form method="post" action="TMBEUS_BoletaHonorariosElectronica.cgi">
         <input type="submit" value="Emitir Boleta de Honorarios Electrónica"></form>""",
-    "TMBEUS_BoletaHonorariosElectronica.cgi": """<h2>Boleta de Honorarios Electrónica N° 81</h2>
-        <p>Fecha 13/10/2026 12:05</p><p>Código: 12345678000008112AB3</p><button>Ver Boleta</button>""",
+    "TMBEUS_BoletaHonorariosElectronica.cgi": """<p>Paso 4 de 4</p><p>BOLETA DE HONORARIOS ELECTRONICA</p>
+        <iframe name="prueba" src="/IMT/pdf/bhe_12345678-81.html"></iframe><button>Ver Boleta</button>""",
 }
+CODIGO = "12345678000008112AB3"
+# Como la del 13-10 (§K): folio en el recuadro, código bajo el código de barras, otros «N°» y números largos.
+BOLETA = f"""BOLETA DE HONORARIOS ELECTRONICA\nN ° 81\nRUT: 12.345.678-5\nFecha: 13 de Octubre de 2026
+    ATENCION PSICOLOGICA 250.000\nTotal Honorarios: $: 250.000\n{CODIGO}\nRes. Ex. N° 83 de 30/08/2004\n11202610131022"""
 PDF = b"%PDF-1.4 boleta"
 LOGIN = "https://zeusr.sii.cl/AUT2000/InicioAutenticacion/IngresoRutClave.html"
 PASO_1 = "https://loa.sii.cl/cgi_IMT/TMBEUS_ValidaAutoriz.cgi?modo=1"
 
 
 class PortalSimulado(robot.PlaywrightEmisor):
-    def __init__(self, clave_ok=True, rut_autorizador="12345678", paso_3=None, paso_4=None, pdf=PDF):
+    def __init__(self, clave_ok=True, rut_autorizador="12345678", paso_3=None, paso_4=None, boleta=BOLETA, pdf=PDF):
         super().__init__()
-        self.paso_3, self.paso_4, self.pdf = paso_3, paso_4, pdf
-        self.valores = {"tras_login": PASO_1 + "&ok=1" if clave_ok else LOGIN, "rut_autorizador": rut_autorizador}
+        self.paso_3, self.paso_4, self.boleta, self.pdf = paso_3, paso_4, boleta, pdf
+        self.valores = {
+            "tras_login": PASO_1 + "&ok=1" if clave_ok else LOGIN, "rut_autorizador": rut_autorizador,
+        }  # fmt: skip
         self.con_sesion = False
         self.pedidas, self.envios = [], []
 
@@ -152,6 +165,8 @@ class PortalSimulado(robot.PlaywrightEmisor):
                 return route.fulfill(status=500, body="")
             return route.fulfill(content_type="application/pdf", body=self.pdf)
         html = PAGINAS.get(pagina, "<p>No encontrada</p>").format(**self.valores)
+        if pagina == "bhe_12345678-81.html":
+            html = self.boleta.replace("\n", "<br>")
         if pagina == "TMBEUS_ConfirmaTimbrajeUsu.cgi" and self.paso_3:
             html = self.paso_3
         if pagina == "TMBEUS_BoletaHonorariosElectronica.cgi" and self.paso_4 == "abortar":
@@ -223,14 +238,18 @@ class PortalSimuladoTests(SimpleTestCase):
         self.assertEqual((resultado.folio, resultado.codigo_sii), ("81", "12345678000008112AB3"))
         self.assertEqual((resultado.monto_bruto, resultado.monto_retencion, resultado.monto_liquido), (250000, None, None))
         self.assertEqual(resultado.pdf, PDF)
-        self.assertIn("04-paso-4-emitida.png", dict(resultado.evidencias))
+        evidencias = dict(resultado.evidencias)
+        self.assertIn("04-paso-4-emitida.png", evidencias)
+        self.assertIn(CODIGO.encode(), evidencias["04-paso-4-boleta.html"])
 
-    def test_paso_4_ilegible_queda_despues_de_enviar(self):
-        emisor = PortalSimulado(paso_4="<p>Su boleta fue emitida.</p>")
-        with self.assertRaises(ErrorDespuesDeEnviar) as ctx:
-            emisor.emitir(datos())
-        self.assertEqual(ctx.exception.codigo, "paso_4_ilegible")
-        self.assertIn("04-paso-4-emitida.png", dict(emisor.evidencias))
+    def test_paso_4_que_no_calza_queda_despues_de_enviar(self):
+        for boleta, codigo in ((BOLETA.replace(CODIGO, ""), "paso_4_ilegible"),
+                               (BOLETA.replace("N ° 81", "N ° 82"), "paso_4_inconsistente")):  # fmt: skip
+            emisor = PortalSimulado(boleta=boleta)
+            with self.subTest(codigo), self.assertRaises(ErrorDespuesDeEnviar) as ctx:
+                emisor.emitir(datos())
+            self.assertEqual(ctx.exception.codigo, codigo)
+            self.assertIn("04-paso-4-emitida.png", dict(emisor.evidencias))
 
     def test_sin_pdf_igual_queda_emitida(self):
         resultado = PortalSimulado(pdf=None).emitir(datos())
@@ -248,3 +267,12 @@ class PortalSimuladoTests(SimpleTestCase):
         with self.assertRaises(ErrorDespuesDeEnviar):
             emisor.emitir(datos())
         self.assertEqual(emisor.pedidas.count("TMBEUS_BoletaHonorariosElectronica.cgi"), 1)
+
+    def test_descargar_pdf_con_un_login_y_sin_formulario(self):
+        emisor = PortalSimulado()
+        self.assertEqual(emisor.descargar_pdf(CODIGO), PDF)
+        self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
+        self.assertNotIn("TMBEUS_PresentaDatosBoleta.cgi", emisor.pedidas)
+        self.assertNotIn("TMBEUS_BoletaHonorariosElectronica.cgi", emisor.pedidas)
+        with self.assertRaises(ErrorNegocio):
+            emisor.descargar_pdf("../otra")

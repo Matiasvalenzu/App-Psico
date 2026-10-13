@@ -89,6 +89,14 @@ class ResolverEmisionForm(forms.Form):
         help_text="Solo para una emisión que sí está en el SII.",
     )
     fecha = forms.DateField(required=False, help_text="Fecha de la boleta en el SII (aaaa-mm-dd). Por omisión, la solicitada.")
+    codigo = forms.CharField(
+        label="Código", required=False,
+        validators=[RegexValidator(r"^[0-9A-Fa-f]{18,22}$", "Copia el código que va bajo el código de barras.")],
+        help_text="Opcional: el que va bajo el código de barras de la boleta. Con él se baja el PDF del SII.",
+    )
+
+    def clean_codigo(self):
+        return self.cleaned_data["codigo"].upper()
 
 
 @admin.register(EmisionBHE)

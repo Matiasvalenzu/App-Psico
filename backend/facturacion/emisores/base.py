@@ -108,6 +108,10 @@ class EmisorBHE(ABC):
     def emitir(self, datos: DatosBoleta) -> ResultadoEmision:
         ...
 
+    def descargar_pdf(self, codigo: str) -> bytes:
+        """El PDF de una boleta ya emitida, con su código del SII; b"" si no se pudo."""
+        raise NotImplementedError
+
     @abstractmethod
     def buscar(self, rut_emisor: str, rut_receptor: str, fecha: date, monto_bruto: int) -> list[ResultadoEmision]:
         """Solo consulta, nunca envía. Puede haber varias si hubo boletas iguales el mismo día."""
