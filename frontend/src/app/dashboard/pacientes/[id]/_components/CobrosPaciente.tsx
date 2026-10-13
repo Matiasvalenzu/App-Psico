@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Receipt } from "lucide-react";
+import { apiFetch, getCurrentUser } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import BorradorBoleta from "./BorradorBoleta";
 import CobroDialog from "./CobroDialog";
-import { ESTADOS_BOLETA, formatCLP, type Cobro } from "./cobros";
+import { ESTADOS_BOLETA, formatCLP, type Cobro, type DelegacionBHE } from "./cobros";
 import { fetchAllPages } from "./utils";
 
 // Cobros del paciente. `refreshKey` permite recargar cuando se crea un cobro desde una sesión.
@@ -28,6 +29,8 @@ export default function CobrosPaciente({
   const [seleccionado, setSeleccionado] = useState<Cobro | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState<Cobro | null>(null);
+  // Solo con la emisión automática disponible (flag BHE_AUTO_DISPONIBLE); si no, la ficha sigue con el flujo manual.
+  const [delegacion, setDelegacion] = useState<DelegacionBHE | null>(null);
 
   const cargar = useCallback(async () => {
     setError("");
@@ -43,6 +46,17 @@ export default function CobrosPaciente({
   useEffect(() => {
     cargar();
   }, [cargar, refreshKey]);
+
+  useEffect(() => {
+    if (soloLectura) return;
+    getCurrentUser()
+      .then(async (user) => {
+        if (!user.bhe_auto_disponible) return;
+        const res = await apiFetch("/facturacion/delegacion/");
+        if (res.ok) setDelegacion(await res.json());
+      })
+      .catch(() => setDelegacion(null));
+  }, [soloLectura]);
 
   function reemplazar(cobro: Cobro) {
     setCobros((prev) => {
@@ -143,6 +157,7 @@ export default function CobrosPaciente({
 
       <BorradorBoleta
         cobro={seleccionado}
+        delegacion={delegacion}
         soloLectura={soloLectura}
         onClose={() => setSeleccionado(null)}
         onChanged={(cobro) => {

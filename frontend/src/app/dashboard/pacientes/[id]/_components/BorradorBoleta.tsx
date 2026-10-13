@@ -16,7 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ESTADOS_BOLETA, formatCLP, hoyISO, MODOS_BOLETA, receptorIncompleto, type Cobro } from "./cobros";
+import { ESTADOS_BOLETA, formatCLP, hoyISO, MODOS_BOLETA, receptorIncompleto, type Cobro, type DelegacionBHE } from "./cobros";
+import EmisionSii, { emitidaPorPsiconex } from "./EmisionSii";
 import { getApiErrorMessage } from "./utils";
 
 const URL_SII = "https://www.sii.cl/servicios_online/";
@@ -46,6 +47,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 // Borrador para emitir la boleta a mano en el portal del SII y registrar luego el folio.
 export default function BorradorBoleta({
   cobro,
+  delegacion,
   soloLectura,
   onClose,
   onChanged,
@@ -53,6 +55,7 @@ export default function BorradorBoleta({
   onDeleted,
 }: {
   cobro: Cobro | null;
+  delegacion: DelegacionBHE | null;
   soloLectura: boolean;
   onClose: () => void;
   onChanged: (cobro: Cobro) => void;
@@ -79,6 +82,9 @@ export default function BorradorBoleta({
   const incompleto = receptorIncompleto(actual);
   const plazoVencido = Boolean(actual.anulable_hasta && hoyISO() > actual.anulable_hasta);
   const tasa = Number(actual.tasa_retencion).toLocaleString("es-CL");
+  const enEmision = actual.estado_boleta === "EN_EMISION";
+  const porPsiconex = emitidaPorPsiconex(actual);
+  const reemitible = Boolean(delegacion && !delegacion.motivo_bloqueo);
 
   async function accion(path: string, init: RequestInit, exito: string) {
     setBusy(true);
@@ -153,6 +159,10 @@ export default function BorradorBoleta({
             </Alert>
           )}
 
+          {(delegacion || enEmision || porPsiconex) && (
+            <EmisionSii cobro={actual} delegacion={delegacion} soloLectura={soloLectura} onChanged={onChanged} />
+          )}
+
           {actual.estado_boleta === "PENDIENTE" && incompleto && (
             <Alert variant="warning">
               <AlertTriangle />
@@ -164,18 +174,21 @@ export default function BorradorBoleta({
           )}
 
           {actual.estado_boleta === "PENDIENTE" && (
-            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-              <li>
-                Entra a{" "}
-                <a href={URL_SII} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
-                  sii.cl <ExternalLink className="h-3 w-3" />
-                </a>{" "}
-                con tu RUT y clave tributaria.
-              </li>
-              <li>Ve a Servicios online › Boletas de honorarios electrónicas › Emisor de boleta de honorarios › Emitir boleta.</li>
-              <li>Copia los datos de abajo en el formulario y emite la boleta.</li>
-              <li>Vuelve aquí y anota el folio que te entrega el SII.</li>
-            </ol>
+            <>
+              {delegacion && <p className="text-sm font-medium">O emítela tú en el portal del SII:</p>}
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>
+                  Entra a{" "}
+                  <a href={URL_SII} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                    sii.cl <ExternalLink className="h-3 w-3" />
+                  </a>{" "}
+                  con tu RUT y clave tributaria.
+                </li>
+                <li>Ve a Servicios online › Boletas de honorarios electrónicas › Emisor de boleta de honorarios › Emitir boleta.</li>
+                <li>Copia los datos de abajo en el formulario y emite la boleta.</li>
+                <li>Vuelve aquí y anota el folio que te entrega el SII.</li>
+              </ol>
+            </>
           )}
 
           <div className="divide-y divide-border/60 rounded-xl border border-border/70 px-4">
@@ -208,7 +221,7 @@ export default function BorradorBoleta({
             </p>
           </div>
 
-          {actual.estado_boleta === "EMITIDA" && (
+          {actual.estado_boleta === "EMITIDA" && !porPsiconex && (
             <div className="space-y-1 text-sm">
               <p>
                 Folio <span className="font-semibold">{actual.boleta_folio}</span> · emitida el{" "}
@@ -222,14 +235,18 @@ export default function BorradorBoleta({
 
           {actual.estado_boleta === "ANULADA" && (
             <p className="text-sm text-muted-foreground">
-              Folio {actual.boleta_folio} anulado. Si corresponde, registra un cobro nuevo y emite otra boleta.
+              Folio {actual.boleta_folio} anulado.{" "}
+              {reemitible ? "Puedes emitir una boleta nueva para este cobro." : "Si corresponde, registra un cobro nuevo y emite otra boleta."}
             </p>
           )}
 
-          <p className="text-xs text-muted-foreground">
-            Psiconex prepara el borrador, pero la boleta la emites tú en el SII. Revisa con tu contador la retención y
-            los datos del receptor.
-          </p>
+          {!enEmision && !porPsiconex && (
+            <p className="text-xs text-muted-foreground">
+              {delegacion
+                ? "Revisa con tu contador la retención y los datos del receptor."
+                : "Psiconex prepara el borrador, pero la boleta la emites tú en el SII. Revisa con tu contador la retención y los datos del receptor."}
+            </p>
+          )}
 
           {!soloLectura && actual.estado_boleta === "PENDIENTE" && (
             <form onSubmit={marcarEmitida} className="grid gap-3 rounded-xl border border-border/70 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -281,14 +298,14 @@ export default function BorradorBoleta({
           )}
         </div>
 
-        {!soloLectura && (
+        {!soloLectura && !enEmision && !porPsiconex && (
           <DialogFooter className="sm:justify-between">
             {actual.estado_boleta === "EMITIDA" ? (
               <Button variant="outline" onClick={() => setConfirmarAnular(true)} disabled={busy || confirmarAnular}>
                 Marcar anulada
               </Button>
             ) : (
-              <>
+                <>
                 <Button variant="ghost" className="text-destructive" onClick={eliminar} disabled={busy}>
                   <Trash2 />
                   Eliminar
