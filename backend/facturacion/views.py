@@ -170,6 +170,11 @@ class DelegacionView(APIView):
         return Response(self._datos(request.user))
 
     def post(self, request):
+        if not settings.BHE_AUTO_DISPONIBLE:
+            return Response(
+                {"detail": bhe.MENSAJES["bhe_no_disponible"], "code": "bhe_no_disponible"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         delegacion = DelegacionSII.objects.filter(psicologo=request.user).first()
         # Desde POR_VENCER sí se puede: es la renovación (vuelve a verificación).
         if delegacion and delegacion.estado == DelegacionSII.Estado.ACTIVA:
@@ -197,6 +202,7 @@ class DelegacionView(APIView):
                 "ultimo_error": "",
                 "consentimiento_at": timezone.now(),
                 "consentimiento_version": bhe.CONSENTIMIENTO_VERSION,
+                "numero_transaccion": datos.validated_data.get("numero_transaccion", ""),
             },
         )
         return Response(self._datos(request.user), status=status.HTTP_201_CREATED)
@@ -212,6 +218,7 @@ class DelegacionView(APIView):
             "fecha_vencimiento": delegacion.fecha_vencimiento if delegacion else None,
             "verificada": bool(delegacion and delegacion.verificada),
             "piloto": bool(delegacion and delegacion.piloto),
+            "numero_transaccion": delegacion.numero_transaccion if delegacion else "",
             "rut_autorizar": settings.BHE_RUT_AUTORIZADO,
             "consentimiento_version": delegacion.consentimiento_version if delegacion else "",
             "consentimiento_version_vigente": bhe.CONSENTIMIENTO_VERSION,

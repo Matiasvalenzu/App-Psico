@@ -194,6 +194,10 @@ class DelegacionSolicitudSerializer(serializers.Serializer):
     fecha_otorgada = serializers.DateField(required=False)
     # Solo se usa si el perfil todavía no tiene RUT.
     rut = serializers.CharField(max_length=12, required=False, allow_blank=True)
+    numero_transaccion = serializers.RegexField(
+        r"^\d{1,20}$", required=False, allow_blank=True,
+        error_messages={"invalid": "El número de transacción debe tener solo dígitos."},
+    )
 
     def validate_acepta(self, value):
         if not value:

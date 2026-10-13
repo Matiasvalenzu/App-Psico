@@ -40,7 +40,9 @@ class DelegacionSIIAdmin(admin.ModelAdmin):
     raw_id_fields = ["psicologo"]
     # El RUT del emisor nunca se muestra completo, ni siquiera a superusuarios.
     exclude = ["rut_emisor"]
-    readonly_fields = ["rut_enmascarado", "verificada_at", "consentimiento_at", "consentimiento_version"]
+    readonly_fields = [
+        "rut_enmascarado", "numero_transaccion", "verificada_at", "consentimiento_at", "consentimiento_version",
+    ]
     fieldsets = [
         (
             None,
@@ -48,12 +50,13 @@ class DelegacionSIIAdmin(admin.ModelAdmin):
                 "description": (
                     "Antes de marcar «verificada»: entra al portal del SII con la clave de la cuenta de Psiconex, "
                     "ve a Boletas de honorarios electrónicas > Emitir > Por usuario autorizado y confirma que el RUT "
-                    "y el nombre del psicólogo aparecen en la lista de autorizadores. Al marcarla verificada pasa a Activa. "
+                    "y el nombre del psicólogo aparecen en la lista de autorizadores. Si el psicólogo anotó el número "
+                    "de transacción, es el que trae su comprobante del SII. Al marcarla verificada pasa a Activa. "
                     "Anota la fecha de vencimiento solo si el SII la muestra; si no, déjala vacía (sin avisos ni "
                     "vencimiento automático)."
                 ),
                 "fields": [
-                    "psicologo", "rut_enmascarado", "estado", "fecha_otorgada", "fecha_vencimiento",
+                    "psicologo", "rut_enmascarado", "numero_transaccion", "estado", "fecha_otorgada", "fecha_vencimiento",
                     "verificada", "verificada_at", "piloto", "ultimo_error", "consentimiento_at",
                     "consentimiento_version",
                 ],

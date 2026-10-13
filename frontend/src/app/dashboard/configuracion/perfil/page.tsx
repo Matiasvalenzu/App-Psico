@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Mail, Receipt, ShieldCheck, UserRound, PlayCircle } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, ChevronRight, Loader2, Mail, Receipt, ShieldCheck, UserRound, PlayCircle } from "lucide-react";
 import { apiFetch, getCurrentUser } from "@/lib/api";
 import { useTutorial } from "@/context/TutorialContext";
+
+const ESTADOS_DELEGACION: Record<string, string> = {
+  NO_INICIADA: "Sin autorizar",
+  PENDIENTE_VERIFICACION: "Pendiente de verificación",
+  ACTIVA: "Activa",
+  POR_VENCER: "Por vencer",
+  VENCIDA: "Vencida",
+  REVOCADA: "Revocada",
+  ERROR: "Con problemas",
+};
 
 interface Profile {
   login_email: string;
@@ -62,11 +73,17 @@ export default function ProfessionalProfilePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [boletasHabilitadas, setBoletasHabilitadas] = useState(false);
+  const [estadoDelegacion, setEstadoDelegacion] = useState("");
 
   useEffect(() => {
     loadProfile();
     getCurrentUser()
-      .then((user) => setBoletasHabilitadas(Boolean(user.boletas_habilitadas)))
+      .then(async (user) => {
+        setBoletasHabilitadas(Boolean(user.boletas_habilitadas));
+        if (!user.boletas_habilitadas || !user.bhe_auto_disponible) return;
+        const res = await apiFetch("/facturacion/delegacion/");
+        if (res.ok) setEstadoDelegacion((await res.json()).estado);
+      })
       .catch(() => {});
   }, []);
 
@@ -213,6 +230,17 @@ export default function ProfessionalProfilePage() {
             <div className="mb-5 flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" /><h2 className="font-semibold">Boletas de honorarios</h2></div>
             <Field label="Glosa por defecto" value={profile.bhe_glosa_default} onChange={(value) => update("bhe_glosa_default", value)} placeholder="Atención psicológica" helper="Se usa al registrar un cobro. No incluyas diagnósticos ni términos clínicos: la boleta la ve el SII y quien la recibe." />
           </section>
+        )}
+
+        {estadoDelegacion && (
+          <Link href="/dashboard/configuracion/boletas" className="flex items-center gap-3 rounded-2xl border bg-card p-5 shadow-sm transition hover:border-primary md:p-6">
+            <Receipt className="h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold">Emisión automática de boletas</h2>
+              <p className="text-sm text-muted-foreground">Estado: {ESTADOS_DELEGACION[estadoDelegacion] ?? estadoDelegacion}</p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </Link>
         )}
 
         <div className="flex justify-end"><button type="submit" disabled={saving} className="flex min-w-40 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />}Guardar cambios</button></div>

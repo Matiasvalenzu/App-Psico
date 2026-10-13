@@ -127,6 +127,8 @@ class DelegacionSII(models.Model):
     ultimo_error = models.TextField(blank=True, default="")
     consentimiento_at = models.DateTimeField(null=True, blank=True)
     consentimiento_version = models.CharField(max_length=20, blank=True, default="")
+    # Número de transacción del comprobante del SII, si el psicólogo lo anota: ayuda al operador a verificar.
+    numero_transaccion = models.CharField(max_length=20, blank=True, default="")
     piloto = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)

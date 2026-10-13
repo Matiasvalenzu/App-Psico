@@ -350,6 +350,37 @@ class DelegacionApiTests(TestCase):
         self.assertIsNone(delegacion.fecha_vencimiento)
         self.assertFalse(delegacion.verificada)
 
+    def test_numero_transaccion(self):
+        self.con_rut()
+        respuesta = self.client.post(self.url, {"acepta": True, "numero_transaccion": "4577-82"}, format="json")
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("numero_transaccion", respuesta.data)
+        respuesta = self.client.post(self.url, {"acepta": True, "numero_transaccion": "45778282851"}, format="json")
+        self.assertEqual(respuesta.status_code, 201)
+        self.assertEqual(respuesta.data["numero_transaccion"], "45778282851")
+        self.assertEqual(DelegacionSII.objects.get(psicologo=self.user).numero_transaccion, "45778282851")
+
+    def test_numero_transaccion_opcional_y_se_reemplaza_al_renovar(self):
+        self.con_rut()
+        DelegacionSII.objects.create(
+            psicologo=self.user, rut_emisor="11.111.111-1", estado=DelegacionSII.Estado.VENCIDA,
+            numero_transaccion="111",
+        )
+        self.assertEqual(self.client.post(self.url, {"acepta": True}, format="json").status_code, 201)
+        self.assertEqual(DelegacionSII.objects.get(psicologo=self.user).numero_transaccion, "")
+
+    @override_settings(BHE_AUTO_DISPONIBLE=False)
+    def test_sin_flag_no_se_autoriza(self):
+        self.con_rut()
+        respuesta = self.client.post(self.url, {"acepta": True}, format="json")
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(respuesta.data["code"], "bhe_no_disponible")
+        self.assertFalse(DelegacionSII.objects.exists())
+        self.assertFalse(self.client.get("/api/auth/me/").data["bhe_auto_disponible"])
+
+    def test_auth_me_expone_el_flag(self):
+        self.assertTrue(self.client.get("/api/auth/me/").data["bhe_auto_disponible"])
+
     def test_rut_libre_sin_delegacion(self):
         self.con_rut()
         respuesta = self.client.patch("/api/cuenta/perfil/", {"rut_profesional": "22.222.222-2"}, format="json")

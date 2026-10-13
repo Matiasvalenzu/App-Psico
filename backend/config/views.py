@@ -79,6 +79,7 @@ def current_user(request):
             "plan": plan,
             "boletas_habilitadas": boletas_habilitadas,
             "plan_plus_disponible": settings.PLAN_PLUS_DISPONIBLE,
+            "bhe_auto_disponible": settings.BHE_AUTO_DISPONIBLE,
             "tiene_cobros": Cobro.objects.filter(psicologo=request.user).exists(),
             "fin_prueba": fin_prueba,
             "dias_restantes_prueba": dias_restantes_prueba,
