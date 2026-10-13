@@ -68,7 +68,7 @@ class ValidacionesTests(SimpleTestCase):
 # Portal simulado con los nombres de campos del mapa (§K); el HTML real es otro.
 PAGINAS = {
     "1040-1287.html": """<button>Emitir boleta de honorarios electrónica</button>
-        <a href="{entrada}">Por usuario autorizado</a>
+        <a href="https://loa.sii.cl/cgi_IMT/TMBEUS_ValidaAutoriz.cgi?modo=1">Por usuario autorizado</a>
         <a href="https://loa.sii.cl/cgi_IMT/TMBEUS_ValidaAutoriz.cgi?modo=2">Por usuario autorizado con datos usados anteriormente</a>""",
     "IngresoRutClave.html": """<form method="post" action="{tras_login}">
         <input id="rutcntr" name="rutcntr"><input type="password" name="clave">
@@ -105,9 +105,11 @@ PASO_1 = "https://loa.sii.cl/cgi_IMT/TMBEUS_ValidaAutoriz.cgi?modo=1"
 
 
 class PortalSimulado(robot.PlaywrightEmisor):
-    def __init__(self, clave_ok=True, rut_autorizador="12345678"):
+    def __init__(self, clave_ok=True, rut_autorizador="12345678", paso_3=None):
         super().__init__()
-        self.valores = {"entrada": LOGIN, "tras_login": PASO_1 if clave_ok else LOGIN, "rut_autorizador": rut_autorizador}
+        self.paso_3 = paso_3
+        self.valores = {"tras_login": PASO_1 + "&ok=1" if clave_ok else LOGIN, "rut_autorizador": rut_autorizador}
+        self.con_sesion = False
         self.pedidas, self.envios = [], []
 
     def _nueva_pagina(self, navegador):
@@ -120,7 +122,14 @@ class PortalSimulado(robot.PlaywrightEmisor):
         self.pedidas.append(pagina)
         if route.request.post_data:
             self.envios.append(route.request.post_data)
+        if pagina == "TMBEUS_ValidaAutoriz.cgi" and not self.con_sesion:
+            # Sin sesión muestra el login (sin redirigir: un 302 se saltaría esta ruta e iría al SII real).
+            if "ok=1" not in route.request.url:
+                pagina = "IngresoRutClave.html"
+            self.con_sesion = "ok=1" in route.request.url
         html = PAGINAS.get(pagina, "<p>No encontrada</p>").format(**self.valores)
+        if pagina == "TMBEUS_ConfirmaTimbrajeUsu.cgi" and self.paso_3:
+            html = self.paso_3
         route.fulfill(content_type="text/html; charset=utf-8", body=f"<html><body>{html}</body></html>")
 
 
@@ -160,7 +169,7 @@ class PortalSimuladoTests(SimpleTestCase):
         with self.assertRaises(ErrorCredencial):
             emisor.vista_previa(datos())
         self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
-        self.assertNotIn("TMBEUS_ValidaAutoriz.cgi", emisor.pedidas)
+        self.assertNotIn("TMBEUS_PresentaDatosBoleta.cgi", emisor.pedidas)
 
     def test_emisor_distinto_no_confirma_datos(self):
         emisor = PortalSimulado(rut_autorizador="99999999")
@@ -168,3 +177,12 @@ class PortalSimuladoTests(SimpleTestCase):
             emisor.vista_previa(datos())
         self.assertEqual(ctx.exception.codigo, "emisor_distinto")
         self.assertNotIn("TMBEUS_ConfirmaTimbrajeUsu.cgi", emisor.pedidas)
+
+    def test_rechazo_del_sii_en_el_paso_3(self):
+        emisor = PortalSimulado(paso_3="<h2>BOLETAS</h2><p>Sr. Contribuyente:<br>No se puede emitir la boleta ya que "
+                                       "el rut del destinatario corresponde a una persona fallecida.</p>")  # fmt: skip
+        with self.assertRaises(ErrorNegocio) as ctx:
+            emisor.vista_previa(datos())
+        self.assertEqual(ctx.exception.codigo, "rechazada_sii")
+        self.assertTrue(ctx.exception.detalle.startswith("No se puede emitir"))
+        self.assertTrue(ctx.exception.detalle.endswith("persona fallecida."))

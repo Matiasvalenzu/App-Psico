@@ -164,8 +164,11 @@ class PlaywrightEmisor(EmisorBHE):
     def _llegar_a_vista_previa(self, page, datos):
         page.goto(PORTAL)
         # Los enlaces del menú son javascript:linkVisita(...) dentro de acordeones: hay que hacer clic.
-        page.get_by_role("button", name=re.compile("Emitir boleta de honorarios electr", re.I)).first.click()
-        page.get_by_role("link", name="Por usuario autorizado", exact=True).click()
+        # «Por usuario autorizado» (modo=2 es «...con datos usados anteriormente»).
+        enlace = page.locator("a[href*='TMBEUS_ValidaAutoriz.cgi?modo=1']")
+        if not enlace.is_visible():  # si el acordeón ya está abierto, un clic lo cerraría
+            page.get_by_role("button", name=re.compile("Emitir boleta de honorarios electr", re.I)).first.click()
+        enlace.click()
         page.wait_for_load_state()
         if self._es_login(page):
             self._login(page)
@@ -244,6 +247,9 @@ class PlaywrightEmisor(EmisorBHE):
                 raise ErrorNegocio("rechazada_sii", self.dialogos[-1]) from None
             raise
         self._capturar(page, "paso-3-vista-previa")
-        revisar_vista_previa(page.locator("body").inner_text(), datos)
+        texto = page.locator("body").inner_text()
         if page.get_by_role("button", name=BOTON_EMITIR).count() != 1:
-            raise ErrorAntesDeEnviar("pantalla_desconocida", "La vista previa no tiene el botón para emitir.")
+            # El SII rechaza en esta misma URL, p. ej. «Sr. Contribuyente: ... persona fallecida».
+            mensaje = " ".join(texto.split("Sr. Contribuyente:")[-1].split())[:300]
+            raise ErrorNegocio("rechazada_sii", mensaje)
+        revisar_vista_previa(texto, datos)
