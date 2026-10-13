@@ -15,6 +15,7 @@ class NotificacionEmail(models.Model):
         AVISO_PURGA_7D = "AVISO_PURGA_7D", "Aviso de eliminación (7 días)"
         AVISO_PURGA_1D = "AVISO_PURGA_1D", "Aviso de eliminación (1 día)"
         RECORDATORIO_CITA = "RECORDATORIO_CITA", "Recordatorio de cita"
+        DELEGACION_POR_VENCER = "DELEGACION_POR_VENCER", "Autorización SII por vencer"
 
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"

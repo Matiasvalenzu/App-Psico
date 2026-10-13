@@ -40,7 +40,7 @@ class DelegacionSIIAdmin(admin.ModelAdmin):
     raw_id_fields = ["psicologo"]
     # El RUT del emisor nunca se muestra completo, ni siquiera a superusuarios.
     exclude = ["rut_emisor"]
-    readonly_fields = ["rut_enmascarado", "fecha_vencimiento", "verificada_at", "consentimiento_at", "consentimiento_version"]
+    readonly_fields = ["rut_enmascarado", "verificada_at", "consentimiento_at", "consentimiento_version"]
     fieldsets = [
         (
             None,
@@ -48,7 +48,9 @@ class DelegacionSIIAdmin(admin.ModelAdmin):
                 "description": (
                     "Antes de marcar «verificada»: entra al portal del SII con la clave de la cuenta de Psiconex, "
                     "ve a Boletas de honorarios electrónicas > Emitir > Por usuario autorizado y confirma que el RUT "
-                    "y el nombre del psicólogo aparecen en la lista de autorizadores. Al marcarla verificada pasa a Activa."
+                    "y el nombre del psicólogo aparecen en la lista de autorizadores. Al marcarla verificada pasa a Activa. "
+                    "Anota la fecha de vencimiento solo si el SII la muestra; si no, déjala vacía (sin avisos ni "
+                    "vencimiento automático)."
                 ),
                 "fields": [
                     "psicologo", "rut_enmascarado", "estado", "fecha_otorgada", "fecha_vencimiento",
@@ -69,8 +71,6 @@ class DelegacionSIIAdmin(admin.ModelAdmin):
             # Solo el operador activa una delegación, después de verla en el SII.
             if obj.verificada and obj.estado == DelegacionSII.Estado.PENDIENTE_VERIFICACION:
                 obj.estado = DelegacionSII.Estado.ACTIVA
-        if "fecha_otorgada" in form.changed_data:
-            obj.fecha_vencimiento = None
         super().save_model(request, obj, form, change)
 
 

@@ -11,7 +11,7 @@ from pacientes.models import Paciente
 from sesiones.models import Sesion
 
 from .models import Cobro, ConfiguracionBHE, DelegacionSII, EmisionBHE
-from .services import anulable_hasta, calcular_retencion, enmascarar_rut, un_anio_despues, validar_glosa
+from .services import anulable_hasta, calcular_retencion, enmascarar_rut, validar_glosa
 
 User = get_user_model()
 URL = "/api/facturacion/cobros/"
@@ -252,16 +252,14 @@ class DelegacionSIITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
 
-    def test_vencimiento_un_anio(self):
+    def test_vencimiento_vacio_por_omision(self):
+        # El SII no mostró fecha de vencimiento en la autorización real: no se inventa una.
         delegacion = DelegacionSII.objects.create(
             psicologo=self.user, rut_emisor="777819771", fecha_otorgada=date(2026, 10, 12)
         )
-        self.assertEqual(delegacion.fecha_vencimiento, date(2027, 10, 12))
+        self.assertIsNone(delegacion.fecha_vencimiento)
         self.assertEqual(delegacion.estado, DelegacionSII.Estado.NO_INICIADA)
         self.assertFalse(delegacion.piloto)
-
-    def test_vencimiento_29_febrero(self):
-        self.assertEqual(un_anio_despues(date(2028, 2, 29)), date(2029, 2, 28))
 
     def test_respeta_vencimiento_del_portal(self):
         delegacion = DelegacionSII.objects.create(

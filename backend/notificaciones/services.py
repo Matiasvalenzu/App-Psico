@@ -293,6 +293,33 @@ def enqueue_booking_change_notifications(event):
     return notifications
 
 
+def enqueue_delegation_expiry_notice(delegacion, dias):
+    """Avisa que la autorización del SII para emitir boletas vence en `dias` (30, 7 o 1).
+
+    La clave incluye la fecha de vencimiento: al renovar, el ciclo de avisos empieza de nuevo.
+    """
+    from cuentas.services import get_notification_email
+
+    user = delegacion.psicologo
+    recipient = get_notification_email(user) or (user.email or "").strip().lower()
+    if not recipient or not delegacion.fecha_vencimiento:
+        return None
+    notification, created = NotificacionEmail.objects.get_or_create(
+        clave_deduplicacion=(
+            f"vencimiento_bhe:{dias}d:{user.pk}:{delegacion.fecha_vencimiento.isoformat()}"
+        ),
+        defaults={
+            "tipo": NotificacionEmail.Tipo.DELEGACION_POR_VENCER,
+            "destinatario": recipient,
+            "responder_a": settings.EMAIL_SUPPORT_ADDRESS,
+            "usuario": user,
+        },
+    )
+    if created:
+        _schedule(notification)
+    return notification
+
+
 def notification_content(notification):
     if notification.tipo == NotificacionEmail.Tipo.BIENVENIDA:
         user = notification.usuario
@@ -362,6 +389,41 @@ def notification_content(notification):
                 ),
                 "export_url": f"{base_url}/dashboard/configuracion/privacidad",
                 "reactivate_url": f"{base_url}/dashboard/suscripcion",
+            },
+        }
+
+    if notification.tipo == NotificacionEmail.Tipo.DELEGACION_POR_VENCER:
+        from facturacion.models import DelegacionSII
+
+        user = notification.usuario
+        delegacion = DelegacionSII.objects.filter(psicologo=user).first() if user else None
+        vencimiento = notification.clave_deduplicacion.rsplit(":", 1)[-1]
+        if (
+            not delegacion
+            or delegacion.estado != DelegacionSII.Estado.POR_VENCER
+            or not delegacion.fecha_vencimiento
+            or delegacion.fecha_vencimiento.isoformat() != vencimiento
+        ):
+            return None  # Ya renovó, venció o se revocó: el aviso no aplica.
+        dias = (delegacion.fecha_vencimiento - timezone.localdate()).days
+        if dias <= 0:
+            return None
+        base_url = settings.PUBLIC_APP_URL.rstrip("/")
+        first_name = user.first_name.strip() or user.get_full_name().strip() or user.username
+        return {
+            "subject": (
+                "Tu autorización del SII para emitir boletas vence mañana"
+                if dias == 1
+                else f"Tu autorización del SII para emitir boletas vence en {dias} días"
+            ),
+            "template": "delegacion_por_vencer",
+            "context": {
+                "first_name": first_name,
+                "dias": dias,
+                "fecha_vencimiento": date_format(delegacion.fecha_vencimiento, "j \\d\\e F \\d\\e Y"),
+                "rut_autorizar": settings.BHE_RUT_AUTORIZADO,
+                "sii_url": "https://www.sii.cl/servicios_online/",
+                "boletas_url": f"{base_url}/dashboard/configuracion/boletas",
             },
         }
 

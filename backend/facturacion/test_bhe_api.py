@@ -412,7 +412,21 @@ class DelegacionApiTests(TestCase):
         delegacion = DelegacionSII.objects.get(psicologo=self.user)
         self.assertEqual(delegacion.estado, DelegacionSII.Estado.PENDIENTE_VERIFICACION)
         self.assertFalse(delegacion.verificada)
-        self.assertGreater(delegacion.fecha_vencimiento, timezone.localdate())
+        self.assertIsNone(delegacion.fecha_vencimiento)
+
+    def test_por_vencer_se_renueva(self):
+        self.con_rut()
+        DelegacionSII.objects.create(
+            psicologo=self.user, rut_emisor="11.111.111-1", estado=DelegacionSII.Estado.POR_VENCER, verificada=True,
+            fecha_otorgada=timezone.localdate() - timedelta(days=350),
+            fecha_vencimiento=timezone.localdate() + timedelta(days=15),
+        )
+        self.assertEqual(self.client.post(self.url, {"acepta": True}, format="json").status_code, 201)
+        delegacion = DelegacionSII.objects.get(psicologo=self.user)
+        self.assertEqual(delegacion.estado, DelegacionSII.Estado.PENDIENTE_VERIFICACION)
+        self.assertEqual(delegacion.fecha_otorgada, timezone.localdate())
+        self.assertIsNone(delegacion.fecha_vencimiento)
+        self.assertFalse(delegacion.verificada)
 
     def test_rut_libre_sin_delegacion(self):
         self.con_rut()

@@ -1,0 +1,17 @@
+Hola {{ first_name }},
+
+La autorización que diste en el SII para que Psiconex emita tus boletas de honorarios vence el {{ fecha_vencimiento }}. Desde ese día no podremos emitirlas por ti y tendrás que hacerlo en el portal del SII, como antes.
+
+Para renovarla:
+1. Entra a {{ sii_url }} con tu RUT y tu clave tributaria.
+2. Ve a Boletas de honorarios electrónicas > Emisor de boleta de honorarios > Delegar emisión a un usuario autorizado.
+3. Autoriza de nuevo el RUT {{ rut_autorizar }}.
+4. Vuelve a Psiconex y avísanos que la renovaste: {{ boletas_url }}
+
+Revisaremos la autorización en el SII. Mientras la confirmamos, las boletas automáticas quedan en pausa (suele tomar unas horas).
+
+Nunca te pediremos tu clave tributaria.
+
+Si necesitas ayuda, escribe a {{ support_email }}.
+
+Equipo Psiconex

@@ -114,7 +114,8 @@ class DelegacionSII(models.Model):
     rut_emisor = models.CharField(max_length=12)
     estado = models.CharField(max_length=30, choices=Estado.choices, default=Estado.NO_INICIADA)
     fecha_otorgada = models.DateField(null=True, blank=True)
-    # La autorización dura 1 año; si el portal muestra otra fecha, manda la del portal.
+    # Solo si el SII la muestra (el 12-10 no la mostró). Vacía: sin avisos ni vencimiento automático; la
+    # vigencia la confirman el canario diario y los errores al emitir.
     fecha_vencimiento = models.DateField(null=True, blank=True)
     verificada = models.BooleanField(default=False)
     verificada_at = models.DateTimeField(null=True, blank=True)
@@ -132,13 +133,6 @@ class DelegacionSII(models.Model):
 
     def __str__(self):
         return f"Delegación #{self.pk} - {self.get_estado_display()}"
-
-    def save(self, *args, **kwargs):
-        if self.fecha_otorgada and not self.fecha_vencimiento:
-            from .services import un_anio_despues
-
-            self.fecha_vencimiento = un_anio_despues(self.fecha_otorgada)
-        super().save(*args, **kwargs)
 
 
 class AlmacenamientoPrivado(FileSystemStorage):

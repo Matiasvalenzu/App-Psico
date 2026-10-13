@@ -100,7 +100,42 @@ def delegacion_vigente(delegacion):
         delegacion
         and delegacion.verificada
         and delegacion.estado in (DelegacionSII.Estado.ACTIVA, DelegacionSII.Estado.POR_VENCER)
+        # El día del vencimiento ya no se emite, aunque la tarea diaria todavía no la haya marcado vencida.
+        and (delegacion.fecha_vencimiento is None or delegacion.fecha_vencimiento > timezone.localdate())
     )
+
+
+AVISOS_VENCIMIENTO = (1, 7, 30)
+
+
+def revisar_vencimientos():
+    """Tarea diaria: POR_VENCER a 30 días (con aviso a 30, 7 y 1) y VENCIDA el día del vencimiento.
+
+    Sin fecha de vencimiento no se hace nada: esa vigencia la confirman el canario y los errores al emitir.
+    """
+    from notificaciones.services import enqueue_delegation_expiry_notice
+
+    hoy = timezone.localdate()
+    delegaciones = DelegacionSII.objects.select_related("psicologo").filter(
+        verificada=True,
+        estado__in=(DelegacionSII.Estado.ACTIVA, DelegacionSII.Estado.POR_VENCER),
+        fecha_vencimiento__isnull=False,
+    )
+    for delegacion in delegaciones:
+        dias = (delegacion.fecha_vencimiento - hoy).days
+        if dias <= 0:
+            delegacion.estado = DelegacionSII.Estado.VENCIDA
+            delegacion.save(update_fields=["estado", "updated_at"])
+            logger.info("Delegación %s vencida", delegacion.pk)
+            continue
+        if dias > AVISOS_VENCIMIENTO[-1]:
+            continue
+        if delegacion.estado != DelegacionSII.Estado.POR_VENCER:
+            delegacion.estado = DelegacionSII.Estado.POR_VENCER
+            delegacion.save(update_fields=["estado", "updated_at"])
+        # El umbral más cercano (30, 7 o 1): la clave del correo evita repetirlo los días siguientes.
+        aviso = next(umbral for umbral in AVISOS_VENCIMIENTO if dias <= umbral)
+        enqueue_delegation_expiry_notice(delegacion, aviso)
 
 
 def _cola_detenida():

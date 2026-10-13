@@ -181,7 +181,8 @@ class DelegacionView(APIView):
 
     def post(self, request):
         delegacion = DelegacionSII.objects.filter(psicologo=request.user).first()
-        if delegacion and delegacion.estado in (DelegacionSII.Estado.ACTIVA, DelegacionSII.Estado.POR_VENCER):
+        # Desde POR_VENCER sí se puede: es la renovación (vuelve a verificación).
+        if delegacion and delegacion.estado == DelegacionSII.Estado.ACTIVA:
             return Response(
                 {"detail": "Ya tienes una autorización vigente.", "code": "delegacion_vigente"},
                 status=status.HTTP_400_BAD_REQUEST,

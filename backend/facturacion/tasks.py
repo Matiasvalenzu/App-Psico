@@ -21,3 +21,8 @@ def rescatar_emisiones_bhe():
 @shared_task
 def purgar_evidencias_bhe():
     return bhe.purgar_evidencias()
+
+
+@shared_task
+def revisar_vencimientos_bhe():
+    bhe.revisar_vencimientos()

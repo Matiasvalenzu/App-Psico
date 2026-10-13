@@ -1,0 +1,19 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Tu autorización del SII vence pronto{% endblock %}
+{% block preheader %}Renuévala antes del {{ fecha_vencimiento }} para seguir emitiendo boletas desde Psiconex.{% endblock %}
+{% block eyebrow %}Boletas de honorarios{% endblock %}
+{% block heading %}{% if dias == 1 %}Tu autorización vence mañana{% else %}Tu autorización vence en {{ dias }} días{% endif %}{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ first_name }}, la autorización que diste en el SII para que Psiconex emita tus boletas de honorarios vence el <strong>{{ fecha_vencimiento }}</strong>. Desde ese día no podremos emitirlas por ti y tendrás que hacerlo en el portal del SII, como antes.</p>
+<p style="margin:0 0 10px;color:#334155;font-size:16px;line-height:1.7;">Para renovarla:</p>
+<ol style="margin:0 0 18px;padding-left:22px;color:#334155;font-size:15px;line-height:1.7;">
+<li>Entra a <a href="{{ sii_url }}" style="color:#2563eb;">sii.cl</a> con tu RUT y tu clave tributaria.</li>
+<li>Ve a <strong>Boletas de honorarios electrónicas &gt; Emisor de boleta de honorarios &gt; Delegar emisión a un usuario autorizado</strong>.</li>
+<li>Autoriza de nuevo el RUT <strong>{{ rut_autorizar }}</strong>.</li>
+<li>Vuelve a Psiconex y avísanos que la renovaste.</li>
+</ol>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Revisaremos la autorización en el SII. Mientras la confirmamos, las boletas automáticas quedan en pausa (suele tomar unas horas). Nunca te pediremos tu clave tributaria.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ boletas_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Ya la renové</a></td></tr></table>
+{% endblock %}

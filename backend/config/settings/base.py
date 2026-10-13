@@ -175,6 +175,8 @@ CELERY_TASK_ROUTES = {
     "notificaciones.tasks.send_notification": {"queue": "email"},
     "notificaciones.tasks.dispatch_pending_notifications": {"queue": "email"},
     "notificaciones.tasks.enqueue_appointment_reminders_task": {"queue": "email"},
+    # Corre aunque worker-bhe esté apagado (la ruta exacta gana a la de facturacion.tasks.*).
+    "facturacion.tasks.revisar_vencimientos_bhe": {"queue": "email"},
     # Boletas en el SII: worker propio con concurrencia 1.
     "facturacion.tasks.*": {"queue": "bhe"},
 }
@@ -198,6 +200,11 @@ CELERY_BEAT_SCHEDULE = {
     "purgar-registros-acceso": {
         "task": "cuentas.tasks.purgar_registros_acceso",
         "schedule": crontab(hour=4, minute=20, day_of_week=0),
+    },
+    # Va siempre (no depende de BHE_BACKEND): sin delegaciones con fecha de vencimiento no hace nada.
+    "revisar-vencimientos-bhe": {
+        "task": "facturacion.tasks.revisar_vencimientos_bhe",
+        "schedule": crontab(hour=8, minute=15),
     },
 }
 

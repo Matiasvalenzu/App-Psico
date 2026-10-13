@@ -51,14 +51,6 @@ def validar_glosa(glosa):
     return glosa
 
 
-def un_anio_despues(fecha):
-    """La autorización de usuario autorizado dura 1 año; un 29 de febrero vence el 28."""
-    try:
-        return fecha.replace(year=fecha.year + 1)
-    except ValueError:
-        return fecha.replace(year=fecha.year + 1, day=28)
-
-
 def enmascarar_rut(rut):
     """'777819771' -> '77.***.***-1'. Para admin y logs; nunca muestra el RUT completo."""
     limpio = "".join(c for c in (rut or "") if c.isalnum())
