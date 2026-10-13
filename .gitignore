@@ -31,3 +31,7 @@ backups/
 .next/
 backend/celerybeat-schedule
 Psiconex-Mailing/
+
+# Boletas y PDFs de trabajo: pueden traer RUT y domicilio reales
+documentacion-marketing/*.pdf
+bhe-*.pdf
