@@ -157,7 +157,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: dev
+      target: bhe-dev
     container_name: psicologo-worker-bhe-dev
     command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --prefetch-multiplier=1 --queues=bhe
     # Solo este servicio lee .env.bhe (BHE_SII_CLAVE); en dev el emisor es el simulado.

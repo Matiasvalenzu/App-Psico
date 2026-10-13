@@ -169,7 +169,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: production
+      target: bhe
     profiles: ["bhe"]
     restart: unless-stopped
     command: celery -A config.celery_app worker --loglevel=info --concurrency=1 --prefetch-multiplier=1 --queues=bhe

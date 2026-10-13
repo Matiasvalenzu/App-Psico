@@ -27,6 +27,15 @@ ENV DJANGO_SETTINGS_MODULE=config.settings.development
 
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
+# Worker BHE: Chromium para el robot del SII. production queda al final (docker-compose.yml no fija target).
+FROM dev AS bhe-dev
+
+RUN playwright install --with-deps chromium
+
+FROM base AS bhe
+
+RUN playwright install --with-deps chromium
+
 FROM base AS production
 
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
