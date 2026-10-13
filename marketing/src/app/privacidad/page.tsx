@@ -102,7 +102,7 @@ export default function PrivacyPage() {
               </p>
               <p className="mt-3">
                 También puede eliminar su cuenta y todos sus datos desde Configuración &gt; Privacidad, de forma inmediata, o solicitarlo escribiendo a{" "}
-                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20y%20Datos">matias@datnexia.com</a> con el asunto &ldquo;Solicitud de Eliminación de Cuenta y Datos&rdquo;. Procesamos las solicitudes verificadas a la brevedad.
+                <a className="text-primary underline underline-offset-4" href="mailto:matias@datnexia.com?subject=Solicitud%20de%20Eliminaci%C3%B3n%20de%20Cuenta%20y%20Datos">matias@datnexia.com</a>{" "}con el asunto &ldquo;Solicitud de Eliminación de Cuenta y Datos&rdquo;. Procesamos las solicitudes verificadas a la brevedad.
               </p>
               <p className="mt-3">
                 Al completar la eliminación, se purgan permanentemente los datos de la cuenta, incluidos perfiles, configuraciones, tokens de OAuth, citas, fichas y registros clínicos asociados.

@@ -25,10 +25,8 @@ const FUNCIONES_ESTANDAR = [
 const FUNCIONES_PLUS_ADMINISTRACION = [
   "Boletas de honorarios electrónicas en el SII con un clic desde cada cobro, sin entregar tu clave: Psiconex las emite como usuario autorizado",
   "Registro de pagos por paciente: fecha, monto, medio de pago y si está pagado o pendiente",
-  "Estado de cada boleta al momento: en cola, en emisión, emitida con su folio o anulada",
   "El PDF de cada boleta guardado y listo para descargar desde la ficha",
   "Cálculo automático de la retención: monto bruto, retención y lo que declaras en tu F29, según quién retiene",
-  "Guía paso a paso para anular una boleta en el SII y dejar registro de que lo hiciste",
   "Historial de cobros y boletas de cada paciente",
 ]
 
@@ -86,8 +84,8 @@ export function PricingSection() {
           eyebrow="Precios"
           title={
             <>
-              Paga menos de lo que{" "}
-              <span className="gradient-primary-text">cuesta una sesión</span>
+              Elige el plan{" "}
+              <span className="gradient-primary-text">para tu consulta</span>
             </>
           }
           description="Sin permanencia. Prueba gratis 14 días sin tarjeta o suscríbete directo a Plus, y cancela cuando quieras."

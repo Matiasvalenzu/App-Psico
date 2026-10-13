@@ -71,7 +71,7 @@ export function HeroSection() {
               >
                 <Receipt className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>
-                  Y emite tu boleta de honorarios sin salir de Psiconex.{" "}
+                  Ahora también emites tu boleta de honorarios.{" "}
                   <span className="font-semibold">Plan Plus.</span>
                 </span>
               </Link>

@@ -80,7 +80,7 @@ export function VoiceBiometricsSection() {
               className="absolute -left-4 top-12 rounded-xl bg-background/95 px-3 py-2 text-xs font-mono shadow-2xl backdrop-blur-sm md:-left-12"
             >
               <span className="text-success">●</span>{" "}
-              <span className="text-foreground/80">Match: 0.91</span>
+              <span className="text-foreground/80">Ejemplo ficticio</span>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, x: 16 }}

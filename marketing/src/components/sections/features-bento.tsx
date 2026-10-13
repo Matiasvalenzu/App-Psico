@@ -147,12 +147,12 @@ const BOLETAS_ITEMS = [
 
 function BoletasVisual() {
   return (
-    <div className="relative mt-6 flex h-32 items-center overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background/80 to-background p-4">
+    <div className="relative mt-6 flex items-center overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-background/80 to-background p-4 sm:h-32">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,hsl(var(--primary)/0.12),transparent_70%)]"
       />
-      <ul className="relative grid w-full grid-cols-3 gap-2 sm:gap-4">
+      <ul className="relative grid w-full grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
         {BOLETAS_ITEMS.map((item, i) => (
           <motion.li
             key={item.title}
@@ -160,14 +160,14 @@ function BoletasVisual() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-50px" }}
             transition={{ duration: 0.5, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col items-center gap-1.5 rounded-lg border border-primary/15 bg-background/80 px-2 py-3 text-center sm:flex-row sm:gap-3 sm:px-4 sm:text-left"
+            className="flex items-center gap-3 rounded-lg border border-primary/15 bg-background/80 px-3 py-2.5 text-left sm:px-4 sm:py-3"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <item.icon className="h-4 w-4 text-primary" aria-hidden />
             </span>
             <span>
-              <span className="block text-[11px] font-semibold text-foreground sm:text-sm">{item.title}</span>
-              <span className="hidden text-xs text-muted-foreground sm:block">{item.detail}</span>
+              <span className="block text-sm font-semibold text-foreground">{item.title}</span>
+              <span className="block text-xs text-muted-foreground">{item.detail}</span>
             </span>
           </motion.li>
         ))}
@@ -206,7 +206,7 @@ function FingerprintVisual() {
       </div>
       {/* score chip */}
       <div className="absolute right-3 top-3 rounded-md border border-primary/30 bg-background/80 px-2 py-1 text-[10px] font-mono text-primary backdrop-blur-sm">
-        match 0.91
+        ejemplo ficticio
       </div>
     </div>
   )

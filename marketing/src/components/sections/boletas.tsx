@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { motion } from "motion/react"
 import { ArrowRight, FileCheck, MousePointerClick, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -90,10 +89,10 @@ export function BoletasSection() {
             Además, sigue tus pagos pendientes y calcula la retención por ti.
           </p>
           <Button asChild size="lg">
-            <Link href="/#precios">
+            <a href="#precios">
               Conoce el Plan Plus
               <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
-            </Link>
+            </a>
           </Button>
         </motion.div>
       </div>

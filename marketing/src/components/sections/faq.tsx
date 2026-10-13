@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: "¿Puedo anular una boleta?",
-    a: "Sí, desde tu SII. En la app tienes una guía paso a paso.",
+    a: "Sí. La anulas en tu SII siguiendo la guía de la app y la marcas como anulada en Psiconex, que actualiza su estado.",
   },
   {
     q: "¿Reemplaza al psicólogo?",
