@@ -54,6 +54,7 @@ export default function EmisionSii({
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmarAnulada, setConfirmarAnulada] = useState(false);
   const [error, setError] = useState("");
   const enviadoRef = useRef(false);
   const onChangedRef = useRef(onChanged);
@@ -265,14 +266,32 @@ export default function EmisionSii({
               <li>Vuelve aquí y marca «Ya la anulé».</li>
             </ol>
             <p className="text-muted-foreground">El SII avisa que el receptor tiene que estar de acuerdo con la anulación.</p>
-            <Button
-              variant="destructive"
-              disabled={busy}
-              onClick={() => accion("marcar-anulada/", { method: "POST" }, "Boleta marcada como anulada.")}
-            >
-              {busy && <Loader2 className="animate-spin" />}
-              Ya la anulé
-            </Button>
+            {confirmarAnulada ? (
+              <Alert variant="warning">
+                <AlertTriangle />
+                <AlertDescription className="space-y-3">
+                  <p>¿Ya la anulaste en el SII? Esto no anula nada allá; solo deja registrado que la anulaste.</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setConfirmarAnulada(false)} disabled={busy}>
+                      Volver
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy}
+                      onClick={() => accion("marcar-anulada/", { method: "POST" }, "Boleta marcada como anulada.")}
+                    >
+                      {busy && <Loader2 className="animate-spin" />}
+                      Sí, ya la anulé
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Button variant="destructive" onClick={() => setConfirmarAnulada(true)}>
+                Ya la anulé
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -350,8 +369,8 @@ export default function EmisionSii({
             <Alert variant="warning">
               <AlertTriangle />
               <AlertDescription>
-                La retención la haces tú: la boleta del SII muestra solo el monto bruto, sin la retención ni el líquido
-                (esos montos los calcula Psiconex). El PPM lo declaras y pagas tú en tu F29.
+                La boleta del SII muestra solo el monto bruto, sin la retención ni el líquido (esos montos los calcula
+                Psiconex). La retención la declaras tú en tu F29.
               </AlertDescription>
             </Alert>
           )}
