@@ -137,7 +137,11 @@ const subscribeInFlight = new Set<string>()
  * `onDone` se llama cuando ya salió, ya se había enviado o no hay etiqueta
  * `send_to` configurada (nada que enviar).
  */
-export function trackGoogleAdsSubscribe(transactionId: string, onDone?: () => void): void {
+export function trackGoogleAdsSubscribe(
+  transactionId: string,
+  onDone?: () => void,
+  value = GOOGLE_ADS_SUBSCRIBE_VALUE_CLP,
+): void {
   const id = transactionId.trim().slice(0, 100)
   if (!id || !isGoogleAdsEnabled || typeof window === "undefined") return
   if (!getSendTo("suscripcion_pagada")) {
@@ -158,7 +162,7 @@ export function trackGoogleAdsSubscribe(transactionId: string, onDone?: () => vo
   whenGoogleAdsReady(() => {
     subscribeInFlight.delete(id)
     const sent = safeConversion("suscripcion_pagada", {
-      value: GOOGLE_ADS_SUBSCRIBE_VALUE_CLP,
+      value,
       currency: "CLP",
       transaction_id: id,
     })

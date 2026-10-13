@@ -118,6 +118,7 @@ export function trackCompleteRegistration(): void {
 
 /** Plan Estándar mensual (CLP) — mismo monto que backend/suscripciones. */
 export const SUBSCRIBE_VALUE_CLP = 4990
+export const SUBSCRIBE_PLUS_VALUE_CLP = 9990
 
 /** Clave de sessionStorage con el id de la suscripción recién contratada. */
 export const SUBSCRIBE_SESSION_KEY = "psx_sub_id"
@@ -130,7 +131,7 @@ const subscribeInFlight = new Set<string>()
  * `transactionId` (preapproval_id) se usa como eventID y para no reenviar el
  * evento si el usuario recarga la página. `onSent` se llama solo si ya salió.
  */
-export function trackSubscribe(transactionId: string, onSent?: () => void): void {
+export function trackSubscribe(transactionId: string, onSent?: () => void, value = SUBSCRIBE_VALUE_CLP): void {
   const id = transactionId.trim().slice(0, 100)
   if (!id || !isMetaPixelEnabled || typeof window === "undefined") return
   const storageKey = `meta_px_subscribe_${id}`
@@ -149,7 +150,7 @@ export function trackSubscribe(transactionId: string, onSent?: () => void): void
     const sent = safeFbq(
       "track",
       "Subscribe",
-      { value: SUBSCRIBE_VALUE_CLP, currency: "CLP" },
+      { value, currency: "CLP" },
       { eventID: id },
     )
     if (!sent) return

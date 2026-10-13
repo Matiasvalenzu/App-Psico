@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 
+import { SubscribeTracker } from "@/components/analytics/subscribe-tracker";
 import { getAccessToken } from "@/lib/api";
 import { guardarPreapprovalPendiente, vincularPreapproval } from "@/lib/vincularPlus";
 
@@ -38,9 +39,13 @@ export function VincularPlus({ preapprovalId }: { preapprovalId: string }) {
       </div>
     );
   }
+  // Conversión de Plus (Meta y Google Ads): al confirmarse en la cuenta o al volver de MP sin sesión.
+  const conversion = <SubscribeTracker transactionId={preapprovalId} plus />;
+
   if (estado === "listo") {
     return (
       <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+        {conversion}
         <CheckCircle2 className="h-4 w-4 shrink-0" />
         El Plan Plus quedó activo en tu cuenta.
       </div>
@@ -49,6 +54,7 @@ export function VincularPlus({ preapprovalId }: { preapprovalId: string }) {
   if (estado === "sin_sesion") {
     return (
       <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200">
+        {conversion}
         Inicia sesión con la cuenta que usarás en Psiconex (o créala) y el Plan Plus se activará automáticamente.{" "}
         <Link href="/login" className="font-semibold underline underline-offset-2">
           Iniciar sesión o crear cuenta

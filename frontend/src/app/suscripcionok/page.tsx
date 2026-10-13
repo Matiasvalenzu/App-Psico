@@ -44,7 +44,7 @@ export default function SubscriptionSuccessPage({
 
   return (
     <>
-      <SubscribeTracker />
+      <SubscribeTracker plus={esPlus} />
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-6 lg:px-8">
           <Link

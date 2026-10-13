@@ -5,7 +5,9 @@ import { useEffect } from "react"
 import { isGoogleAdsEnabled, trackGoogleAdsSubscribe } from "@/lib/googleAds"
 import { useMetaConsent } from "@/lib/metaConsent"
 import {
+  SUBSCRIBE_PLUS_VALUE_CLP,
   SUBSCRIBE_SESSION_KEY,
+  SUBSCRIBE_VALUE_CLP,
   isMetaPixelEnabled,
   trackSubscribe,
 } from "@/lib/metaPixel"
@@ -22,15 +24,17 @@ function clearStoredId() {
  * Dispara Subscribe (Meta) y la conversión "Suscripción pagada" (Google Ads) una sola vez tras contratar el plan. El id de la
  * suscripción llega por sessionStorage (no por la URL); sin id no se envía
  * nada (visitas directas / recargas). Limpia el id al enviar o al rechazar.
+ * El enlace de Plus no pasa por la app: su id llega como `transactionId`.
  */
-export function SubscribeTracker() {
+export function SubscribeTracker({ transactionId, plus }: { transactionId?: string; plus?: boolean } = {}) {
   const consent = useMetaConsent()
+  const value = plus ? SUBSCRIBE_PLUS_VALUE_CLP : SUBSCRIBE_VALUE_CLP
 
   useEffect(() => {
     if (consent === "pending") return
     let id = ""
     try {
-      id = window.sessionStorage.getItem(SUBSCRIBE_SESSION_KEY) ?? ""
+      id = transactionId || (window.sessionStorage.getItem(SUBSCRIBE_SESSION_KEY) ?? "")
     } catch {
       /* noop */
     }
@@ -47,10 +51,10 @@ export function SubscribeTracker() {
         pending -= 1
         if (pending <= 0) clearStoredId()
       }
-      if (isMetaPixelEnabled) trackSubscribe(id, done)
-      if (isGoogleAdsEnabled) trackGoogleAdsSubscribe(id, done)
+      if (isMetaPixelEnabled) trackSubscribe(id, done, value)
+      if (isGoogleAdsEnabled) trackGoogleAdsSubscribe(id, done, value)
     }
-  }, [consent])
+  }, [consent, transactionId, value])
 
   return null
 }
