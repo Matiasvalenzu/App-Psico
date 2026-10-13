@@ -152,10 +152,21 @@ class CobroViewSet(viewsets.ModelViewSet):
         cobro = self.get_object()
         return Response(EmisionBHESerializer(cobro.emisiones.all(), many=True).data)
 
-    @action(detail=True, methods=["get"], url_path=r"emisiones/(?P<emision_id>\d+)/pdf")
+    @action(detail=True, methods=["get", "post"], url_path=r"emisiones/(?P<emision_id>\d+)/pdf")
     def pdf_emision(self, request, pk=None, emision_id=None):
         # Solo el PDF: las capturas del portal quedan para el staff, en el admin.
-        emision = get_object_or_404(self.get_object().emisiones, pk=emision_id)
+        cobro = self.get_object()
+        emision = get_object_or_404(cobro.emisiones, pk=emision_id)
+        if request.method == "POST":
+            # El que el psicólogo bajó de su SII, cuando el robot no alcanzó a bajarlo.
+            archivo = request.FILES.get("archivo")
+            try:
+                if not archivo or archivo.size > settings.DOCUMENT_UPLOAD_MAX_BYTES:
+                    raise bhe.EmisionNoPermitida("pdf_invalido")
+                bhe.subir_pdf(emision, archivo.read())
+            except bhe.EmisionNoPermitida as exc:
+                return _no_permitida(exc)
+            return self._cobro_actualizado(cobro)
         if not emision.pdf:
             raise Http404
         return descarga_privada(emision.pdf.storage, emision.pdf.name)

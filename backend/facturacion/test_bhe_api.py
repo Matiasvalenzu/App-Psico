@@ -93,29 +93,14 @@ class ResolverManualTests(EntornoBHE, TestCase):
         self.assertEqual(self.cobro.boleta_folio, "555")
         self.assertEqual(self.cobro.boleta_fecha_emision, timezone.localdate())
 
-    def test_emision_hecha_con_codigo_baja_el_pdf(self):
+    def test_emision_hecha_guarda_el_codigo_sin_ir_al_sii(self):
+        # Con un login nuevo el SII no entrega el PDF: el psicólogo lo sube desde la ficha.
         emision = emision_por_confirmar(self.cobro, self.user)
-        with mock.patch.object(bhe, "_programar_pdf") as programar, self.captureOnCommitCallbacks(execute=True):
+        with mock.patch.object(FakeEmisor, "emitir") as emitir_sii:
             self.resolver(emision, hecha=True, folio="555", codigo="12345678000055512AB3")
-        programar.assert_called_once_with(emision.pk)
+        emitir_sii.assert_not_called()
         emision.refresh_from_db()
-        self.assertEqual(emision.codigo_sii, "12345678000055512AB3")
-
-        with mock.patch.object(FakeEmisor, "descargar_pdf", return_value=b"%PDF-1.4", create=True) as bajar:
-            self.assertTrue(bhe.descargar_pdf(emision.pk))
-            self.assertFalse(bhe.descargar_pdf(emision.pk))  # ya tiene PDF: no vuelve a entrar al SII
-        bajar.assert_called_once_with("12345678000055512AB3")
-        emision.refresh_from_db()
-        self.assertEqual(emision.pdf.read(), b"%PDF-1.4")
-
-    def test_pdf_que_falla_deja_la_boleta_emitida(self):
-        emision = emision_por_confirmar(self.cobro, self.user)
-        with mock.patch.object(bhe, "_programar_pdf"), self.captureOnCommitCallbacks(execute=True):
-            self.resolver(emision, hecha=True, folio="555", codigo="12345678000055512AB3")
-        with mock.patch.object(FakeEmisor, "descargar_pdf", side_effect=RuntimeError, create=True):
-            self.assertFalse(bhe.descargar_pdf(emision.pk))
-        emision.refresh_from_db()
-        self.assertEqual((emision.estado, bool(emision.pdf)), (Estado.EMITIDA, False))
+        self.assertEqual((emision.codigo_sii, bool(emision.pdf)), ("12345678000055512AB3", False))
 
     def test_emision_hecha_sin_folio(self):
         emision = emision_por_confirmar(self.cobro, self.user)

@@ -36,7 +36,7 @@ BOTON_EMITIR = "Emitir Boleta de Honorarios Electrónica"
 # El paso 2 trae 4 prestaciones visibles; las demás se agregan con JS y su numeración salta el 5.
 MAX_PRESTACIONES = 4
 MAX_MONTO = 99_999_999  # valor_prestacion tiene maxlength 8
-CODIGO_SII = r"[0-9A-F]{18,22}"  # RUT del titular sin DV + folio (7) + 5 hex (mapa §K)
+CODIGO_SII = r"[0-9A-F]{18,22}"  # empieza con el RUT del titular sin DV; el resto no se interpreta (mapa §K.2)
 MARCO_BOLETA = "iframe[name=prueba]"
 
 
@@ -144,7 +144,8 @@ class PlaywrightEmisor(EmisorBHE):
         with self._navegador() as page:
             self._llegar_a_vista_previa(page, datos)
             folio, codigo = self._paso_4(page)
-            pdf = self._descargar_pdf(page, codigo)
+            # Solo esta sesión puede bajar el PDF (con un login nuevo el SII lo rechaza): un reintento aquí mismo.
+            pdf = self._descargar_pdf(page, codigo) or self._descargar_pdf(page, codigo)
         return ResultadoEmision(
             folio=folio,
             fecha=datos.fecha,
@@ -222,16 +223,6 @@ class PlaywrightEmisor(EmisorBHE):
         select = page.locator(f"select[name={nombre}]")
         opciones = select.locator("option").evaluate_all("os => os.map(o => [o.value, o.textContent])")
         select.select_option(value=elegir_opcion(opciones, texto))
-
-    def descargar_pdf(self, codigo):
-        """El PDF de una boleta ya emitida (p. ej. resuelta a mano): un login, sin pasar por el formulario."""
-        if not re.fullmatch(CODIGO_SII, codigo or ""):
-            raise ErrorNegocio("codigo_invalido", "El código del SII no tiene el formato esperado.")
-        _credenciales()
-        with self._navegador() as page:
-            self._abrir_paso_1(page)
-            self._en(page, "TMBEUS_ValidaAutoriz.cgi")
-            return self._descargar_pdf(page, codigo)
 
     def _llegar_a_vista_previa(self, page, datos):
         self._abrir_paso_1(page)
@@ -340,7 +331,7 @@ class PlaywrightEmisor(EmisorBHE):
         return leer_paso_4(boleta.locator("body").inner_text(), page.locator(MARCO_BOLETA).get_attribute("src"))
 
     def _descargar_pdf(self, page, codigo):
-        """El PDF con la misma sesión. Si falla la boleta igual quedó emitida: el psicólogo lo baja del SII."""
+        """El PDF con la misma sesión. Si falla la boleta igual quedó emitida: el psicólogo lo sube desde la ficha."""
         from playwright.sync_api import Error as ErrorPlaywright
 
         url = urljoin(

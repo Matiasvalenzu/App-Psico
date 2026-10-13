@@ -11,8 +11,10 @@ Los mensajes de log usan solo ids: nada del receptor.
 
 import json
 import logging
+import re
 from dataclasses import asdict
 from datetime import date, timedelta
+from io import BytesIO
 from pathlib import Path
 
 from django.conf import settings
@@ -21,6 +23,7 @@ from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+from pypdf import PdfReader
 
 from .comunas import buscar_comuna
 from .emisores import (
@@ -76,6 +79,8 @@ MENSAJES = {
     "confirmacion_requerida": "Confirma los datos de la boleta antes de enviarla al SII.",
     "folio_requerido": "Indica el folio que muestra el SII.",
     "folio_ocupado": "Ese folio ya está registrado en otro cobro.",
+    "pdf_invalido": "Sube el PDF de la boleta tal como lo descargaste del SII.",
+    "pdf_otro_folio": "Este PDF no parece ser la boleta.",
 }
 
 # Códigos que se responden con 403: el usuario no puede usar la emisión automática.
@@ -86,10 +91,10 @@ Tipo = EmisionBHE.Tipo
 
 
 class EmisionNoPermitida(Exception):
-    def __init__(self, codigo):
-        super().__init__(MENSAJES[codigo])
+    def __init__(self, codigo, detalle=""):
         self.codigo = codigo
-        self.detalle = MENSAJES[codigo]
+        self.detalle = detalle or MENSAJES[codigo]
+        super().__init__(self.detalle)
 
 
 def delegacion_vigente(delegacion):
@@ -341,8 +346,6 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None, codigo="")
                 raise EmisionNoPermitida("folio_ocupado")
             emision.folio = folio
             emision.codigo_sii = codigo
-            if codigo:
-                transaction.on_commit(lambda: _programar_pdf(emision_id))
             cobro.estado_boleta = Cobro.EstadoBoleta.EMITIDA
             cobro.boleta_folio = folio
             cobro.boleta_fecha_emision = fecha or date.fromisoformat(json.loads(emision.payload)["fecha"])
@@ -365,31 +368,23 @@ def resolver_manual(emision_id, usuario, hecha, folio="", fecha=None, codigo="")
     return emision
 
 
-def _programar_pdf(emision_id):
-    from .tasks import descargar_pdf_bhe
-
-    descargar_pdf_bhe.apply_async((emision_id,))
-
-
-def descargar_pdf(emision_id):
-    """Baja el PDF de una emisión resuelta a mano con su código. Si falla, la boleta sigue registrada sin PDF."""
-    emision = EmisionBHE.objects.select_related("cobro").get(pk=emision_id)
-    if emision.estado != Estado.EMITIDA or emision.pdf or not emision.codigo_sii:
-        return False
+def subir_pdf(emision, contenido):
+    """El PDF que el psicólogo bajó de su SII, si la emisión quedó sin él (la empresa solo lo baja al emitir)."""
+    if emision.tipo != Tipo.EMISION or emision.estado != Estado.EMITIDA or emision.pdf:
+        raise EmisionNoPermitida("estado_invalido")
+    if not contenido.startswith(b"%PDF"):
+        raise EmisionNoPermitida("pdf_invalido")
     try:
-        pdf = get_emisor().descargar_pdf(emision.codigo_sii)
-    except ErrorCredencial as exc:
-        pausar_por_credencial(exc)
-        return False
-    except Exception as exc:
-        logger.warning("Emisión BHE %s: no se bajó el PDF (%s).", emision_id, getattr(exc, "codigo", type(exc).__name__))
-        return False
-    if not pdf:
-        logger.warning("Emisión BHE %s: el SII no devolvió el PDF.", emision_id)
-        return False
-    emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(pdf), save=False)
+        texto = " ".join(pagina.extract_text() or "" for pagina in PdfReader(BytesIO(contenido)).pages)
+    except Exception:
+        raise EmisionNoPermitida("pdf_invalido")
+    # El folio como lo imprime la boleta, no el «Res. Ex. N° 83» ni un «N°» del domicilio.
+    folios = re.findall(r"ELECTR[OÓ]NICA\s*N\s*[°º]?\s*(\d+)", texto, re.I)
+    if int(emision.folio) not in {int(folio) for folio in folios}:
+        raise EmisionNoPermitida("pdf_otro_folio", f"Este PDF no parece ser la boleta N° {emision.folio}.")
+    emision.pdf.save(f"boleta-{emision.folio}.pdf", ContentFile(contenido), save=False)
     emision.save(update_fields=["pdf"])
-    return True
+    logger.info("Emisión BHE %s: PDF subido por el psicólogo.", emision.pk)
 
 
 def _bloquear(emision_id, *estados):

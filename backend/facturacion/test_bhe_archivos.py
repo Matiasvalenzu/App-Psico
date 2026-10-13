@@ -8,6 +8,7 @@ from unittest import mock
 from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -20,6 +21,25 @@ from .test_bhe import RUT_EMISOR, EntornoBHE, User, crear_cobro, preparar_psicol
 from .test_bhe_api import emitir
 
 CLAVE = "Cl4ve-Secreta!"
+
+
+def pdf_con_texto(texto):
+    """Un PDF mínimo de una página con ese texto, para que pypdf lo lea como una boleta del SII."""
+    contenido = b"BT /F1 12 Tf 50 750 Td (" + texto.encode("cp1252") + b") Tj ET"
+    objetos = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(contenido) + contenido + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    ]
+    pdf, offsets = b"%PDF-1.4\n", []
+    for numero, objeto in enumerate(objetos, 1):
+        offsets.append(len(pdf))
+        pdf += b"%d 0 obj\n" % numero + objeto + b"\nendobj\n"
+    xref = len(pdf)
+    pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objetos) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    return pdf + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objetos) + 1, xref)
 
 
 @override_settings(BHE_SII_CLAVE=CLAVE)
@@ -108,6 +128,62 @@ class ArchivosTests(EntornoBHE, TestCase):
         self.assertEqual(self.client.get(f"/{settings.MEDIA_URL}{emision.pdf.name}").status_code, 404)
         self.assertEqual(os.stat(emision.pdf.path).st_mode & 0o777, 0o600)
         self.assertEqual(os.stat(os.path.dirname(emision.pdf.path)).st_mode & 0o777, 0o700)
+
+    def subir(self, emision, contenido):
+        archivo = SimpleUploadedFile("boleta.pdf", contenido, content_type="application/pdf")
+        return self.client.post(self.url_pdf(emision), {"archivo": archivo}, format="multipart")
+
+    def sin_pdf(self):
+        # Como cuando el robot no alcanzó a bajarlo en la sesión de la emisión.
+        emision = self.emitida()
+        emision.pdf.delete(save=True)
+        return emision
+
+    def test_psicologo_sube_el_pdf_que_bajo_de_su_sii(self):
+        emision = self.sin_pdf()
+        contenido = pdf_con_texto(f"BOLETA DE HONORARIOS ELECTRONICA N° {emision.folio}")
+        respuesta = self.subir(emision, contenido)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta.json()["ultima_emision"]["tiene_pdf"])
+        self.assertEqual(b"".join(self.client.get(self.url_pdf(emision)).streaming_content), contenido)
+
+    def test_pdf_de_otra_boleta(self):
+        emision = self.sin_pdf()
+        # Otro folio, o el número solo en la resolución del pie: no es esta boleta.
+        for texto in (f"BOLETA DE HONORARIOS ELECTRONICA N° {int(emision.folio) + 1}", f"Res. Ex. N° {emision.folio}"):
+            respuesta = self.subir(emision, pdf_con_texto(texto))
+            self.assertEqual(respuesta.status_code, 400)
+            self.assertEqual(respuesta.json()["detail"], f"Este PDF no parece ser la boleta N° {emision.folio}.")
+        emision.refresh_from_db()
+        self.assertFalse(emision.pdf)
+
+    def test_archivo_que_no_es_pdf(self):
+        emision = self.sin_pdf()
+        for contenido in (b"<html></html>", b"%PDF-1.4 basura"):
+            respuesta = self.subir(emision, contenido)
+            self.assertEqual((respuesta.status_code, respuesta.json()["code"]), (400, "pdf_invalido"))
+        with override_settings(DOCUMENT_UPLOAD_MAX_BYTES=10):
+            respuesta = self.subir(emision, pdf_con_texto(f"BOLETA DE HONORARIOS ELECTRONICA N° {emision.folio}"))
+        self.assertEqual((respuesta.status_code, respuesta.json()["code"]), (400, "pdf_invalido"))
+        emision.refresh_from_db()
+        self.assertFalse(emision.pdf)
+
+    def test_no_reemplaza_el_pdf_ni_sube_sin_plus_o_ajeno(self):
+        emision = self.emitida()  # ya trae el PDF que bajó el robot
+        contenido = pdf_con_texto(f"BOLETA DE HONORARIOS ELECTRONICA N° {emision.folio}")
+        respuesta = self.subir(emision, contenido)
+        self.assertEqual((respuesta.status_code, respuesta.json()["code"]), (400, "estado_invalido"))
+
+        emision.pdf.delete(save=True)
+        otro = APIClient()
+        otro.force_authenticate(user=preparar_psicologo("otro@psiconex.cl"))
+        archivo = SimpleUploadedFile("boleta.pdf", contenido, content_type="application/pdf")
+        self.assertEqual(otro.post(self.url_pdf(emision), {"archivo": archivo}, format="multipart").status_code, 404)
+        self.user.suscripcion.plan = "estandar"
+        self.user.suscripcion.save()
+        self.assertEqual(self.subir(emision, contenido).status_code, 403)
+        emision.refresh_from_db()
+        self.assertFalse(emision.pdf)
 
     def test_dueno_descarga_el_pdf(self):
         emision = self.emitida()

@@ -138,7 +138,8 @@ PASO_1 = "https://loa.sii.cl/cgi_IMT/TMBEUS_ValidaAutoriz.cgi?modo=1"
 class PortalSimulado(robot.PlaywrightEmisor):
     def __init__(self, clave_ok=True, rut_autorizador="12345678", paso_3=None, paso_4=None, boleta=BOLETA, pdf=PDF):
         super().__init__()
-        self.paso_3, self.paso_4, self.boleta, self.pdf = paso_3, paso_4, boleta, pdf
+        self.paso_3, self.paso_4, self.boleta = paso_3, paso_4, boleta
+        self.pdfs = list(pdf) if isinstance(pdf, list) else [pdf]  # una respuesta por pedido; la última se repite
         self.valores = {
             "tras_login": PASO_1 + "&ok=1" if clave_ok else LOGIN, "rut_autorizador": rut_autorizador,
         }  # fmt: skip
@@ -155,15 +156,20 @@ class PortalSimulado(robot.PlaywrightEmisor):
         self.pedidas.append(pagina)
         if route.request.post_data:
             self.envios.append(route.request.post_data)
+        cookie = {}
         if pagina == "TMBEUS_ValidaAutoriz.cgi" and not self.con_sesion:
             # Sin sesión muestra el login (sin redirigir: un 302 se saltaría esta ruta e iría al SII real).
             if "ok=1" not in route.request.url:
                 pagina = "IngresoRutClave.html"
             self.con_sesion = "ok=1" in route.request.url
+            if self.con_sesion:
+                cookie = {"set-cookie": "sesion=del-login; Path=/"}
         if pagina == "TMBCOT_ConsultaBoletaPdf.cgi":
-            if self.pdf is None:
+            # Como el SII: solo la sesión que emitió baja el PDF.
+            pdf = self.pdfs.pop(0) if len(self.pdfs) > 1 else self.pdfs[0]
+            if pdf is None or "sesion=del-login" not in route.request.all_headers().get("cookie", ""):
                 return route.fulfill(status=500, body="")
-            return route.fulfill(content_type="application/pdf", body=self.pdf)
+            return route.fulfill(content_type="application/pdf", body=pdf)
         html = PAGINAS.get(pagina, "<p>No encontrada</p>").format(**self.valores)
         if pagina == "bhe_12345678-81.html":
             html = self.boleta.replace("\n", "<br>")
@@ -173,7 +179,7 @@ class PortalSimulado(robot.PlaywrightEmisor):
             return route.abort()
         if pagina == "TMBEUS_BoletaHonorariosElectronica.cgi" and self.paso_4:
             html = self.paso_4
-        route.fulfill(content_type="text/html; charset=utf-8", body=f"<html><body>{html}</body></html>")
+        route.fulfill(content_type="text/html; charset=utf-8", headers=cookie, body=f"<html><body>{html}</body></html>")
 
 
 def _hay_chromium():
@@ -252,8 +258,16 @@ class PortalSimuladoTests(SimpleTestCase):
             self.assertIn("04-paso-4-emitida.png", dict(emisor.evidencias))
 
     def test_sin_pdf_igual_queda_emitida(self):
-        resultado = PortalSimulado(pdf=None).emitir(datos())
+        emisor = PortalSimulado(pdf=None)
+        resultado = emisor.emitir(datos())
         self.assertEqual((resultado.folio, resultado.pdf), ("81", b""))
+        self.assertEqual(emisor.pedidas.count("TMBCOT_ConsultaBoletaPdf.cgi"), 2)  # un solo reintento
+
+    def test_pdf_con_la_sesion_que_emitio_y_un_reintento_sin_otro_login(self):
+        emisor = PortalSimulado(pdf=[None, PDF])
+        self.assertEqual(emisor.emitir(datos()).pdf, PDF)
+        self.assertEqual(emisor.pedidas.count("TMBCOT_ConsultaBoletaPdf.cgi"), 2)
+        self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
 
     def test_rechazo_antes_de_emitir_no_envia(self):
         emisor = PortalSimulado(rut_autorizador="99999999")
@@ -267,12 +281,3 @@ class PortalSimuladoTests(SimpleTestCase):
         with self.assertRaises(ErrorDespuesDeEnviar):
             emisor.emitir(datos())
         self.assertEqual(emisor.pedidas.count("TMBEUS_BoletaHonorariosElectronica.cgi"), 1)
-
-    def test_descargar_pdf_con_un_login_y_sin_formulario(self):
-        emisor = PortalSimulado()
-        self.assertEqual(emisor.descargar_pdf(CODIGO), PDF)
-        self.assertEqual(sum(CLAVE in envio for envio in emisor.envios), 1)
-        self.assertNotIn("TMBEUS_PresentaDatosBoleta.cgi", emisor.pedidas)
-        self.assertNotIn("TMBEUS_BoletaHonorariosElectronica.cgi", emisor.pedidas)
-        with self.assertRaises(ErrorNegocio):
-            emisor.descargar_pdf("../otra")

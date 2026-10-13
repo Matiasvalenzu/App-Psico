@@ -92,7 +92,7 @@ class ResolverEmisionForm(forms.Form):
     codigo = forms.CharField(
         label="Código", required=False,
         validators=[RegexValidator(r"^[0-9A-Fa-f]{18,22}$", "Copia el código que va bajo el código de barras.")],
-        help_text="Opcional: el que va bajo el código de barras de la boleta. Con él se baja el PDF del SII.",
+        help_text="Opcional: el que va bajo el código de barras de la boleta, para el registro.",
     )
 
     def clean_codigo(self):

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Download, ExternalLink, Loader2, Send } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Loader2, Send, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { formatDateCL } from "@/lib/utils";
@@ -57,6 +57,7 @@ export default function EmisionSii({
   const [confirmarAnulada, setConfirmarAnulada] = useState(false);
   const [error, setError] = useState("");
   const enviadoRef = useRef(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
 
@@ -140,6 +141,16 @@ export default function EmisionSii({
     }
   }
 
+  function subirPdf(event: React.ChangeEvent<HTMLInputElement>) {
+    // El que el psicólogo bajó de su SII cuando el robot no alcanzó a bajarlo; el backend revisa que traiga el folio.
+    const archivo = event.target.files?.[0];
+    event.target.value = "";
+    if (!archivo || !emision) return;
+    const body = new FormData();
+    body.append("archivo", archivo);
+    accion(`emisiones/${emision.id}/pdf/`, { method: "POST", body }, "PDF guardado.");
+  }
+
   async function descargarPdf() {
     if (!emision) return;
     setBusy(true);
@@ -218,6 +229,17 @@ export default function EmisionSii({
             )}
           </AlertDescription>
         </Alert>
+
+        {emision && !emision.tiene_pdf && !soloLectura && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 p-4 text-sm">
+            <span className="text-muted-foreground">Descárgala desde tu SII: Consultas › boletas emitidas.</span>
+            <input ref={pdfInputRef} type="file" accept="application/pdf" className="hidden" onChange={subirPdf} />
+            <Button size="sm" variant="outline" onClick={() => pdfInputRef.current?.click()} disabled={busy}>
+              <Upload />
+              Subir PDF
+            </Button>
+          </div>
+        )}
 
         {!soloLectura && !cobro.anulacion_solicitada_at && (
           <Button
