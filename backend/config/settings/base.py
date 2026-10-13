@@ -274,6 +274,9 @@ GOOGLE_CALENDAR_NAME = os.environ.get("GOOGLE_CALENDAR_NAME", "Agenda Psicológi
 MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
 MERCADOPAGO_PUBLIC_KEY = os.environ.get("MERCADOPAGO_PUBLIC_KEY", "")
 MERCADOPAGO_PLAN_ID = os.environ.get("MERCADOPAGO_PLAN_ID", "")
+# Plan Plus: enlace público de suscripción y el preapproval_plan_id al que apunta (para reconocer el pago).
+MERCADOPAGO_PLUS_URL = os.environ.get("MERCADOPAGO_PLUS_URL", "")
+MERCADOPAGO_PLUS_PLAN_ID = os.environ.get("MERCADOPAGO_PLUS_PLAN_ID", "")
 # Muestra el Plan Plus (boletas de honorarios) para contratación propia; el Admin puede asignarlo igual.
 PLAN_PLUS_DISPONIBLE = os.environ.get("PLAN_PLUS_DISPONIBLE", "False").lower() in ("1", "true", "yes")
 # Emisión automática de boletas como usuario autorizado (Fase 2). Independiente de PLAN_PLUS_DISPONIBLE.

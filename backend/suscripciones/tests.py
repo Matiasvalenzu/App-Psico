@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -381,3 +382,90 @@ class PlanPlusTests(APITestCase):
         self.assertEqual(mock_sdk.preapproval().create.call_args[0][0]["auto_recurring"]["transaction_amount"], 4990)
         self.user.suscripcion.refresh_from_db()
         self.assertEqual(self.user.suscripcion.plan, "plus")
+
+
+@override_settings(MERCADOPAGO_PLUS_PLAN_ID="planplus", MERCADOPAGO_PLUS_URL="https://mpago.la/plus")
+class EnlacePlusTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="enlace@psiconex.cl", email="enlace@psiconex.cl", password="x")
+        self.client.force_authenticate(user=self.user)
+        self.suscripcion = self.user.suscripcion
+
+    def _mp(self, mock_sdk_fn, **response):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        datos = {"preapproval_plan_id": "planplus", "status": "authorized", "payer_id": 77,
+                 "payment_method_id": "visa", "next_payment_date": "2026-11-13T10:00:00.000-04:00"}
+        datos.update(response)
+        mock_sdk.preapproval().get.return_value = {"status": 200, "response": datos}
+        mock_sdk.preapproval().update.return_value = {"status": 200, "response": {}}
+        return mock_sdk
+
+    def _vincular(self, preapproval_id="prePlus1"):
+        return self.client.post("/api/suscripciones/vincular/", {"preapproval_id": preapproval_id}, format="json", secure=True)
+
+    def test_enlace_expuesto(self):
+        self.assertEqual(self.client.get("/api/suscripciones/estado/", secure=True).data["plus_url"], "https://mpago.la/plus")
+        self.assertEqual(self.client.get("/api/auth/me/", secure=True).data["plus_url"], "https://mpago.la/plus")
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_vincular_deja_plus_activo(self, mock_sdk_fn):
+        mock_sdk = self._mp(mock_sdk_fn)
+        response = self._vincular()
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mock_sdk.preapproval().get.assert_called_with("prePlus1")
+        self.suscripcion.refresh_from_db()
+        self.assertEqual((self.suscripcion.plan, self.suscripcion.estado), ("plus", "activa"))
+        self.assertEqual(self.suscripcion.mp_preapproval_id, "prePlus1")
+        self.assertEqual(self.suscripcion.card_brand, "visa")
+        self.assertIsNotNone(self.suscripcion.proximo_cobro)
+        self.assertTrue(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_vincular_rechaza_otro_plan(self, mock_sdk_fn):
+        self._mp(mock_sdk_fn, preapproval_plan_id="estandar")
+        self.assertEqual(self._vincular().status_code, status.HTTP_400_BAD_REQUEST)
+        self.suscripcion.refresh_from_db()
+        self.assertEqual((self.suscripcion.plan, self.suscripcion.mp_preapproval_id), ("estandar", None))
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_vincular_rechaza_preapproval_de_otra_cuenta(self, mock_sdk_fn):
+        mock_sdk = self._mp(mock_sdk_fn)
+        otro = User.objects.create_user(username="otro@psiconex.cl", email="otro@psiconex.cl", password="x")
+        Suscripcion.objects.filter(user=otro).update(mp_preapproval_id="prePlus1")
+        self.assertEqual(self._vincular().status_code, status.HTTP_409_CONFLICT)
+        mock_sdk.preapproval().get.assert_not_called()
+        self.assertEqual(self._vincular("prePlus1; DROP").status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_vincular_cancela_el_estandar_que_pagaba(self, mock_sdk_fn):
+        mock_sdk = self._mp(mock_sdk_fn)
+        Suscripcion.objects.filter(pk=self.suscripcion.pk).update(estado="activa", mp_preapproval_id="preEstandar")
+        self.assertEqual(self._vincular().status_code, status.HTTP_200_OK)
+        mock_sdk.preapproval().update.assert_called_with("preEstandar", {"status": "cancelled"})
+
+        # El aviso de cancelación del Estándar reemplazado no toca la suscripción Plus.
+        mock_sdk.preapproval().get.return_value = {
+            "status": 200, "response": {"external_reference": str(self.user.id), "status": "cancelled"},
+        }
+        self.client.post("/api/suscripciones/webhook/",
+                         {"type": "subscription_preapproval", "data": {"id": "preEstandar"}}, format="json", secure=True)
+        self.suscripcion.refresh_from_db()
+        self.assertEqual((self.suscripcion.plan, self.suscripcion.estado, self.suscripcion.mp_preapproval_id),
+                         ("plus", "activa", "prePlus1"))
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_webhook_reconoce_preapproval_plus_vinculado(self, mock_sdk_fn):
+        self._mp(mock_sdk_fn, status="paused")
+        Suscripcion.objects.filter(pk=self.suscripcion.pk).update(estado="activa", plan="plus", mp_preapproval_id="prePlus1")
+        self.client.post("/api/suscripciones/webhook/",
+                         {"type": "subscription_preapproval", "data": {"id": "prePlus1"}}, format="json", secure=True)
+        self.suscripcion.refresh_from_db()
+        self.assertEqual((self.suscripcion.plan, self.suscripcion.estado), ("plus", "past_due"))
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_webhook_ignora_preapproval_plus_sin_vincular(self, mock_sdk_fn):
+        self._mp(mock_sdk_fn)
+        self.client.post("/api/suscripciones/webhook/",
+                         {"type": "subscription_preapproval", "data": {"id": "prePlus9"}}, format="json", secure=True)
+        self.assertFalse(Suscripcion.objects.filter(mp_preapproval_id="prePlus9").exists())

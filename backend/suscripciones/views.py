@@ -4,6 +4,7 @@ import mercadopago
 from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -62,6 +63,7 @@ class SuscripcionEstadoView(APIView):
                 "plan": suscripcion.plan,
                 "boletas_habilitadas": suscripcion.tiene_boletas,
                 "plan_plus_disponible": settings.PLAN_PLUS_DISPONIBLE,
+                "plus_url": settings.MERCADOPAGO_PLUS_URL,
                 "planes": {clave: {"nombre": nombre, "monto": monto} for clave, (nombre, monto) in PLANES.items()},
                 "fin_prueba": suscripcion.fin_prueba,
                 "dias_restantes_prueba": dias_restantes,
@@ -289,6 +291,67 @@ class CambiarPlanView(APIView):
         return Response({"status": "ok", "plan": plan})
 
 
+class VincularPreapprovalView(APIView):
+    """
+    El enlace público de Plus crea la suscripción en Mercado Pago sin decir quién pagó (sin external_reference
+    ni correo). Al volver, MP agrega ?preapproval_id= a la back_url y el frontend lo envía aquí: se confirma
+    con MP que es del plan Plus y se asigna al usuario que lo reclama primero.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        preapproval_id = str(request.data.get("preapproval_id") or "").strip()
+        plan_id = settings.MERCADOPAGO_PLUS_PLAN_ID
+        if not preapproval_id.isalnum() or not plan_id:
+            return Response({"error": "Suscripción no válida."}, status=status.HTTP_400_BAD_REQUEST)
+        if Suscripcion.objects.filter(mp_preapproval_id=preapproval_id).exclude(user=request.user).exists():
+            return Response({"error": "Esta suscripción ya está asociada a otra cuenta."}, status=status.HTTP_409_CONFLICT)
+
+        sdk = _get_mp_sdk()
+        try:
+            mp_resp = sdk.preapproval().get(preapproval_id)
+        except Exception as e:
+            logger.error(f"Excepción al consultar preapproval en Mercado Pago: {e}")
+            mp_resp = {}
+        if mp_resp.get("status") != 200:
+            return Response(
+                {"error": "No fue posible confirmar la suscripción con Mercado Pago. Intenta nuevamente."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        data = mp_resp.get("response", {})
+        if data.get("preapproval_plan_id") != plan_id or data.get("status") not in ("authorized", "pending"):
+            return Response({"error": "La suscripción no corresponde al Plan Plus."}, status=status.HTTP_400_BAD_REQUEST)
+        referencia = data.get("external_reference")
+        if referencia and referencia != str(request.user.id):
+            return Response({"error": "Esta suscripción ya está asociada a otra cuenta."}, status=status.HTTP_409_CONFLICT)
+
+        suscripcion, _ = Suscripcion.objects.get_or_create(
+            user=request.user,
+            defaults={"estado": "trial", "fin_prueba": timezone.now() + timedelta(days=14)},
+        )
+        anterior = suscripcion.mp_preapproval_id
+        if anterior and anterior != preapproval_id and suscripcion.estado == "activa":
+            # Ya pagaba con otra suscripción (p. ej. Estándar con tarjeta): se cancela para no cobrar dos veces.
+            try:
+                sdk.preapproval().update(anterior, {"status": "cancelled"})
+            except Exception as e:
+                logger.warning(f"No se pudo cancelar el preapproval anterior de user={request.user.id}: {e}")
+
+        if data.get("status") == "authorized":
+            suscripcion.estado = "activa"
+            suscripcion.cancelada_en = None
+        suscripcion.plan = "plus"
+        suscripcion.mp_preapproval_id = preapproval_id
+        suscripcion.mp_payer_id = str(data.get("payer_id") or "")
+        suscripcion.card_brand = (data.get("payment_method_id") or "")[:20] or None
+        suscripcion.card_last_four = None
+        suscripcion.proximo_cobro = parse_datetime(data.get("next_payment_date") or "") or suscripcion.proximo_cobro
+        suscripcion.save()
+        logger.info(f"Preapproval Plus vinculado a user={request.user.id} ({data.get('status')})")
+        return Response({"status": "ok", "plan": "plus", "estado": suscripcion.estado})
+
+
 class CheckoutView(APIView):
     """
     Genera un checkout hospedado en Mercado Pago retornando init_point
@@ -371,20 +434,27 @@ class WebhookView(APIView):
                         user_id = data.get("external_reference")
                         mp_status = data.get("status")
 
+                        # Las suscripciones del enlace de Plus no traen external_reference: se reconocen
+                        # por el preapproval que /vincular/ ya dejó guardado.
                         if user_id:
-                            try:
-                                suscripcion = Suscripcion.objects.get(user__id=user_id)
-                                if mp_status == "authorized":
-                                    suscripcion.estado = "activa"
-                                elif mp_status == "paused":
-                                    suscripcion.estado = "past_due"
-                                elif mp_status == "cancelled":
-                                    suscripcion.estado = "cancelada"
+                            suscripcion = Suscripcion.objects.filter(user__id=user_id).first()
+                        else:
+                            suscripcion = Suscripcion.objects.filter(mp_preapproval_id=mp_id).first()
+                        # Un aviso de un preapproval reemplazado (p. ej. el Estándar cancelado al pasar a Plus)
+                        # no debe tocar la suscripción vigente.
+                        if suscripcion and suscripcion.mp_preapproval_id in (None, "", mp_id):
+                            if mp_status == "authorized":
+                                suscripcion.estado = "activa"
+                            elif mp_status == "paused":
+                                suscripcion.estado = "past_due"
+                            elif mp_status == "cancelled":
+                                suscripcion.estado = "cancelada"
+                            plan_plus = settings.MERCADOPAGO_PLUS_PLAN_ID
+                            if plan_plus and data.get("preapproval_plan_id") == plan_plus:
+                                suscripcion.plan = "plus"
 
-                                suscripcion.mp_preapproval_id = mp_id
-                                suscripcion.save()
-                            except Suscripcion.DoesNotExist:
-                                pass
+                            suscripcion.mp_preapproval_id = mp_id
+                            suscripcion.save()
                 except Exception as e:
                     logger.error(f"Error procesando webhook Mercado Pago: {e}")
 

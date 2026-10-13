@@ -14,6 +14,7 @@ x-backend-env: &backend-env
   REDIS_URL: redis://redis:6379/0
   DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
   BHE_BACKEND: ${BHE_BACKEND:-fake}
+  PLAN_PLUS_DISPONIBLE: ${PLAN_PLUS_DISPONIBLE:-False}
   BHE_AUTO_DISPONIBLE: ${BHE_AUTO_DISPONIBLE:-False}
   # Cuenta de Psiconex que el psicólogo autoriza en el SII (no es secreto). Con default para que
   # nunca quede vacío: environment pisa a env_file.
@@ -23,6 +24,8 @@ x-backend-env: &backend-env
   DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
   MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
   MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY:-}
+  MERCADOPAGO_PLUS_URL: ${MERCADOPAGO_PLUS_URL:-https://mpago.la/1JBRauq}
+  MERCADOPAGO_PLUS_PLAN_ID: ${MERCADOPAGO_PLUS_PLAN_ID:-3dc6b33c774d430d8960bca570457490}
   PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://192.168.1.151:3000}
   SIGNALING_SECRET: ${SIGNALING_SECRET:-dev-signaling-secret}
   TEST_LINK_EXPIRATION_DAYS: ${TEST_LINK_EXPIRATION_DAYS:-7}
