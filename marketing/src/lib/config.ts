@@ -7,6 +7,9 @@ export const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
   "http://localhost:3000"
 
+/** Enlace público de suscripción al Plan Plus en Mercado Pago (env NEXT_PUBLIC_MERCADOPAGO_PLUS_URL). */
+export const PLUS_URL = process.env.NEXT_PUBLIC_MERCADOPAGO_PLUS_URL || ""
+
 export const ROUTES = {
   login: `${APP_URL}/login`,
   register: `${APP_URL}/login`, // la app aún no tiene /register público

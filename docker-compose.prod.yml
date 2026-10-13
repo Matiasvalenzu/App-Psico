@@ -239,6 +239,7 @@ services:
         NEXT_PUBLIC_APP_URL: https://app.psiconex.cl
         NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID:-}
         NEXT_PUBLIC_GOOGLE_ADS_ID: ${NEXT_PUBLIC_GOOGLE_ADS_ID:-}
+        NEXT_PUBLIC_MERCADOPAGO_PLUS_URL: ${NEXT_PUBLIC_MERCADOPAGO_PLUS_URL:-https://mpago.la/1JBRauq}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3002:3001"
