@@ -17,12 +17,16 @@ const FUNCIONES_ESTANDAR = [
   "Chat IA independiente por paciente",
   "Agenda con Google Calendar",
   "Test de Creencias Ellis, Rueda de la Vida y escalas clínicas validadas (PHQ-9, GAD-7, DASS-21, Rosenberg) con trayectoria y alerta de riesgo",
-  "Brief previo a la sesión e informes para colegio, Tribunal de Familia y licencia médica (CIE-10)",
   "Tareas intersesión y registro de ánimo con enlace privado para el paciente",
   "Videollamada propia de Psiconex",
   "Enlace privado para reserva de horas",
   "Recordatorios por correo a tus pacientes",
   "Exportación completa de tus datos",
+]
+
+const FUNCIONES_PLUS_CLINICO = [
+  "Brief previo a la sesión con IA: dónde quedó el proceso en un minuto",
+  "Informes con IA para colegio, Tribunal de Familia, licencia médica, avance y derivación, con CIE-10 y exportación a PDF o Word",
 ]
 
 const FUNCIONES_PLUS_ADMINISTRACION = [
@@ -182,7 +186,8 @@ export function PricingSection() {
                   <Stethoscope className="h-4 w-4 text-primary" aria-hidden="true" />
                   Clínico
                 </h4>
-                <p className="text-sm text-foreground/85">Todo lo del plan Estándar.</p>
+                <p className="mb-3 text-sm text-foreground/85">Todo lo del plan Estándar, más:</p>
+                <ListaFunciones items={FUNCIONES_PLUS_CLINICO} destacada={seleccionado === "plus"} />
               </div>
               <div>
                 <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">

@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Download, FileSignature, Loader2, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
+import { Copy, Download, FileSignature, Loader2, Lock, RefreshCw, Sparkles, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import UpsellPlusModal from "@/components/suscripcion/UpsellPlusModal";
 import { API_SEG, TIPOS_INFORME, fechaCorta, type DocumentoIA } from "@/lib/seguimiento";
 
 async function json<T>(res: Response): Promise<T> {
@@ -277,7 +278,21 @@ function GeneradorInformes({ pacienteId }: { pacienteId: string }) {
   );
 }
 
-export default function BriefInformes({ pacienteId }: { pacienteId: string }) {
+function BloqueoPlus({ enPrueba }: { enPrueba: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="rounded-2xl border p-6 text-center">
+      <Lock className="mx-auto mb-2 size-6 text-muted-foreground" />
+      <h3 className="font-semibold">Brief previo a la sesión e informes con IA</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Un resumen de un minuto antes de cada sesión y borradores de informe para colegio, Tribunal de Familia, licencia médica, avance y derivación, con CIE-10 y exportación a PDF o Word. Disponible en el Plan Plus.</p>
+      <Button className="mt-4" variant="outline" onClick={() => setOpen(true)}><Lock /> Conocer el Plan Plus</Button>
+      <UpsellPlusModal open={open} onOpenChange={setOpen} origen="informes_ficha" enPrueba={enPrueba} />
+    </section>
+  );
+}
+
+export default function BriefInformes({ pacienteId, plus, enPrueba = false }: { pacienteId: string; plus: boolean; enPrueba?: boolean }) {
+  if (!plus) return <BloqueoPlus enPrueba={enPrueba} />;
   return (
     <div className="space-y-6">
       <Brief pacienteId={pacienteId} />

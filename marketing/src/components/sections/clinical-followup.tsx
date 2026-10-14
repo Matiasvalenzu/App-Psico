@@ -22,11 +22,13 @@ const TARJETAS = [
     icon: ClipboardList,
     title: "Brief antes de cada sesión",
     body: "Un resumen de un minuto con la última sesión, los cambios en escalas, las tareas y el ánimo para retomar el hilo.",
+    badge: "Plus",
   },
   {
     icon: FileSignature,
     title: "Informes para colegio, tribunal y licencia",
     body: "Borradores según el destinatario, con diagnóstico CIE-10, listos para revisar, firmar y exportar a PDF o Word.",
+    badge: "Plus",
   },
   {
     icon: HeartPulse,
@@ -99,7 +101,7 @@ export function ClinicalFollowupSection() {
           ))}
         </div>
         <p className="mx-auto mt-8 max-w-3xl text-center text-xs text-muted-foreground">
-          Las escalas son instrumentos de tamizaje, no diagnósticos. Psiconex no envía mensajes a tus pacientes por su cuenta: tú compartes los enlaces.
+          Escalas, alerta de riesgo, tareas y ánimo están en todos los planes; el brief y los informes con IA, en el Plan Plus. Las escalas son instrumentos de tamizaje, no diagnósticos. Psiconex no envía mensajes a tus pacientes por su cuenta: tú compartes los enlaces.
         </p>
       </div>
     </section>

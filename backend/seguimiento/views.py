@@ -26,6 +26,7 @@ from .models import (
     RegistroAnimo,
     TareaIntersesion,
 )
+from .permissions import TienePlanPlusIA
 from .services import enlace_whatsapp, expiracion, generar_token, hash_token, notificar_psicologo, url_publica
 
 DIAS_VIGENCIA_ESCALA = 7
@@ -301,7 +302,7 @@ def _limite(request, paciente, tipos, maximo):
 
 
 class BriefView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, TienePlanPlusIA]
 
     def get(self, request, paciente_id):
         p = _paciente(request, paciente_id)
@@ -318,7 +319,7 @@ class BriefView(APIView):
 
 
 class InformesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, TienePlanPlusIA]
 
     def get(self, request, paciente_id):
         p = _paciente(request, paciente_id)
@@ -348,7 +349,7 @@ class InformesView(APIView):
 
 
 class DocumentoDetalleView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, TienePlanPlusIA]
 
     def _get(self, request, pk):
         return get_object_or_404(DocumentoClinicoIA, pk=pk, psicologo=request.user)
@@ -371,7 +372,7 @@ class DocumentoDetalleView(APIView):
 
 
 class FinalizarDocumentoView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, TienePlanPlusIA]
 
     def post(self, request, pk):
         d = get_object_or_404(DocumentoClinicoIA, pk=pk, psicologo=request.user)
@@ -384,7 +385,7 @@ class FinalizarDocumentoView(APIView):
 
 
 class RegenerarDocumentoView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, TienePlanPlusIA]
 
     def post(self, request, pk):
         d = get_object_or_404(DocumentoClinicoIA, pk=pk, psicologo=request.user)
@@ -398,7 +399,7 @@ class RegenerarDocumentoView(APIView):
 
 
 class ExportarDocumentoView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, TienePlanPlusIA]
 
     def get(self, request, pk, formato):
         d = get_object_or_404(DocumentoClinicoIA, pk=pk, psicologo=request.user)

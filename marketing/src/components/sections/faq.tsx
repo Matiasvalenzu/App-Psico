@@ -64,7 +64,7 @@ const FAQS = [
   },
   {
     q: "¿Los informes para colegio o tribunal reemplazan mi firma?",
-    a: "No. Son borradores que marcan con [COMPLETAR] lo que falta. Tú los revisas, los corriges, los marcas como finales y los exportas a PDF o Word para firmarlos.",
+    a: "No. Son borradores (disponibles en el Plan Plus) que marcan con [COMPLETAR] lo que falta. Tú los revisas, los corriges, los marcas como finales y los exportas a PDF o Word para firmarlos.",
   },
   {
     q: "¿Mi paciente ve mis notas si le doy el enlace de seguimiento?",

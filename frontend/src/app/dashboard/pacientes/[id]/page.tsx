@@ -353,6 +353,7 @@ export default function PacienteDetailPage() {
               <FileSignature className="hidden sm:block" />
               <span className="hidden sm:inline">Brief e informes</span>
               <span className="sm:hidden">Informes</span>
+              {!boletas.habilitadas && <span className="text-xs text-muted-foreground">Plus</span>}
             </TabsTrigger>
             <TabsTrigger value="documentos" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
               <FileText className="hidden sm:block" />
@@ -404,7 +405,7 @@ export default function PacienteDetailPage() {
           </TabsContent>
 
           <TabsContent value="informes">
-            {tab === "informes" && <BriefInformes pacienteId={id} />}
+            {tab === "informes" && <BriefInformes pacienteId={id} plus={boletas.habilitadas} enPrueba={boletas.enPrueba} />}
           </TabsContent>
 
           <TabsContent value="documentos" className="space-y-4">

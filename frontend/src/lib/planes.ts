@@ -8,7 +8,6 @@ export const FUNCIONES_ESTANDAR = [
   "Chat IA independiente por paciente",
   "Agenda con Google Calendar",
   "Test de Creencias Ellis, Rueda de la Vida y escalas clínicas (PHQ-9, GAD-7, DASS-21, Rosenberg)",
-  "Brief previo a la sesión e informes para terceros con IA",
   "Tareas intersesión y registro de ánimo del paciente",
   "Registro de sesiones online (Meet y Zoom)",
   "Enlace privado para reserva de horas",
@@ -19,6 +18,8 @@ export const FUNCIONES_ESTANDAR = [
 export const TITULO_PLUS = "Tu consulta clínica y administrativa en un solo lugar";
 
 export const FUNCIONES_PLUS_ADMINISTRACION = [
+  "Brief previo a la sesión con IA: dónde quedó el proceso en un minuto",
+  "Informes con IA para colegio, Tribunal de Familia, licencia médica, avance y derivación (CIE-10, PDF y Word)",
   "Boletas de honorarios electrónicas en el SII con un clic desde cada cobro, sin entregar tu clave: Psiconex las emite como usuario autorizado",
   "Registro de pagos por paciente: fecha, monto, medio de pago y si está pagado o pendiente",
   "Estado de cada boleta al momento: en cola, en emisión, emitida con su folio o anulada",

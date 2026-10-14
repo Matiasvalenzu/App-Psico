@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from pacientes.models import Paciente
+from suscripciones.models import Suscripcion
 from sesiones.models import Sesion, TranscripcionSegmento
 
 from .escalas import DASS21, GAD7, PHQ9, RSES, calcular_escala
@@ -91,6 +92,8 @@ class ApiTests(TestCase):
         self.psico = User.objects.create_user(username="psico_demo", email="psico.demo@example.test", password="x", first_name="Demo", last_name="Psicóloga")
         self.otro = User.objects.create_user(username="otro", email="otro@example.test", password="x")
         self.paciente = Paciente.objects.create(psicologo=self.psico, nombre="Sofía", apellido="Ficticia", telefono_whatsapp="+56 9 1234 5678", motivo_consulta="Ansiedad (dato ficticio)")
+        Suscripcion.objects.update_or_create(user=self.psico, defaults={"plan": "plus", "estado": "activa"})
+        self.psico = User.objects.get(pk=self.psico.pk)
         self.client.force_authenticate(self.psico)
         self.base = f"/api/seguimiento/pacientes/{self.paciente.id}"
 
@@ -227,3 +230,30 @@ class ApiTests(TestCase):
         self.paciente.save()
         ctx, _ = construir_contexto(self.paciente)
         self.assertNotIn("11.111.111-1", ctx)
+
+
+class GatingPlanTests(TestCase):
+    def setUp(self):
+        self.psico = User.objects.create_user(username="estandar_demo", email="estandar@example.test", password="x")
+        Suscripcion.objects.update_or_create(user=self.psico, defaults={"plan": "estandar", "estado": "activa"})
+        self.paciente = Paciente.objects.create(psicologo=self.psico, nombre="Demo", apellido="Estandar")
+        self.client = APIClient()
+        self.client.force_authenticate(self.psico)
+        self.base = f"/api/seguimiento/pacientes/{self.paciente.id}"
+
+    def test_estandar_no_accede_a_brief_ni_informes(self):
+        for metodo, url, body in [("post", f"{self.base}/brief/", None), ("get", f"{self.base}/brief/", None),
+                                  ("post", f"{self.base}/informes/", {"tipo": "COLEGIO"}), ("get", f"{self.base}/informes/", None)]:
+            r = getattr(self.client, metodo)(url, body, format="json")
+            self.assertEqual(r.status_code, 403, url)
+            self.assertEqual(r.data["code"], "requiere_plus")
+        doc = DocumentoClinicoIA.objects.create(paciente=self.paciente, psicologo=self.psico, tipo="COLEGIO", estado="LISTO")
+        self.assertEqual(self.client.get(f"/api/seguimiento/documentos/{doc.id}/exportar/pdf/").status_code, 403)
+
+    def test_estandar_si_accede_a_escalas_tareas_y_animo(self):
+        r = self.client.post(f"{self.base}/escalas/", {"escala": "gad-7", "canal": "EN_CONSULTA", "respuestas": resp(GAD7, [0] * 7)}, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(self.client.get(f"{self.base}/trayectoria/").status_code, 200)
+        self.assertEqual(self.client.post(f"{self.base}/tareas/", {"descripcion": "Caminar 20 minutos"}, format="json").status_code, 201)
+        self.assertEqual(self.client.post(f"{self.base}/animo/", {"valor": 6}, format="json").status_code, 201)
+        self.assertEqual(self.client.post(f"{self.base}/portal/").status_code, 201)

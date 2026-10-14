@@ -1,7 +1,7 @@
 import { GOOGLE_ADS_READY_EVENT } from "@/lib/googleAds"
 import { META_PIXEL_READY_EVENT } from "@/lib/metaPixel"
 
-export type OrigenUpsell = "dashboard" | "cobros_ficha" | "lista_pacientes" | "menu"
+export type OrigenUpsell = "dashboard" | "cobros_ficha" | "lista_pacientes" | "menu" | "informes_ficha"
 export type EventoUpsell = "upsell_plus_click" | "upsell_plus_cta"
 
 const COLA = "psx_upsell_events"
