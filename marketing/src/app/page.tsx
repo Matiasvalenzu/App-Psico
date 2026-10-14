@@ -1,6 +1,7 @@
 import { Nav } from "@/components/layout/nav"
 import { Footer } from "@/components/layout/footer"
 import { HeroSection } from "@/components/sections/hero"
+import { PainSection } from "@/components/sections/pain"
 import { TrustSection } from "@/components/sections/trust"
 import { ProblemSection } from "@/components/sections/problem"
 import { FeaturesBentoSection } from "@/components/sections/features-bento"
@@ -18,6 +19,7 @@ export default function Home() {
       <Nav />
       <main className="flex flex-1 flex-col">
         <HeroSection />
+        <PainSection />
         <TrustSection />
         <ProblemSection />
         <FeaturesBentoSection />

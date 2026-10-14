@@ -55,8 +55,8 @@ export function HeroSection() {
               transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
               className="text-display mt-6 text-balance text-foreground"
             >
-              Escucha al paciente,{" "}
-              <span className="gradient-primary-text">no a tu cuaderno</span>
+              Que la ficha{" "}
+              <span className="gradient-primary-text">no te robe la tarde</span>
             </motion.h1>
 
             <motion.div
@@ -83,9 +83,8 @@ export function HeroSection() {
               transition={{ duration: 0.6, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
               className="mx-auto mt-5 max-w-xl text-balance text-lg text-muted-foreground lg:mx-0"
             >
-              Psiconex transcribe tus sesiones, distingue quién habla, busca en el
-              historial y redacta informes clínicos. Tú haces clínica; nosotros, la
-              burocracia.
+              Psiconex transcribe tu sesión, separa las voces y te deja una base para
+              tu registro. Tú la revisas, la corriges y decides qué queda.
             </motion.p>
 
             <motion.div
