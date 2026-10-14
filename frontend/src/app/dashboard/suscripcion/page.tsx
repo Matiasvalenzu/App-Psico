@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getCurrentUser, apiFetch } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
 import { FUNCIONES_ESTANDAR, FUNCIONES_PLUS_ADMINISTRACION, NOTA_PLUS, TITULO_PLUS } from "@/lib/planes";
+import { flushUpsell } from "@/lib/upsell";
 import {
   CreditCard,
   CheckCircle2,
@@ -71,6 +72,10 @@ export default function SuscripcionPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    flushUpsell();
+  }, []);
 
   const handleCancelSubscription = async () => {
     setCancelling(true);

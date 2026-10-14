@@ -1,17 +1,15 @@
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import SAFE_METHODS, BasePermission
+from rest_framework.permissions import BasePermission
 
 
 class TienePlanPlus(BasePermission):
-    """Leer cobros siempre se puede; crearlos o modificarlos requiere el Plan Plus."""
+    """Cobros y boletas, también la lectura, requieren Plan Plus activo."""
 
     def has_permission(self, request, view):
-        if request.method in SAFE_METHODS:
-            return True
         user = request.user
         suscripcion = getattr(user, "suscripcion", None)
         if user.is_staff or user.is_superuser or (suscripcion and suscripcion.tiene_boletas):
             return True
         raise PermissionDenied(
-            {"detail": "Las boletas de honorarios están disponibles en el Plan Plus.", "code": "plan_required"}
+            {"detail": "Las boletas de honorarios están disponibles en el Plan Plus.", "code": "requiere_plus"}
         )

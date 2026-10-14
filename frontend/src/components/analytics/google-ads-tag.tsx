@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Script from "next/script"
 
 import { useMetaConsent } from "@/lib/metaConsent"
-import { isPixelPath } from "@/lib/metaPixel"
+import { isPixelPath, isUpsellMeasurementPath } from "@/lib/metaPixel"
 import {
   GOOGLE_ADS_ID,
   GOOGLE_ADS_READY_EVENT,
@@ -28,7 +28,7 @@ export function GoogleAdsTag() {
   const pathname = usePathname()
   const consent = useMetaConsent()
   const allowed =
-    isGoogleAdsEnabled && isPixelPath(pathname) && consent === "accepted"
+    isGoogleAdsEnabled && (isPixelPath(pathname) || isUpsellMeasurementPath(pathname)) && consent === "accepted"
 
   // Red de seguridad: si gtag ya estaba cargado y la ruta sale de la allowlist
   // (o se retira el consentimiento), recarga completa para descargarlo.

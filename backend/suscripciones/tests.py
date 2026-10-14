@@ -288,8 +288,15 @@ class PlanPlusTests(APITestCase):
         self.assertTrue(data["tiene_cobros"])
         self.assertFalse(data["boletas_habilitadas"])
 
+    def test_trial_plus_no_habilita_boletas(self):
+        self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.estado = "trial"
+        self.user.suscripcion.save()
+        self.assertFalse(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+
     def test_plus_vigente_habilita_boletas(self):
         self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.estado = "activa"
         self.user.suscripcion.save()
         self.assertTrue(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
         self.user.suscripcion.estado = "expirada"

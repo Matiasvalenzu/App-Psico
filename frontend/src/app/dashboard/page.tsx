@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getCurrentUser } from "@/lib/api";
 import { formatDateCL } from "@/lib/utils";
 import { formatRut, isValidRut } from "@/lib/rut";
 import {
   AlertTriangle,
+  Lock,
+  Receipt,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -26,6 +28,8 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ImportarPacientes from "@/components/pacientes/ImportarPacientes";
 import ResumenCobros from "@/components/pacientes/ResumenCobros";
+import UpsellPlusModal from "@/components/suscripcion/UpsellPlusModal";
+import type { OrigenUpsell } from "@/lib/upsell";
 import { useTutorial } from "@/context/TutorialContext";
 
 import { Button } from "@/components/ui/button";
@@ -217,7 +221,15 @@ function StatusBadge({ estado }: { estado: string }) {
   );
 }
 
-function DeudaBadge({ paciente }: { paciente: Paciente }) {
+function DeudaBadge({ paciente, bloqueado, onBloqueo }: { paciente: Paciente; bloqueado?: boolean; onBloqueo?: () => void }) {
+  if (bloqueado) {
+    return (
+      <button type="button" onClick={onBloqueo} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+        <Lock className="h-3 w-3" />
+        Debe
+      </button>
+    );
+  }
   if (!paciente.deuda_pendiente) return null;
   return (
     <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
@@ -349,6 +361,11 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [sort, setSort] = useState<SortKey>("nombre");
   const [soloDeudores, setSoloDeudores] = useState(false);
+  const [plus, setPlus] = useState<boolean | null>(null);
+  const [enPrueba, setEnPrueba] = useState(false);
+  const [boletasConfiguradas, setBoletasConfiguradas] = useState(false);
+  const [upsell, setUpsell] = useState(false);
+  const [upsellOrigen, setUpsellOrigen] = useState<OrigenUpsell>("dashboard");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -375,6 +392,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadPacientes();
+    getCurrentUser()
+      .then((user) => {
+        setPlus(Boolean(user.boletas_habilitadas));
+        setEnPrueba(user.suscripcion_estado === "trial");
+        setBoletasConfiguradas(Boolean(user.boletas_configuradas));
+      })
+      .catch(() => setPlus(false));
   }, []);
 
   useEffect(() => {
@@ -571,7 +595,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {plus !== null && (
+        <button
+          type="button"
+          onClick={() => (plus ? router.push("/dashboard/configuracion/perfil") : (setUpsellOrigen("dashboard"), setUpsell(true)))}
+          className="flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 text-left text-sm font-medium hover:border-primary"
+        >
+          <Receipt className="h-4 w-4 text-primary" />
+          {plus && boletasConfiguradas ? "Boletas activas" : "Configurar boleta de honorarios"}
+        </button>
+      )}
+
       <ResumenCobros />
+      <UpsellPlusModal open={upsell} onOpenChange={setUpsell} origen={upsellOrigen} enPrueba={enPrueba} />
 
       {/* ── Filtros ── */}
       <div className="space-y-3">
@@ -609,15 +645,16 @@ export default function DashboardPage() {
               </button>
             )}
           </div>
-          {(conDeuda > 0 || soloDeudores) && (
+          {(plus === false || conDeuda > 0 || soloDeudores) && (
             <Button
               variant={soloDeudores ? "default" : "outline"}
               size="sm"
               aria-pressed={soloDeudores}
-              onClick={() => setSoloDeudores((v) => !v)}
+              onClick={() => (plus === false ? (setUpsellOrigen("lista_pacientes"), setUpsell(true)) : setSoloDeudores((v) => !v))}
               className="self-start sm:self-auto"
             >
-              Con pagos pendientes <span className="text-xs opacity-80">{conDeuda}</span>
+              {plus === false && <Lock className="h-3.5 w-3.5" />}
+              Con pagos pendientes {plus !== false && <span className="text-xs opacity-80">{conDeuda}</span>}
             </Button>
           )}
           <div className="flex items-center gap-2 sm:ml-auto">
@@ -690,7 +727,7 @@ export default function DashboardPage() {
                     <PacienteMeta paciente={p} />
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <StatusBadge estado={p.estado} />
-                      <DeudaBadge paciente={p} />
+                      <DeudaBadge paciente={p} bloqueado={plus === false} onBloqueo={() => { setUpsellOrigen("lista_pacientes"); setUpsell(true); }} />
                       {(tieneRiesgo(p) || p.es_menor_edad) && <AlertChips paciente={p} />}
                     </div>
                   </div>
@@ -760,7 +797,7 @@ export default function DashboardPage() {
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge estado={p.estado} />
-                        <DeudaBadge paciente={p} />
+                        <DeudaBadge paciente={p} bloqueado={plus === false} onBloqueo={() => { setUpsellOrigen("lista_pacientes"); setUpsell(true); }} />
                       </div>
                     </TableCell>
                     <TableCell className="row-action pr-4 text-right">

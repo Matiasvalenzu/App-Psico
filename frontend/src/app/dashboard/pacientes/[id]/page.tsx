@@ -29,6 +29,7 @@ import PacienteLateral from "./_components/PacienteLateral";
 import PacienteResumen from "./_components/PacienteResumen";
 import { cambiarPago, MarcarPagadoDialog } from "./_components/PagoCobro";
 import type { Cobro } from "./_components/cobros";
+import CobrosBloqueados from "@/components/suscripcion/CobrosBloqueados";
 import SesionesLista from "./_components/SesionesLista";
 import TestDialog, { type TestMode } from "./_components/TestDialog";
 import { fetchAllPages, getDateTimeInputValue, tieneRiesgo, type InformeIA, type Paciente, type Sesion } from "./_components/utils";
@@ -82,7 +83,7 @@ export default function PacienteDetailPage() {
   const [consentOpen, setConsentOpen] = useState(false);
   const [sesionToDelete, setSesionToDelete] = useState<Sesion | null>(null);
   // Cobros: visibles con Plus; si bajó de plan y tiene cobros, quedan en solo lectura.
-  const [boletas, setBoletas] = useState<{ habilitadas: boolean; visibles: boolean }>({ habilitadas: false, visibles: false });
+  const [boletas, setBoletas] = useState<{ habilitadas: boolean; enPrueba: boolean }>({ habilitadas: false, enPrueba: false });
   const [sesionCobro, setSesionCobro] = useState<Sesion | null>(null);
   const [cobrosRefresh, setCobrosRefresh] = useState(0);
   const [cobroPorPagar, setCobroPorPagar] = useState<number | null>(null);
@@ -128,14 +129,14 @@ export default function PacienteDetailPage() {
     }
   }
 
-  const tab: Tab = tabSolicitada === "cobros" && !boletas.visibles ? "resumen" : tabSolicitada;
+  const tab: Tab = tabSolicitada;
 
   useEffect(() => {
     getCurrentUser()
       .then((user) =>
         setBoletas({
           habilitadas: Boolean(user.boletas_habilitadas),
-          visibles: Boolean(user.boletas_habilitadas || user.tiene_cobros),
+          enPrueba: user.suscripcion_estado === "trial",
         })
       )
       .catch(() => {});
@@ -336,12 +337,11 @@ export default function PacienteDetailPage() {
               <span className="sm:hidden">IA</span>
               <span className="hidden sm:inline">Asistente IA</span>
             </TabsTrigger>
-            {boletas.visibles && (
-              <TabsTrigger value="cobros" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
-                <Receipt className="hidden sm:block" />
-                Cobros
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="cobros" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <Receipt className="hidden sm:block" />
+              Cobros
+              {!boletas.habilitadas && <span className="text-xs text-muted-foreground">Plus</span>}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="resumen">
@@ -359,7 +359,7 @@ export default function PacienteDetailPage() {
               onNewRemote={() => setRemoteModalOpen(true)}
               onDelete={setSesionToDelete}
               onCobro={boletas.habilitadas ? setSesionCobro : undefined}
-              mostrarCobro={boletas.visibles}
+              mostrarCobro={boletas.habilitadas}
               onMarcarPagado={boletas.habilitadas ? (s) => setCobroPorPagar(s.cobro?.id ?? null) : undefined}
               onVolverPendiente={boletas.habilitadas ? volverAPendiente : undefined}
             />
@@ -382,14 +382,16 @@ export default function PacienteDetailPage() {
             <ChatIA pacienteId={id} paciente={paciente} onInformeSaved={loadData} />
           </TabsContent>
 
-          {boletas.visibles && (
-            <TabsContent value="cobros">
-              <CobrosPaciente pacienteId={Number(id)} soloLectura={!boletas.habilitadas} refreshKey={cobrosRefresh}
+          <TabsContent value="cobros">
+            {boletas.habilitadas ? (
+              <CobrosPaciente pacienteId={Number(id)} soloLectura={false} refreshKey={cobrosRefresh}
                 onCobroChanged={actualizarCobroSesion}
                 onCompletarFicha={() => setEditOpen(true)}
               />
-            </TabsContent>
-          )}
+            ) : (
+              <CobrosBloqueados origen="cobros_ficha" enPrueba={boletas.enPrueba} />
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 

@@ -221,7 +221,9 @@ class ArchivosTests(EntornoBHE, TestCase):
         emision = self.emitida()
         self.user.suscripcion.plan = "estandar"
         self.user.suscripcion.save()
-        self.assertEqual(self.client.get(self.url_pdf(emision)).status_code, 200)
+        respuesta = self.client.get(self.url_pdf(emision))
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(respuesta.json()["code"], "requiere_plus")
 
     def test_otro_psicologo_no_descarga(self):
         emision = self.emitida()

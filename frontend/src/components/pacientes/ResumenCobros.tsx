@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, getCurrentUser } from "@/lib/api";
+import CobrosBloqueados from "@/components/suscripcion/CobrosBloqueados";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { etiquetaCobros, formatCLP, hoyISO } from "@/app/dashboard/pacientes/[id]/_components/cobros";
@@ -21,19 +22,23 @@ interface Resumen {
 
 // Resumen de cobros del inicio: solo para quien usa cobros (Plan Plus o cobros antiguos).
 export default function ResumenCobros() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState<"plus" | "bloqueo" | "oculto">("oculto");
+  const [enPrueba, setEnPrueba] = useState(false);
   const [mes, setMes] = useState(hoyISO().slice(0, 7));
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [descargando, setDescargando] = useState(false);
 
   useEffect(() => {
     getCurrentUser()
-      .then((user) => setVisible(Boolean(user.boletas_habilitadas || user.tiene_cobros)))
-      .catch(() => setVisible(false));
+      .then((user) => {
+        setEnPrueba(user.suscripcion_estado === "trial");
+        setVisible(user.boletas_habilitadas ? "plus" : "bloqueo");
+      })
+      .catch(() => setVisible("oculto"));
   }, []);
 
   useEffect(() => {
-    if (!visible || !mes) return;
+    if (visible !== "plus" || !mes) return;
     let vigente = true;
     apiFetch(`/facturacion/cobros/resumen/?mes=${mes}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -62,7 +67,9 @@ export default function ResumenCobros() {
     }
   }
 
-  if (!visible || !resumen) return null;
+  if (visible === "oculto") return null;
+  if (visible === "bloqueo") return <CobrosBloqueados origen="dashboard" enPrueba={enPrueba} />;
+  if (!resumen) return null;
 
   return (
     <section aria-label="Resumen de cobros" className="space-y-4 rounded-xl border border-border/70 bg-card p-4 sm:p-5">

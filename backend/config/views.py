@@ -17,7 +17,7 @@ import logging
 from django.db.models import Count, Sum
 from cuentas.models import RegistroConsumoIA
 from cuentas.services import eliminar_cuenta
-from facturacion.models import Cobro
+from facturacion.models import Cobro, DelegacionSII
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 from suscripciones.models import PLANES, Suscripcion
@@ -78,6 +78,12 @@ def current_user(request):
             "suscripcion_estado": suscripcion_estado,
             "plan": plan,
             "boletas_habilitadas": boletas_habilitadas,
+            "boletas_configuradas": (
+                boletas_habilitadas
+                and DelegacionSII.objects.filter(
+                    psicologo=request.user, estado=DelegacionSII.Estado.ACTIVA
+                ).exists()
+            ),
             "plan_plus_disponible": settings.PLAN_PLUS_DISPONIBLE,
             "plus_url": settings.MERCADOPAGO_PLUS_URL,
             "bhe_auto_disponible": settings.BHE_AUTO_DISPONIBLE,

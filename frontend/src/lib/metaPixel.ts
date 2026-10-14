@@ -46,6 +46,12 @@ export function isPixelPath(pathname: string | null | undefined): boolean {
   return PIXEL_ALLOWED_PATHS.includes(normalizePath(pathname))
 }
 
+/** Ruta neutra para el upsell: no lleva id de paciente y no dispara PageView. */
+export function isUpsellMeasurementPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return normalizePath(pathname) === "/dashboard/suscripcion"
+}
+
 function currentPath(): string {
   return typeof window === "undefined" ? "" : window.location.pathname
 }

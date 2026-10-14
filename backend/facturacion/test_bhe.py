@@ -28,6 +28,7 @@ RUT_EMISOR = "77.781.977-1"
 def preparar_psicologo(username="psi@psiconex.cl"):
     user = User.objects.create_user(username=username, email=username, password="x")
     user.suscripcion.plan = "plus"
+    user.suscripcion.estado = "activa"
     user.suscripcion.save()
     DelegacionSII.objects.create(
         psicologo=user, rut_emisor=RUT_EMISOR, estado=DelegacionSII.Estado.ACTIVA, verificada=True, piloto=True

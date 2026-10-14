@@ -52,6 +52,7 @@ class CobroApiTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
         self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.estado = "activa"
         self.user.suscripcion.save()
         self.paciente = Paciente.objects.create(
             psicologo=self.user, nombre="Ana", apellido="Rojas", tipo_documento="RUT",
@@ -108,6 +109,7 @@ class CobroApiTests(APITestCase):
         cobro_id = self.crear().data["id"]
         otro = User.objects.create_user(username="otro@psiconex.cl", email="otro@psiconex.cl", password="x")
         otro.suscripcion.plan = "plus"
+        otro.suscripcion.estado = "activa"
         otro.suscripcion.save()
         self.client.force_authenticate(user=otro)
         self.assertEqual(self.client.get(URL, secure=True).data["results"], [])
@@ -126,10 +128,10 @@ class CobroApiTests(APITestCase):
         cobro_id = self.crear().data["id"]
         self.user.suscripcion.plan = "estandar"
         self.user.suscripcion.save()
-        self.assertEqual(self.client.get(URL, secure=True).status_code, 200)
+        self.assertEqual(self.client.get(URL, secure=True).status_code, 403)
         response = self.crear()
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data["code"], "plan_required")
+        self.assertEqual(response.data["code"], "requiere_plus")
         self.assertEqual(
             self.client.post(f"{URL}{cobro_id}/marcar-emitida/", {"folio": "1"}, secure=True).status_code, 403
         )
@@ -352,6 +354,7 @@ class CobroEnEmisionTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
         self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.estado = "activa"
         self.user.suscripcion.save()
         self.cobro = crear_cobro(self.user, estado_boleta=Cobro.EstadoBoleta.EN_EMISION)
         self.client.force_authenticate(user=self.user)
@@ -379,6 +382,7 @@ class EstadoPagoTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="psi@psiconex.cl", email="psi@psiconex.cl", password="x")
         self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.estado = "activa"
         self.user.suscripcion.save()
         self.paciente = Paciente.objects.create(psicologo=self.user, nombre="Ana", apellido="Rojas")
         self.cobro = crear_cobro(self.user, paciente=self.paciente, estado_pago=Cobro.EstadoPago.PENDIENTE)
@@ -437,6 +441,7 @@ class EstadoPagoTests(APITestCase):
     def test_aislamiento_entre_psicologos(self):
         otro = User.objects.create_user(username="otro@psiconex.cl", email="otro@psiconex.cl", password="x")
         otro.suscripcion.plan = "plus"
+        otro.suscripcion.estado = "activa"
         otro.suscripcion.save()
         self.client.force_authenticate(user=otro)
         self.assertEqual(self.post("marcar-pagado").status_code, status.HTTP_404_NOT_FOUND)

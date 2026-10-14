@@ -173,6 +173,11 @@ class SesionListSerializer(serializers.ModelSerializer):
         ]
 
     def get_cobro(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        suscripcion = getattr(user, "suscripcion", None)
+        if not user or not (user.is_staff or user.is_superuser or (suscripcion and suscripcion.tiene_boletas)):
+            return None
         # El vínculo nuevo manda. Si no hay, se usa el FK viejo para no dejar el chip en blanco.
         cobros = list(obj.cobros_vinculados.all()) or list(obj.cobros.all())
         if not cobros:

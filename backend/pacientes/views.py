@@ -1,7 +1,7 @@
 from datetime import date
 
 from django.db import IntegrityError
-from django.db.models import Count, IntegerField, OuterRef, Subquery, Sum
+from django.db.models import Count, IntegerField, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -23,6 +23,13 @@ from sesiones.models import Sesion
 
 from .documentos import TIPO_RUT
 from .models import ConsentimientoInformado, Paciente
+
+
+def _puede_ver_cobros(user):
+    if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+        return True
+    suscripcion = getattr(user, "suscripcion", None)
+    return bool(suscripcion and suscripcion.tiene_boletas)
 from .serializers import (
     ConsentimientoInformadoSerializer,
     CrearConsentimientoSerializer,
@@ -93,16 +100,24 @@ class PacienteViewSet(viewsets.ModelViewSet):
                     .order_by("-created_at")
                     .values("estado")[:1]
                 ),
-                deuda_pendiente=Coalesce(
-                    Subquery(
-                        cobros_pendientes.annotate(total=Sum("monto_bruto")).values("total"),
-                        output_field=IntegerField(),
-                    ),
-                    0,
+                deuda_pendiente=(
+                    Coalesce(
+                        Subquery(
+                            cobros_pendientes.annotate(total=Sum("monto_bruto")).values("total"),
+                            output_field=IntegerField(),
+                        ),
+                        0,
+                    )
+                    if _puede_ver_cobros(self.request.user)
+                    else Value(None, output_field=IntegerField())
                 ),
-                cobros_pendientes=Coalesce(
-                    Subquery(cobros_pendientes.annotate(n=Count("id")).values("n"), output_field=IntegerField()),
-                    0,
+                cobros_pendientes=(
+                    Coalesce(
+                        Subquery(cobros_pendientes.annotate(n=Count("id")).values("n"), output_field=IntegerField()),
+                        0,
+                    )
+                    if _puede_ver_cobros(self.request.user)
+                    else Value(None, output_field=IntegerField())
                 ),
             )
         return qs

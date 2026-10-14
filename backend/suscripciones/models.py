@@ -1,5 +1,5 @@
 import math
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -17,6 +17,9 @@ PLANES = {
     "estandar": ("Plan Estándar - Psiconex", 4990),
     "plus": ("Plan Plus - Psiconex", 9990),
 }
+# Prueba con Plus, caso único. No se extiende sola después de esa fecha.
+EXCEPCION_PLUS_USUARIO = 22
+EXCEPCION_PLUS_HASTA = date(2026, 10, 25)
 
 
 class Suscripcion(models.Model):
@@ -75,7 +78,15 @@ class Suscripcion(models.Model):
     def tiene_boletas(self):
         if self.user.is_staff or self.user.is_superuser:
             return True
-        return self.plan == "plus" and self.is_active_or_trial
+        if self.plan == "plus" and self.estado == "activa":
+            return True
+        return (
+            self.user_id == EXCEPCION_PLUS_USUARIO
+            and self.estado == "trial"
+            and bool(self.fin_prueba)
+            and timezone.now() < self.fin_prueba
+            and timezone.localdate() <= EXCEPCION_PLUS_HASTA
+        )
 
     def expirar_si_vencida(self):
         """Pasa un trial vencido a 'expirada'; el plazo de purga corre desde fin_prueba."""

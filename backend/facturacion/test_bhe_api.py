@@ -208,7 +208,7 @@ class ApiBHETests(EntornoBHE, TestCase):
         self.user.suscripcion.save()
         respuesta = self.client.post(self.url("emitir-sii"), {"confirmado": True}, format="json")
         self.assertEqual(respuesta.status_code, 403)
-        self.assertEqual(respuesta.data["code"], "plan_required")
+        self.assertEqual(respuesta.data["code"], "requiere_plus")
 
     def test_emitir_boleta_ya_emitida(self):
         Cobro.objects.filter(pk=self.cobro.pk).update(estado_boleta=Cobro.EstadoBoleta.EMITIDA, boleta_folio="1")
@@ -266,6 +266,7 @@ class DelegacionApiTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="nuevo@psiconex.cl", email="nuevo@psiconex.cl", password="x")
         self.user.suscripcion.plan = "plus"
+        self.user.suscripcion.estado = "activa"
         self.user.suscripcion.save()
         self.perfil = get_or_create_profile(self.user)
         self.client = APIClient()

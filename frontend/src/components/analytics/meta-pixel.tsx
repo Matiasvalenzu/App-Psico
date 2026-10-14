@@ -10,6 +10,7 @@ import {
   META_PIXEL_READY_EVENT,
   isMetaPixelEnabled,
   isPixelPath,
+  isUpsellMeasurementPath,
   trackPageView,
 } from "@/lib/metaPixel"
 
@@ -25,7 +26,7 @@ export function MetaPixel() {
   const pathname = usePathname()
   const consent = useMetaConsent()
   const allowed =
-    isMetaPixelEnabled && isPixelPath(pathname) && consent === "accepted"
+    isMetaPixelEnabled && (isPixelPath(pathname) || isUpsellMeasurementPath(pathname)) && consent === "accepted"
 
   useEffect(() => {
     if (allowed) trackPageView(pathname)
