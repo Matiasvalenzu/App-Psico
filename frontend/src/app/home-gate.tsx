@@ -17,16 +17,16 @@ export default function HomeGate() {
       <Image
         src="/logo-psiconex.png"
         alt="Psiconex"
-        width={1951}
-        height={393}
+        width={1200}
+        height={273}
         priority
         className="h-11 w-auto dark:hidden"
       />
       <Image
-        src="/logo-psiconex-sidebar.png"
+        src="/logo-psiconex-dark.png"
         alt=""
-        width={1951}
-        height={393}
+        width={1200}
+        height={273}
         priority
         className="hidden h-11 w-auto dark:block"
       />

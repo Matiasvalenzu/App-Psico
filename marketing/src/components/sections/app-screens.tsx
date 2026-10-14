@@ -132,9 +132,9 @@ function PacienteShell({ tab, children }: { tab: string; children: ReactNode }) 
           </span>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-              <span className="truncate">Ana Rojas (ejemplo)</span> <Pill tone="slate">Activo</Pill>
+              <span className="whitespace-nowrap">Ana Rojas</span> <Pill tone="slate">Activo</Pill>
             </p>
-            <p className="text-[11px] text-slate-500">Ficticio (ejemplo)</p>
+            <p className="text-[11px] text-slate-500">Diseñadora gráfica</p>
           </div>
           <Boton className="hidden sm:inline-flex">
             <Plus className="size-3" aria-hidden /> Nueva sesión
@@ -302,7 +302,7 @@ const DIALOGO = [
 
 export function TranscripcionScreen() {
   return (
-    <AppFrame nav="pacientes" crumb="Ana Rojas (ejemplo) / Sesión 3">
+    <AppFrame nav="pacientes" crumb="Ana Rojas / Sesión 3">
       <div className="flex h-full flex-col gap-2.5">
         <Card className="flex items-center justify-between gap-2 py-2.5">
           <div className="min-w-0">
@@ -471,7 +471,7 @@ export function BoletasScreen() {
               <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 Boleta de honorarios <Pill tone="amber">Por emitir</Pill>
               </p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Cobro del 15/10/2026 · Camila Pérez (ejemplo)</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Cobro del 15/10/2026 · Camila Pérez</p>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] text-slate-700">
               Pago <Pill tone="green">Pagado</Pill> el 15/10/2026

@@ -46,8 +46,8 @@ export default function RecuperarContrasenaPage() {
       </div>
       <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-16">
         <section className="w-full rounded-[28px] border border-border/70 bg-card/95 p-6 shadow-[0_30px_70px_-34px_hsl(var(--primary)/0.45)] sm:p-9">
-          <Image src="/logo-psiconex.png" alt="Psiconex" width={1951} height={393} className="mx-auto h-11 w-auto dark:hidden" priority />
-          <Image src="/logo-psiconex-sidebar.png" alt="Psiconex" width={1951} height={393} className="mx-auto hidden h-11 w-auto dark:block" priority />
+          <Image src="/logo-psiconex.png" alt="Psiconex" width={1200} height={273} className="mx-auto h-11 w-auto dark:hidden" priority />
+          <Image src="/logo-psiconex-dark.png" alt="Psiconex" width={1200} height={273} className="mx-auto hidden h-11 w-auto dark:block" priority />
           <h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Recuperar contraseña</h1>
           <p className="mt-2 text-center text-sm leading-relaxed text-muted-foreground">
             Ingresa el correo de tu cuenta. Si está registrado, te enviaremos un enlace.

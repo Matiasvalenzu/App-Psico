@@ -282,16 +282,16 @@ export default function LoginPage() {
               <Image
                 src="/logo-psiconex.png"
                 alt="Psiconex"
-                width={1951}
-                height={393}
+                width={1200}
+                height={273}
                 className="h-11 w-auto dark:hidden sm:h-12 xl:h-14"
                 priority
               />
               <Image
-                src="/logo-psiconex-sidebar.png"
+                src="/logo-psiconex-dark.png"
                 alt="Psiconex"
-                width={1951}
-                height={393}
+                width={1200}
+                height={273}
                 className="hidden h-11 w-auto dark:block sm:h-12 xl:h-14"
                 priority
               />

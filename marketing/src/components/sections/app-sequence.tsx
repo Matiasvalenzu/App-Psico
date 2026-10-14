@@ -124,7 +124,7 @@ export function AppSequence({ className }: { className?: string }) {
       </div>
 
       <div
-        className="relative h-[400px] overflow-hidden rounded-2xl border border-border bg-white shadow-lg shadow-primary/15 lg:h-auto lg:min-h-0 lg:flex-1"
+        className="relative h-[340px] overflow-hidden rounded-2xl border border-border bg-white shadow-lg shadow-primary/15 sm:h-[400px] lg:h-auto lg:min-h-0 lg:flex-1"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >

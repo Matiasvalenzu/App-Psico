@@ -39,7 +39,6 @@ export function Footer() {
           <div className="col-span-2 max-w-sm">
             <Logo />
             <p className="mt-4 text-sm text-muted-foreground">
-              La herramienta clínica que devuelve tiempo a tu consulta.
               Transcripción, informes y memoria clínica inteligente para psicólogos.
             </p>
           </div>

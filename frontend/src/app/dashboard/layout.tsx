@@ -305,16 +305,16 @@ function DashboardInner({
                 <Image
                   src="/logo-psiconex.png"
                   alt="Psiconex"
-                  width={1951}
-                  height={393}
+                  width={1200}
+                  height={273}
                   className="h-full w-auto object-contain drop-shadow-sm dark:hidden"
                   priority
                 />
                 <Image
-                  src="/logo-psiconex-sidebar.png"
+                  src="/logo-psiconex-dark.png"
                   alt="Psiconex"
-                  width={1951}
-                  height={393}
+                  width={1200}
+                  height={273}
                   className="hidden h-full w-auto object-contain dark:block"
                   priority
                 />

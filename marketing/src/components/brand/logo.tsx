@@ -11,8 +11,8 @@ export function Logo({ className, withWordmark = true }: LogoProps) {
     <Image
       src={withWordmark ? "/logo-psiconex.png" : "/logo-psiconex-icon.png"}
       alt="Psiconex"
-      width={withWordmark ? 1951 : 281}
-      height={withWordmark ? 393 : 282}
+      width={withWordmark ? 1200 : 281}
+      height={withWordmark ? 273 : 282}
       className={cn(
         withWordmark ? "h-10 w-auto object-contain" : "h-9 w-9 object-contain",
         className
