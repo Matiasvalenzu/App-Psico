@@ -17,7 +17,7 @@ const FUNCIONES_ESTANDAR = [
   "Chat IA independiente por paciente",
   "Agenda con Google Calendar",
   "Test de Creencias Ellis y Rueda de la Vida",
-  "Videollamada propia de Psiconex (también Meet y Zoom)",
+  "Videollamada propia de Psiconex",
   "Enlace privado para reserva de horas",
   "Recordatorios por correo a tus pacientes",
   "Exportación completa de tus datos",

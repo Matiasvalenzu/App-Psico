@@ -89,7 +89,6 @@ export function ProvidersTable() {
 
       <ul className="mt-5 space-y-1.5 text-sm text-muted-foreground">
         <li>La separación de voces se aplica automáticamente a las sesiones de audio. El chat, los informes y la observación de tests con IA los solicitas tú.</li>
-        <li>Las sesiones por Meet o Zoom registradas con la extensión de Chrome usan los subtítulos de la llamada, no el audio.</li>
         <li>Cada proveedor procesa y conserva los datos según sus propias condiciones.</li>
       </ul>
     </>

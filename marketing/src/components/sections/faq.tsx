@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     q: "¿Puedo hacer sesiones online?",
-    a: "Sí. La vía principal es la videollamada propia de Psiconex: creas la sala, compartes el enlace y el paciente se une desde el navegador, sin instalar nada. La llamada graba cada voz en una pista aparte y, al cerrarla, el audio se transcribe y queda en el historial. Si prefieres Meet o Zoom, puedes grabar el audio compartiendo la pestaña o la pantalla (Chrome o Edge, en computador) o usar la extensión de Chrome, que capta los subtítulos. Recuerda informar al paciente y contar con su consentimiento.",
+    a: "Sí. La vía principal es la videollamada propia de Psiconex: creas la sala, compartes el enlace y el paciente se une desde el navegador, sin crear cuenta ni instalar nada. La llamada graba cada voz en una pista aparte y, al cerrarla, el audio se transcribe y queda en el historial. Se graba solo el audio, sin video. Recuerda informar al paciente y contar con su consentimiento.",
   },
   {
     q: "¿Qué pasa si cancelo? ¿Me llevo mis datos?",

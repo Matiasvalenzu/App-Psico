@@ -66,7 +66,7 @@ const FEATURES: Feature[] = [
   {
     icon: Video,
     title: "Videollamada propia de Psiconex",
-    body: "La sesión online ocurre en Psiconex: envías un enlace y el paciente entra desde el navegador, sin instalar nada. Cada voz se graba en su pista y, al terminar, se transcribe y queda en el historial. Meet y Zoom siguen como alternativa: puedes grabar el audio compartiendo la pestaña o usar la extensión de Chrome, que capta los subtítulos.",
+    body: "Envías un enlace y el paciente entra desde el navegador, sin crear cuenta ni instalar nada. Se graba solo el audio, con tu voz y la del paciente en canales separados, y al terminar la sesión se transcribe y queda en el historial.",
     className: "border-primary/40 shadow-[0_12px_32px_-16px_hsl(var(--primary)/0.45)] md:col-span-2",
     badge: "Integrada",
   },

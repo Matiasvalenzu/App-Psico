@@ -9,7 +9,7 @@ const STEPS = [
     icon: Mic,
     eyebrow: "Paso 1",
     title: "Graba la sesión",
-    body: "Graba en el consultorio o haz la videollamada propia de Psiconex: el paciente entra con un enlace y cada voz queda en su pista. Si usas Meet o Zoom, puedes grabar el audio compartiendo la pestaña o la pantalla, o usar la extensión de Chrome para captar los subtítulos.",
+    body: "Graba en el consultorio o haz la videollamada propia de Psiconex: el paciente entra con un enlace y cada voz queda en su pista.",
     detail: "El audio se sube por una conexión cifrada (HTTPS).",
   },
   {
