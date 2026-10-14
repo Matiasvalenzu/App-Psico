@@ -36,7 +36,8 @@ export default function BottomNav({ onMoreClick }: BottomNavProps) {
 
   const isMoreActive =
     pathname.startsWith("/dashboard/configuracion") ||
-    pathname.startsWith("/dashboard/usuarios");
+    pathname.startsWith("/dashboard/usuarios") ||
+    pathname.startsWith("/dashboard/admin");
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-end justify-around border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">

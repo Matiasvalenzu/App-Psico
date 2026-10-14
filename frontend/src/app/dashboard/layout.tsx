@@ -16,7 +16,6 @@ import {
   Sun,
   Mic,
   UserCog,
-  UserPlus,
   Users,
   Settings,
   ShieldCheck,
@@ -24,6 +23,7 @@ import {
   Receipt,
   CreditCard,
   MessageSquarePlus,
+  Sparkles,
   PlayCircle,
   Video,
 } from "lucide-react";
@@ -55,6 +55,7 @@ function isActivePath(pathname: string, path: string) {
   if (path === "/dashboard") {
     return pathname === "/dashboard" || pathname.startsWith("/dashboard/pacientes");
   }
+  if (path === "/dashboard/admin") return pathname === "/dashboard/admin";
   return pathname.startsWith(path);
 }
 
@@ -261,7 +262,12 @@ function DashboardInner({
     if (pathname.startsWith("/dashboard/voz")) return "Voz";
     if (pathname.startsWith("/dashboard/agenda")) return "Agenda";
     if (pathname.startsWith("/dashboard/tests")) return "Tests";
+    if (pathname.startsWith("/dashboard/admin/usuarios")) return "Usuario";
     if (pathname.startsWith("/dashboard/usuarios")) return "Usuarios";
+    if (pathname.startsWith("/dashboard/admin/ingresos")) return "Ingresos";
+    if (pathname.startsWith("/dashboard/admin/uso")) return "Uso e IA";
+    if (pathname.startsWith("/dashboard/admin/embudo")) return "Embudo";
+    if (pathname.startsWith("/dashboard/admin")) return "Resumen";
     if (pathname.startsWith("/dashboard/configuracion")) return "Configuración";
     if (pathname.startsWith("/dashboard/feedback")) return "Feedback y Ayuda";
     return "";
@@ -355,13 +361,16 @@ function DashboardInner({
             )}
             <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" {...navProps} />
             <NavItem href="/dashboard/configuracion/privacidad" icon={ShieldCheck} label="Privacidad y datos" {...navProps} />
-            {isAdmin && (
-              <NavItem href="/dashboard/usuarios/crear" icon={UserPlus} label="Crear Usuario" {...navProps} />
-            )}
-            {isSuperuser && (
-              <NavItem href="/dashboard/usuarios" icon={UserCog} label="Usuarios" {...navProps} />
-            )}
           </NavGroup>
+          {isSuperuser && (
+            <NavGroup label="Administración" isCollapsed={isCollapsed}>
+              <NavItem href="/dashboard/admin" icon={ShieldCheck} label="Resumen" {...navProps} />
+              <NavItem href="/dashboard/usuarios" icon={UserCog} label="Usuarios" {...navProps} />
+              <NavItem href="/dashboard/admin/ingresos" icon={CreditCard} label="Ingresos" {...navProps} />
+              <NavItem href="/dashboard/admin/uso" icon={Sparkles} label="Uso e IA" {...navProps} />
+              <NavItem href="/dashboard/admin/embudo" icon={ClipboardList} label="Embudo" {...navProps} />
+            </NavGroup>
+          )}
           <NavGroup label="Ayuda" isCollapsed={isCollapsed}>
             <NavItem href="/dashboard/feedback" icon={MessageSquarePlus} label="Feedback y Ayuda" {...navProps} />
             <button

@@ -8,7 +8,6 @@ import {
   Moon,
   Sun,
   UserCog,
-  UserPlus,
   CreditCard,
   Receipt,
   ShieldCheck,
@@ -31,7 +30,6 @@ interface MoreDrawerProps {
 export default function MoreDrawer({
   open,
   onClose,
-  isAdmin,
   isSuperuser,
   boletasHabilitadas = false,
   onBoletasPlus,
@@ -56,8 +54,6 @@ export default function MoreDrawer({
     localStorage.clear();
     router.replace("/login");
   };
-
-  const showAdminSection = isAdmin || isSuperuser;
 
   const MenuItem = ({
     href,
@@ -178,26 +174,17 @@ export default function MoreDrawer({
               label="Privacidad y datos"
             />
 
-            {showAdminSection && (
+            {isSuperuser && (
               <>
                 <div className="my-2 h-px bg-border mx-2" />
                 <div className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
                   Administración
                 </div>
-                {isAdmin && (
-                  <MenuItem
-                    href="/dashboard/usuarios/crear"
-                    icon={UserPlus}
-                    label="Crear Usuario"
-                  />
-                )}
-                {isSuperuser && (
-                  <MenuItem
-                    href="/dashboard/usuarios"
-                    icon={UserCog}
-                    label="Usuarios"
-                  />
-                )}
+                <MenuItem href="/dashboard/admin" icon={ShieldCheck} label="Resumen" />
+                <MenuItem href="/dashboard/usuarios" icon={UserCog} label="Usuarios" />
+                <MenuItem href="/dashboard/admin/ingresos" icon={CreditCard} label="Ingresos" />
+                <MenuItem href="/dashboard/admin/uso" icon={ShieldCheck} label="Uso e IA" />
+                <MenuItem href="/dashboard/admin/embudo" icon={ShieldCheck} label="Embudo" />
               </>
             )}
 
