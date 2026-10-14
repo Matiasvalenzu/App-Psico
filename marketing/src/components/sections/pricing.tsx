@@ -3,7 +3,7 @@
 import { useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import { motion } from "motion/react"
-import { Check, Clock, Receipt, Sparkles, Stethoscope } from "lucide-react"
+import { Check, Clock, FileSpreadsheet, Receipt, Sparkles, Stethoscope } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { ROUTES } from "@/lib/config"
@@ -212,8 +212,23 @@ export function PricingSection() {
           </motion.div>
         </div>
 
+        {/* Importación de pacientes */}
+        <motion.div {...animacion(2)} className="card-premium mx-auto mt-10 flex max-w-5xl flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center">
+          <span className="icon-tile h-11 w-11 shrink-0">
+            <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-base font-semibold text-foreground">¿Ya tienes tus pacientes en una planilla?</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Impórtalos desde Excel o CSV: Psiconex reconoce las columnas y te muestra lo
+              que va a crear antes de confirmar. Solo datos de contacto y
+              administrativos; nunca notas clínicas.
+            </p>
+          </div>
+        </motion.div>
+
         {/* Próximamente */}
-        <motion.div {...animacion(2)} className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2">
+        <motion.div {...animacion(2)} className="mx-auto mt-4 grid max-w-5xl gap-4 sm:grid-cols-2">
           {PROXIMAMENTE.map((plan) => (
             <div key={plan.name} className="card-premium flex items-start gap-3 rounded-2xl p-5 opacity-70">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />

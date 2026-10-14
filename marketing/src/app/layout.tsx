@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Psiconex — La IA que devuelve tiempo a tu consulta",
     description:
-      "Transcripción, diarización por voz, memoria clínica inteligente, informes automáticos y tests psicológicos. Hecho para psicólogos clínicos.",
+      "Transcripción, diarización por voz, memoria clínica inteligente, borradores de informe y tests psicológicos. Hecho para psicólogos clínicos.",
     type: "website",
     locale: "es_CL",
     siteName: "Psiconex",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Psiconex — La IA que devuelve tiempo a tu consulta",
     description:
-      "Transcripción, diarización por voz, memoria clínica inteligente, informes automáticos y tests psicológicos. Hecho para psicólogos clínicos.",
+      "Transcripción, diarización por voz, memoria clínica inteligente, borradores de informe y tests psicológicos. Hecho para psicólogos clínicos.",
     images: ["/og-image.png"],
   },
 };

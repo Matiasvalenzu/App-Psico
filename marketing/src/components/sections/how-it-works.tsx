@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { Mic, Sparkles, FileText } from "lucide-react"
+import { Mic, Sparkles, FileText, UserCheck } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 
 const STEPS = [
@@ -16,14 +16,14 @@ const STEPS = [
     icon: Sparkles,
     eyebrow: "Paso 2",
     title: "La IA hace el trabajo pesado",
-    body: "Transcribe la sesión, separa las voces, ordena los puntos clave y deja el historial listo para consultarlo. Tú revisas y corriges.",
+    body: "Transcribe la sesión, separa tu voz de la del paciente y deja el historial listo para consultarlo. Tú revisas y corriges la transcripción.",
     detail: "El audio se elimina en cuanto termina la transcripción.",
   },
   {
     icon: FileText,
     eyebrow: "Paso 3",
-    title: "Recibes la ficha completa",
-    body: "Transcripción diarizada, resumen ejecutivo, evolución del paciente, items para próxima sesión y un borrador de informe que tú revisas y editas.",
+    title: "Pides el resumen o el informe",
+    body: "En el chat con IA le pides un resumen, la evolución del paciente o un borrador de informe. Lo revisas, lo descargas en PDF o Word y lo editas antes de firmarlo.",
     detail: "Todo editable. La IA propone, tú decides.",
   },
 ]
@@ -41,7 +41,7 @@ export function HowItWorksSection() {
           title={
             <>
               Del audio al informe,{" "}
-              <span className="gradient-primary-text">sin tocar el teclado</span>
+              <span className="gradient-primary-text">sin empezar de cero</span>
             </>
           }
           description="Tres pasos, de la sesión al borrador que tú revisas."
@@ -121,6 +121,26 @@ export function HowItWorksSection() {
             })}
           </ol>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="card-premium mx-auto mt-20 flex max-w-3xl flex-col items-center gap-4 rounded-2xl p-6 text-center sm:flex-row sm:text-left md:p-8"
+        >
+          <span className="icon-tile h-11 w-11 shrink-0">
+            <UserCheck className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">IA responsable</h3>
+            <p className="mt-1 text-base text-muted-foreground">
+              La IA te ahorra la página en blanco, no la responsabilidad clínica. Lo
+              que propone es editable y nada queda como informe hasta que tú lo
+              decides.
+            </p>
+          </div>
+        </motion.div>
       </div>
     </section>
   )

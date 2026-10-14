@@ -41,7 +41,7 @@ export function BoletasSection() {
               <span className="gradient-primary-text">en un clic</span>
             </>
           }
-          description="Registras el cobro de la sesión y emites tu boleta de honorarios desde Psiconex, sin entregar tu clave del SII."
+          description="Deja de ser también la secretaria de tu consulta: registra tus cobros y emite tu boleta de honorarios en un clic, sin entregar tu clave del SII."
         />
 
         <ol className="mt-16 grid gap-6 md:grid-cols-3">

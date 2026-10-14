@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react"
 import Link from "next/link"
-import { Lock, Server, Eye, FileKey, AudioLines, Download } from "lucide-react"
+import { Lock, Server, Eye, FileKey, AudioLines, Download, ShieldCheck } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { SITE } from "@/lib/config"
 
@@ -69,7 +69,32 @@ export function SecuritySection() {
           description="Trabajas con información muy sensible. Aquí te contamos qué procesamos en nuestro servidor, qué servicios externos intervienen y qué decides tú."
         />
 
-        <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="card-premium mt-16 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row md:p-8"
+        >
+          <span className="icon-tile h-11 w-11 shrink-0">
+            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Secreto profesional</h3>
+            <p className="mt-1 text-base text-muted-foreground">
+              Lo que te cuenta un paciente es información sensible. En Psiconex cada
+              psicólogo ve solo a sus pacientes: sus sesiones, informes y cobros no
+              los ve ningún otro profesional de la plataforma.
+            </p>
+            <p className="mt-3 text-sm text-foreground/70">
+              Como contexto: en Chile, la Ley 19.628 trata la información de salud
+              como dato sensible y la Ley 20.584 resguarda la confidencialidad de la
+              ficha clínica.
+            </p>
+          </div>
+        </motion.div>
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((p, i) => {
             const Icon = p.icon
             return (
