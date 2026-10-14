@@ -12,7 +12,7 @@ import {
 } from "@/components/sections/app-screens"
 
 const SCREENS = [
-  { id: "agenda", label: "Agenda", caption: "Tus sesiones del día, con todo listo antes de que entre el paciente.", Screen: AgendaScreen },
+  { id: "agenda", label: "Agenda", caption: "Tus sesiones de la semana en una vista, con todo listo antes de que entre el paciente.", Screen: AgendaScreen },
   { id: "ficha", label: "Ficha", caption: "La historia de cada paciente ordenada en un solo lugar.", Screen: FichaScreen },
   { id: "transcripcion", label: "Transcripción", caption: "La sesión transcrita, con tu voz y la del paciente separadas.", Screen: TranscripcionScreen },
   { id: "informe", label: "Informe", caption: "Un borrador del informe para que lo revises y lo edites antes de firmarlo.", Screen: InformeScreen },
@@ -124,7 +124,7 @@ export function AppSequence({ className }: { className?: string }) {
       </div>
 
       <div
-        className="relative h-[360px] overflow-hidden rounded-2xl border border-border bg-white shadow-lg shadow-primary/15 sm:h-[400px] lg:h-auto lg:min-h-0 lg:flex-1"
+        className="relative h-[400px] overflow-hidden rounded-2xl border border-border bg-white shadow-lg shadow-primary/15 lg:h-auto lg:min-h-0 lg:flex-1"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
