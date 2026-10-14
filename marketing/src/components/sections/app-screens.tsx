@@ -80,7 +80,7 @@ function AppFrame({ nav, crumb, children }: { nav: Nav; crumb: string; children:
         </div>
         {NAV_SECCIONES.map((seccion) => (
           <div key={seccion.titulo} className="mt-2 flex flex-col items-center gap-0.5 px-1.5 xl:items-stretch">
-            <p className="hidden px-2 pb-1 text-[9px] font-semibold uppercase tracking-wider text-slate-400 xl:block">
+            <p className="hidden px-2 pb-1 text-[9px] font-semibold uppercase tracking-wider text-slate-500 xl:block">
               {seccion.titulo}
             </p>
             {seccion.items.map(({ key, icon: Icon, label }) => (
@@ -100,7 +100,7 @@ function AppFrame({ nav, crumb, children }: { nav: Nav; crumb: string; children:
       </aside>
       <div className="flex min-w-0 flex-1 flex-col bg-slate-50/60">
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5">
-          <span className="truncate text-[11px] text-slate-400">
+          <span className="truncate text-[11px] text-slate-500">
             Psiconex <span className="px-1">/</span>
             <span className="font-medium text-slate-700">{crumb}</span>
           </span>
@@ -189,8 +189,8 @@ export function AgendaScreen() {
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="flex items-center gap-1.5 text-slate-700">
             <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5">Hoy</span>
-            <ChevronLeft className="size-3.5 text-slate-400" aria-hidden />
-            <ChevronRight className="size-3.5 text-slate-400" aria-hidden />
+            <ChevronLeft className="size-3.5 text-slate-500" aria-hidden />
+            <ChevronRight className="size-3.5 text-slate-500" aria-hidden />
             <span className="font-semibold">12 – 18 oct 2026</span>
           </span>
           <span className="hidden overflow-hidden rounded-md border border-slate-200 bg-white sm:flex">
@@ -214,7 +214,7 @@ export function AgendaScreen() {
               </span>
             ))}
             {HORAS.map((h, r) => (
-              <span key={h} className="border-t border-slate-100 pr-1 pt-0.5 text-slate-400" style={{ gridColumn: 1, gridRow: r + 2 }}>
+              <span key={h} className="border-t border-slate-100 pr-1 pt-0.5 text-slate-500" style={{ gridColumn: 1, gridRow: r + 2 }}>
                 {h}
               </span>
             ))}
@@ -248,7 +248,7 @@ export function AgendaScreen() {
 }
 
 function Rotulo({ children }: { children: ReactNode }) {
-  return <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{children}</p>
+  return <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{children}</p>
 }
 
 export function FichaScreen() {
@@ -278,13 +278,13 @@ export function FichaScreen() {
           <Card className="hidden space-y-1.5 sm:block">
             <p className="text-xs font-semibold text-slate-900">Contacto</p>
             <p className="flex items-center gap-1.5 text-[11px] text-blue-600">
-              <MessageCircle className="size-3 shrink-0 text-slate-400" aria-hidden /> +56 9 0000 0001
+              <MessageCircle className="size-3 shrink-0 text-slate-500" aria-hidden /> +56 9 0000 0001
             </p>
             <p className="flex items-center gap-1.5 truncate text-[11px] text-blue-600">
-              <Mail className="size-3 shrink-0 text-slate-400" aria-hidden /> ana.ejemplo@example.com
+              <Mail className="size-3 shrink-0 text-slate-500" aria-hidden /> ana.ejemplo@example.com
             </p>
             <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-              <Clock className="size-3 shrink-0 text-slate-400" aria-hidden /> Última sesión 14/10/2026
+              <Clock className="size-3 shrink-0 text-slate-500" aria-hidden /> Última sesión 14/10/2026
             </p>
           </Card>
         </div>
@@ -344,7 +344,7 @@ export function TranscripcionScreen() {
                       {psicologo ? <UserCheck className="size-2.5" aria-hidden /> : <User className="size-2.5" aria-hidden />}
                       {l.quien}
                     </span>
-                    <span className="font-mono text-[10px] text-slate-400">{l.t}</span>
+                    <span className="font-mono text-[10px] text-slate-500">{l.t}</span>
                   </p>
                   <p className="mt-1 text-xs leading-snug text-slate-700">{l.texto}</p>
                 </div>
