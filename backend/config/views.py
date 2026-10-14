@@ -15,6 +15,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 import logging
 from django.db.models import Count, Sum
+from cuentas.actividad import aplicar_atribucion, cuentas_medibles, registrar_login
 from cuentas.models import RegistroConsumoIA
 from cuentas.services import eliminar_cuenta
 from facturacion.models import Cobro, DelegacionSII
@@ -109,7 +110,7 @@ def current_user(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_user(request):
-    if not _is_admin_user(request.user):
+    if not (_is_admin_user(request.user) or _is_superuser(request.user)):
         return Response(
             {"detail": "No tienes permiso para crear usuarios."},
             status=status.HTTP_403_FORBIDDEN,
@@ -120,6 +121,25 @@ def create_user(request):
     first_name = str(request.data.get("first_name", "")).strip()
     last_name = str(request.data.get("last_name", "")).strip()
     email = str(request.data.get("email", "")).strip()
+    plan = str(request.data.get("plan") or "estandar").strip() or "estandar"
+    dias_prueba = request.data.get("dias_prueba", None)
+
+    if plan not in PLANES:
+        return Response({"detail": "Plan inválido."}, status=status.HTTP_400_BAD_REQUEST)
+    dias_int = None
+    if dias_prueba not in (None, ""):
+        try:
+            dias_int = int(dias_prueba)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Los días de prueba deben ser un número entero."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if dias_int < 0 or dias_int > 365:
+            return Response(
+                {"detail": "Los días de prueba deben estar entre 0 y 365."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     if not username or not password:
         return Response(
@@ -151,6 +171,13 @@ def create_user(request):
 
     user.set_password(password)
     user.save()
+    suscripcion = getattr(user, "suscripcion", None)
+    if suscripcion is not None:
+        suscripcion.plan = plan
+        if dias_int is not None:
+            suscripcion.estado = "trial"
+            suscripcion.fin_prueba = timezone.now() + timezone.timedelta(days=dias_int)
+        suscripcion.save()
     return Response(
         {
             "id": user.id,
@@ -158,6 +185,8 @@ def create_user(request):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
+            "plan": suscripcion.plan if suscripcion else plan,
+            "fin_prueba": suscripcion.fin_prueba if suscripcion else None,
         },
         status=status.HTTP_201_CREATED,
     )
@@ -173,7 +202,7 @@ def list_users(request):
         )
 
     User = get_user_model()
-    users = User.objects.order_by("-date_joined")
+    users = User.objects.select_related("perfil_psicologo").order_by("-date_joined")
 
     # 1. Total pacientes por psicólogo
     pacientes_map = dict(
@@ -215,13 +244,18 @@ def list_users(request):
         t_total, costo_usd = tokens_map.get(user.id, (0, 0.0))
 
         susc = suscripciones_map.get(user.id)
+        perfil = getattr(user, "perfil_psicologo", None)
+        es_interna = bool(perfil and perfil.es_interna)
+        exenta = user.is_superuser or es_interna
         dias_restantes = None
-        if susc and susc.fin_prueba and susc.estado == "trial":
+        if susc and susc.fin_prueba and susc.estado == "trial" and not exenta:
             delta = susc.fin_prueba - now
             dias_restantes = max(0, delta.days + (1 if delta.seconds > 0 else 0))
 
+        estado = susc.estado if susc else "trial"
         susc_info = {
-            "estado": susc.estado if susc else "trial",
+            "estado": estado,
+            "estado_visible": "exenta" if exenta else estado,
             "plan": susc.plan if susc else "estandar",
             "is_active_or_trial": susc.is_active_or_trial if susc else True,
             "fin_prueba": susc.fin_prueba if susc else None,
@@ -243,6 +277,9 @@ def list_users(request):
             "is_superuser": user.is_superuser,
             "date_joined": user.date_joined,
             "last_login": user.last_login,
+            "ultima_actividad": perfil.ultima_actividad if perfil else None,
+            "es_interna": es_interna,
+            "origen": perfil.origen if perfil else "desconocido",
             "pacientes_count": p_count,
             "sesiones_count": s_count,
             "audio_segundos_total": s_segundos,
@@ -265,26 +302,30 @@ def admin_system_stats(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    User = get_user_model()
     now = timezone.now()
     thirty_days_ago = now - timezone.timedelta(days=30)
+    medibles = cuentas_medibles()
+    medibles_ids = medibles.values("id")
 
-    total_usuarios = User.objects.count()
-    usuarios_activos_mes = User.objects.filter(last_login__gte=thirty_days_ago).count()
+    total_usuarios = medibles.count()
+    usuarios_activos_mes = medibles.filter(
+        perfil_psicologo__ultima_actividad__gte=thirty_days_ago
+    ).count()
 
-    total_pacientes = Paciente.objects.count()
-    total_sesiones = Sesion.objects.count()
-    total_audio_segundos = Sesion.objects.aggregate(s=Sum("duracion_segundos"))["s"] or 0
+    total_pacientes = Paciente.objects.filter(psicologo_id__in=medibles_ids).count()
+    sesiones = Sesion.objects.filter(paciente__psicologo_id__in=medibles_ids)
+    total_sesiones = sesiones.count()
+    total_audio_segundos = sesiones.aggregate(s=Sum("duracion_segundos"))["s"] or 0
     total_audio_horas = round(total_audio_segundos / 3600, 1)
 
-    ia_agg = RegistroConsumoIA.objects.aggregate(
+    ia_agg = RegistroConsumoIA.objects.filter(user_id__in=medibles_ids).aggregate(
         t=Sum("tokens_total"),
         c=Sum("costo_estimado_usd"),
     )
     total_tokens_ia = ia_agg["t"] or 0
     total_costo_ia_usd = float(ia_agg["c"] or 0)
 
-    susc_counts = Suscripcion.objects.values("estado").annotate(c=Count("id"))
+    susc_counts = Suscripcion.objects.filter(user_id__in=medibles_ids).values("estado").annotate(c=Count("id"))
     susc_dist = {item["estado"]: item["c"] for item in susc_counts}
     suscripciones_activas = susc_dist.get("activa", 0)
     suscripciones_trial = susc_dist.get("trial", 0)
@@ -492,6 +533,9 @@ def google_login(request):
                 user.save()
                 enqueue_welcome_email(user)
 
+        registrar_login(user)
+        aplicar_atribucion(user, request.data)
+
         # Generar JWT tokens
         from rest_framework_simplejwt.tokens import RefreshToken
         refresh = RefreshToken.for_user(user)
@@ -615,6 +659,8 @@ def verify_registration(request):
     try:
         from cuentas.services import confirm_user_registration
         user = confirm_user_registration(email, code)
+        registrar_login(user)
+        aplicar_atribucion(user, request.data)
 
         from rest_framework_simplejwt.tokens import RefreshToken
         refresh = RefreshToken.for_user(user)

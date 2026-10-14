@@ -162,11 +162,11 @@ export async function login(username: string, password: string) {
   return data;
 }
 
-export async function loginWithGoogle(credential: string) {
+export async function loginWithGoogle(credential: string, atribucion: Record<string, string> = {}) {
   const res = await fetch(`${API_URL}/auth/google/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential }),
+    body: JSON.stringify({ credential, ...atribucion }),
   });
   if (!res.ok) {
     let message = "Error de autenticación con Google";
@@ -202,10 +202,14 @@ export async function registerUser(payload: {
   return res.json();
 }
 
-export async function verifyRegistrationCode(email: string, code: string) {
+export async function verifyRegistrationCode(
+  email: string,
+  code: string,
+  atribucion: Record<string, string> = {},
+) {
   const res = await publicApiFetch("/auth/register/verify/", {
     method: "POST",
-    body: JSON.stringify({ email, code }),
+    body: JSON.stringify({ email, code, ...atribucion }),
   });
   if (!res.ok) {
     let message = "Error al verificar el código.";
@@ -294,6 +298,8 @@ export async function createUser(input: {
   first_name?: string;
   last_name?: string;
   email?: string;
+  plan?: string;
+  dias_prueba?: number;
   is_admin?: boolean;
   is_superuser?: boolean;
 }) {

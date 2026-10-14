@@ -13,6 +13,8 @@ export default function CrearUsuarioPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [plan, setPlan] = useState("estandar");
+  const [diasPrueba, setDiasPrueba] = useState("14");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -21,7 +23,7 @@ export default function CrearUsuarioPage() {
     async function verifyAdmin() {
       try {
         const user = await getCurrentUser();
-        const isAdmin = user.username === "Admin" || user.is_admin === true;
+        const isAdmin = user.username === "Admin" || user.is_admin === true || user.is_superuser === true;
         setAuthorized(isAdmin);
         if (!isAdmin) router.replace("/dashboard");
       } catch {
@@ -47,12 +49,16 @@ export default function CrearUsuarioPage() {
         first_name: firstName,
         last_name: lastName,
         email,
+        plan,
+        dias_prueba: Number(diasPrueba),
       });
       setUsername("");
       setPassword("");
       setFirstName("");
       setLastName("");
       setEmail("");
+      setPlan("estandar");
+      setDiasPrueba("14");
       setSuccess("Usuario creado correctamente.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el usuario.");
@@ -78,8 +84,9 @@ export default function CrearUsuarioPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium">Nombre</label>
+            <label htmlFor="crear-nombre" className="text-sm font-medium">Nombre</label>
             <input
+              id="crear-nombre"
               type="text"
               value={firstName}
               onChange={(event) => setFirstName(event.target.value)}
@@ -87,8 +94,9 @@ export default function CrearUsuarioPage() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Apellido</label>
+            <label htmlFor="crear-apellido" className="text-sm font-medium">Apellido</label>
             <input
+              id="crear-apellido"
               type="text"
               value={lastName}
               onChange={(event) => setLastName(event.target.value)}
@@ -98,8 +106,9 @@ export default function CrearUsuarioPage() {
         </div>
 
         <div>
-          <label className="text-sm font-medium">Email</label>
+          <label htmlFor="crear-email" className="text-sm font-medium">Email</label>
           <input
+            id="crear-email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -108,8 +117,9 @@ export default function CrearUsuarioPage() {
         </div>
 
         <div>
-          <label className="text-sm font-medium">Usuario</label>
+          <label htmlFor="crear-usuario" className="text-sm font-medium">Usuario</label>
           <input
+            id="crear-usuario"
             type="text"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -119,8 +129,9 @@ export default function CrearUsuarioPage() {
         </div>
 
         <div>
-          <label className="text-sm font-medium">Contraseña</label>
+          <label htmlFor="crear-clave" className="text-sm font-medium">Contraseña</label>
           <input
+            id="crear-clave"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -128,6 +139,34 @@ export default function CrearUsuarioPage() {
             required
             minLength={8}
           />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="crear-plan" className="text-sm font-medium">Plan</label>
+            <select
+              id="crear-plan"
+              value={plan}
+              onChange={(event) => setPlan(event.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            >
+              <option value="estandar">Estándar</option>
+              <option value="plus">Plus</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="crear-dias" className="text-sm font-medium">Días de prueba</label>
+            <input
+              id="crear-dias"
+              type="number"
+              min={0}
+              max={365}
+              value={diasPrueba}
+              onChange={(event) => setDiasPrueba(event.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              required
+            />
+          </div>
         </div>
 
         <div className="flex justify-end gap-2">

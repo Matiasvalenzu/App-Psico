@@ -7,3 +7,6 @@ class CuentasConfig(AppConfig):
 
     def ready(self):
         import cuentas.signals  # noqa: F401
+        from cuentas.actividad import install_jwt_login_hooks
+
+        install_jwt_login_hooks()

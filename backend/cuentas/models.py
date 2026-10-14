@@ -32,10 +32,24 @@ class PerfilPsicologo(models.Model):
     direccion_consulta = models.CharField(max_length=255, blank=True, default="")
     tutorial_visto = models.BooleanField(default=False)
     tutoriales_vistos = models.JSONField(default=dict, blank=True)
+    ultima_actividad = models.DateTimeField(null=True, blank=True, db_index=True)
+    es_interna = models.BooleanField(
+        default=False,
+        help_text="Cuenta de prueba interna. No entra en las métricas del panel.",
+    )
+    utm_source = models.CharField(max_length=200, blank=True, default="")
+    utm_medium = models.CharField(max_length=200, blank=True, default="")
+    utm_campaign = models.CharField(max_length=200, blank=True, default="")
+    gclid = models.CharField(max_length=200, blank=True, default="")
+    fbclid = models.CharField(max_length=200, blank=True, default="")
     recordatorios_paciente_activos = models.BooleanField(default=True)
     bhe_glosa_default = models.CharField(max_length=200, default="Atención psicológica")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def origen(self):
+        return (self.utm_source or "").strip() or "desconocido"
 
     @property
     def email_notificaciones_efectivo(self):

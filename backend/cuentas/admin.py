@@ -10,7 +10,10 @@ class PerfilPsicologoAdmin(admin.ModelAdmin):
         "email_notificaciones",
         "especialidad_clinica",
         "modalidad_atencion",
+        "es_interna",
+        "ultima_actividad",
     )
+    list_filter = ("es_interna",)
     search_fields = ("user__username", "user__email", "email_notificaciones")
 
 

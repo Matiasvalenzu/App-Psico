@@ -29,6 +29,15 @@ class SoloLecturaMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if request.path.startswith("/api/"):
+            user = _usuario_jwt(request)
+            if user is not None:
+                try:
+                    from cuentas.actividad import registrar_actividad
+
+                    registrar_actividad(user)
+                except Exception:
+                    pass
         if (
             request.method not in METODOS_SEGUROS
             and request.path.startswith("/api/")
