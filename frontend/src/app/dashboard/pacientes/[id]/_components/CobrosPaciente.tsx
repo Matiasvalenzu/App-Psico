@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Receipt } from "lucide-react";
 import { apiFetch, getCurrentUser } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
@@ -14,6 +15,7 @@ import CobroDialog from "./CobroDialog";
 import EnvioBoleta from "./EnvioBoleta";
 import { chipBoleta, ESTADOS_PAGO, etiquetaCobros, formatCLP, hoyISO, textoSesiones, type Cobro, type DelegacionBHE } from "./cobros";
 import { MarcarPagadoDialog } from "./PagoCobro";
+import { AsociarSesionDialog } from "./VinculoSesionDialogs";
 import { fetchAllPages } from "./utils";
 
 // Cobros del paciente. `refreshKey` permite recargar cuando se crea un cobro desde una sesión.
@@ -42,7 +44,10 @@ export default function CobrosPaciente({
   const [delegacion, setDelegacion] = useState<DelegacionBHE | null>(null);
   const [filtroPago, setFiltroPago] = useState("");
   const [filtroBoleta, setFiltroBoleta] = useState("");
+  const sinSesionInicial = useSearchParams().get("sin_sesion") === "1";
+  const [filtroSesion, setFiltroSesion] = useState(sinSesionInicial ? "SIN" : "");
   const [marcarPagado, setMarcarPagado] = useState<number | null>(null);
+  const [asociar, setAsociar] = useState<Cobro | null>(null);
 
   const cargar = useCallback(async () => {
     setError("");
@@ -91,6 +96,7 @@ export default function CobrosPaciente({
   const visibles = cobros.filter(
     (c) =>
       (!filtroPago || c.estado_pago === filtroPago) &&
+      (!filtroSesion || !(c.sesiones_detalle?.length)) &&
       (!filtroBoleta ||
         (filtroBoleta === "SIN" ? c.estado_boleta === "PENDIENTE" || c.estado_boleta === "NO_APLICA" : c.estado_boleta === filtroBoleta)),
   );
@@ -162,6 +168,10 @@ export default function CobrosPaciente({
               <option value="PENDIENTE">Pendientes</option>
               <option value="PAGADO">Pagados</option>
             </NativeSelect>
+            <NativeSelect aria-label="Filtrar por sesión" value={filtroSesion} onChange={(e) => setFiltroSesion(e.target.value)} className="w-44">
+              <option value="">Todas las sesiones</option>
+              <option value="SIN">Sin sesión</option>
+            </NativeSelect>
             <NativeSelect aria-label="Filtrar por boleta" value={filtroBoleta} onChange={(e) => setFiltroBoleta(e.target.value)} className="w-44">
               <option value="">Todas las boletas</option>
               <option value="EMITIDA">Emitidas</option>
@@ -215,7 +225,11 @@ export default function CobrosPaciente({
                     className="cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
                   >
                     <td className="px-4 py-3">{formatDateCL(cobro.fecha_pago)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{textoSesiones(cobro) || "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {textoSesiones(cobro) || (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Sin sesión</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCLP(cobro.monto_bruto)}</td>
                     <td className="px-4 py-3">
                       <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", pago.className)}>{pago.label}</span>
@@ -229,6 +243,18 @@ export default function CobrosPaciente({
                     <td className="px-4 py-3 tabular-nums">{cobro.boleta_folio || "—"}</td>
                     {!soloLectura && (
                       <td className="px-4 py-2 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mr-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAsociar(cobro);
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          Asociar sesión
+                        </Button>
                         {cobro.estado_pago === "PENDIENTE" && (
                           <Button
                             size="sm"
@@ -272,9 +298,24 @@ export default function CobrosPaciente({
           setSeleccionado(null);
         }}
         onCompletarFicha={onCompletarFicha}
+        onAsociar={soloLectura ? undefined : setAsociar}
       />
 
       <MarcarPagadoDialog cobroId={marcarPagado} onClose={() => setMarcarPagado(null)} onDone={reemplazar} />
+
+      {!soloLectura && (
+        <AsociarSesionDialog
+          open={Boolean(asociar)}
+          cobro={asociar}
+          pacienteId={pacienteId}
+          sesiones={sesiones}
+          onOpenChange={(open) => !open && setAsociar(null)}
+          onSaved={(cobro) => {
+            reemplazar(cobro);
+            setSeleccionado((actual) => (actual?.id === cobro.id ? cobro : actual));
+          }}
+        />
+      )}
 
       {!soloLectura && (
         <CobroDialog

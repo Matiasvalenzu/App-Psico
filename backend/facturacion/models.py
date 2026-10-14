@@ -104,6 +104,29 @@ class Cobro(models.Model):
         return f"Cobro #{self.pk} - {self.fecha_pago}"
 
 
+class CambioVinculoSesion(models.Model):
+    """Quién asoció o quitó una sesión de un cobro, y cuándo. No altera la boleta."""
+
+    class Accion(models.TextChoices):
+        ASOCIAR = "ASOCIAR", "Asociar"
+        QUITAR = "QUITAR", "Quitar"
+
+    cobro = models.ForeignKey(Cobro, on_delete=models.CASCADE, related_name="cambios_sesion")
+    sesion = models.ForeignKey(Sesion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    numero_sesion = models.PositiveIntegerField(null=True, blank=True)
+    accion = models.CharField(max_length=10, choices=Accion.choices)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"Cobro #{self.cobro_id}: {self.accion} sesión {self.numero_sesion or self.sesion_id}"
+
+
 class CambioEstadoPago(models.Model):
     """Quién marcó un cobro como pagado o pendiente, y cuándo."""
 

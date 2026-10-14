@@ -2,6 +2,7 @@ import csv
 import mimetypes
 import os
 from datetime import date
+from django.utils.dateparse import parse_date, parse_datetime
 
 from django.conf import settings
 from django.db.models import Count, Prefetch, Q, Sum
@@ -36,6 +37,38 @@ from .serializers import (
     receptor_desde_ficha,
 )
 from .services import hoy_chile
+from .vinculos import (
+    VinculoInvalido,
+    aplicar_vinculo,
+    cobros_sin_sesion,
+    contar_sin_sesion,
+    paciente_con_mas_sin_sesion,
+    sugerir_cobro,
+)
+
+
+def _fecha_sugerencia(raw):
+    if not raw:
+        return None
+    if "T" not in raw:
+        return parse_date(raw[:10])
+    momento = parse_datetime(raw)
+    if not momento:
+        return parse_date(raw[:10])
+    if timezone.is_naive(momento):
+        momento = timezone.make_aware(momento, timezone.get_current_timezone())
+    return timezone.localtime(momento).date()
+
+
+def _cobro_sugerido(cobro):
+    return {
+        "id": cobro.id,
+        "fecha_pago": cobro.fecha_pago,
+        "monto_bruto": cobro.monto_bruto,
+        "estado_pago": cobro.estado_pago,
+        "estado_boleta": cobro.estado_boleta,
+        "paciente": cobro.paciente_id,
+    }
 
 
 def _mes_pedido(request):
@@ -115,6 +148,8 @@ class CobroViewSet(viewsets.ModelViewSet):
         sesion = self.request.query_params.get("sesion")
         if sesion:
             qs = qs.filter(Q(sesion=sesion) | Q(sesiones=sesion)).distinct()
+        if self.request.query_params.get("sin_sesion") in ("1", "true"):
+            qs = cobros_sin_sesion(qs)
         if self.request.query_params.get("mes"):
             anio, mes = _mes_pedido(self.request)
             qs = qs.filter(fecha_pago__year=anio, fecha_pago__month=mes)
@@ -239,8 +274,31 @@ class CobroViewSet(viewsets.ModelViewSet):
                 "retencion_mes": retencion or 0,
                 "top_deudores": [{**d, "nombre": nombres.get(d["paciente"], "")} for d in deudores],
                 "sesiones_sin_cobro": sin_cobro,
+                "cobros_sin_sesion": contar_sin_sesion(cobros),
+                "cobros_sin_sesion_paciente": paciente_con_mas_sin_sesion(cobros),
             }
         )
+
+    @action(detail=False, methods=["get"])
+    def sugerencia(self, request):
+        fecha = _fecha_sugerencia(request.query_params.get("fecha"))
+        paciente = request.query_params.get("paciente")
+        if not fecha or not paciente:
+            return Response({"cobro": None})
+        qs = Cobro.objects.filter(psicologo=request.user, paciente_id=paciente)
+        cobro = sugerir_cobro(qs, fecha)
+        if not cobro:
+            return Response({"cobro": None})
+        return Response({"cobro": _cobro_sugerido(cobro)})
+
+    @action(detail=True, methods=["post"], url_path="vincular-sesiones")
+    def vincular_sesiones(self, request, pk=None):
+        cobro = self.get_object()
+        try:
+            cobro = aplicar_vinculo(cobro, request.data.get("sesiones", []), request.user)
+        except VinculoInvalido as exc:
+            return Response({"detail": exc.detail, "sesiones": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+        return self._cobro_actualizado(cobro)
 
     @action(detail=False, methods=["get"])
     def exportar(self, request):

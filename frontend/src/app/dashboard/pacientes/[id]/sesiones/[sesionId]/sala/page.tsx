@@ -18,6 +18,7 @@ import {
   VideoOff,
 } from "lucide-react";
 import AvisoConsentimiento from "@/components/pacientes/AvisoConsentimiento";
+import { sugerirAsociarCobro } from "@/components/cobros/sugerirCobro";
 import { apiFetch } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -230,6 +231,7 @@ export default function SalaPsicologoPage() {
       rtc.leave();
       rtc.releaseMedia();
       setConfirmOpen(false);
+      sugerirAsociarCobro(Number(pacienteId), Number(sesionId), new Date().toISOString());
       router.push(`/dashboard/pacientes/${pacienteId}/sesiones/${sesionId}`);
     } catch (e) {
       setFinishError(e instanceof Error ? e.message : "Error al finalizar la videollamada.");

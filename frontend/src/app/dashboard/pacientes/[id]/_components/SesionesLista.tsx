@@ -45,6 +45,7 @@ export default function SesionesLista({
   onNewRemote,
   onDelete,
   onCobro,
+  onVincularCobro,
   mostrarCobro = false,
   onMarcarPagado,
   onVolverPendiente,
@@ -58,6 +59,7 @@ export default function SesionesLista({
   onNewRemote: () => void;
   onDelete: (sesion: Sesion) => void;
   onCobro?: (sesion: Sesion) => void;
+  onVincularCobro?: (sesion: Sesion) => void;
   mostrarCobro?: boolean;
   onMarcarPagado?: (sesion: Sesion) => void;
   onVolverPendiente?: (sesion: Sesion) => void;
@@ -186,11 +188,17 @@ export default function SesionesLista({
                         <MoreHorizontal />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuContent align="end" className="w-64">
                       {onCobro && !cobro && (
                         <DropdownMenuItem className="cursor-pointer" onClick={() => onCobro(sesion)}>
                           <Receipt className="mr-2 h-4 w-4" />
                           Registrar cobro
+                        </DropdownMenuItem>
+                      )}
+                      {onVincularCobro && !cobro && (
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => onVincularCobro(sesion)}>
+                          <Receipt className="mr-2 h-4 w-4" />
+                          Vincular a un cobro existente
                         </DropdownMenuItem>
                       )}
                       {onMarcarPagado && cobro?.estado_pago === "PENDIENTE" && (

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { formatRut } from "@/lib/rut";
-import { formatDateCL } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { hoyISO, MEDIOS_PAGO, MODOS_BOLETA, type Cobro } from "./cobros";
 import { fetchAllPages } from "./utils";
-
-type SesionOpcion = { id: number; numero_sesion: number | null; fecha_hora_inicio: string; origen: string };
+import { primeraLibre, SelectorSesiones, type SesionVinculo } from "./VinculoSesionDialogs";
 
 type FormState = {
   fecha_pago: string;
@@ -80,7 +78,7 @@ export default function CobroDialog({
   open: boolean;
   pacienteId: number;
   sesionId?: number | null;
-  sesiones?: SesionOpcion[];
+  sesiones?: SesionVinculo[];
   fechaInicial?: string;
   cobro?: Cobro | null;
   onOpenChange: (open: boolean) => void;
@@ -91,7 +89,7 @@ export default function CobroDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [opciones, setOpciones] = useState<SesionOpcion[]>([]);
+  const [opciones, setOpciones] = useState<SesionVinculo[]>([]);
   const [cargandoSesiones, setCargandoSesiones] = useState(false);
   const [errorSesiones, setErrorSesiones] = useState("");
   const [elegidas, setElegidas] = useState<number[]>([]);
@@ -102,19 +100,26 @@ export default function CobroDialog({
     if (!open || !Number.isFinite(pacienteId)) return;
     let activo = true;
     const conocidas = (sesiones ?? []).filter((s) => s.origen !== "DOCUMENTO_EXTERNO");
+    const actuales = cobro?.sesiones?.length ? cobro.sesiones : (cobro?.sesiones_detalle ?? []).map((s) => s.id);
+    const libre = !cobro && !sesionId ? primeraLibre(conocidas)?.id : undefined;
     setForm(toForm(cobro ?? null, fechaInicial || hoyISO()));
-    setElegidas(cobro?.sesiones ?? (sesionId ? [sesionId] : []));
+    setElegidas(actuales.length ? actuales : sesionId ? [sesionId] : libre ? [libre] : []);
     setIncluirGlosa(Boolean(cobro?.glosa_incluye_sesion));
     setError("");
     setFieldErrors({});
     setErrorSesiones("");
     setOpciones(conocidas);
     setCargandoSesiones(true);
-    fetchAllPages<SesionOpcion>(`/sesiones/?paciente=${pacienteId}`)
+    fetchAllPages<SesionVinculo>(`/sesiones/?paciente=${pacienteId}`)
       .then((lista) => {
         if (!activo) return;
         const clinicas = lista.filter((s) => s.origen !== "DOCUMENTO_EXTERNO");
-        setOpciones(clinicas.length ? clinicas : conocidas);
+        const siguientes = clinicas.length ? clinicas : conocidas;
+        setOpciones(siguientes);
+        if (!cobro && !sesionId) {
+          const id = primeraLibre(siguientes)?.id;
+          if (id) setElegidas([id]);
+        }
       })
       .catch(() => {
         if (!activo) return;
@@ -191,7 +196,6 @@ export default function CobroDialog({
       for (const key of CAMPOS_RECEPTOR) body[key] = form[key].trim();
     } else {
       body.paciente = pacienteId;
-      if (sesionId) body.sesion = sesionId;
     }
     try {
       const res = await apiFetch(editando ? `/facturacion/cobros/${cobro!.id}/` : "/facturacion/cobros/", {
@@ -239,48 +243,19 @@ export default function CobroDialog({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {field("fecha_pago", "Fecha de pago", { type: "date", required: true })}
-            {field("monto_bruto", "Monto bruto (CLP)", { inputMode: "numeric", required: true, placeholder: "Ej: 35000" })}
-            {select("medio_pago", "Medio de pago", MEDIOS_PAGO)}
-            {select("estado_pago", "Estado del pago", { PAGADO: "Pagado", PENDIENTE: "Pendiente" })}
-            {select("bhe_modo", "Retención", MODOS_BOLETA)}
-            {field("glosa", "Glosa de la boleta", {
-              placeholder: editando ? "" : "Por defecto, la de tu perfil",
-              maxLength: 200,
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            La glosa no puede incluir diagnósticos ni términos clínicos: la boleta la ve el SII y quien la recibe.
-          </p>
           <fieldset className="space-y-2 rounded-xl border border-border/70 p-4">
             <legend className="px-1 text-sm font-semibold">Sesiones de este cobro</legend>
             {cargandoSesiones && opciones.length === 0 ? (
               <p className="text-sm text-muted-foreground">Cargando sesiones...</p>
             ) : errorSesiones ? (
               <p className="text-sm text-destructive">{errorSesiones}</p>
-            ) : opciones.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Este paciente todavía no tiene sesiones.</p>
             ) : (
-              <div className="max-h-40 space-y-1.5 overflow-y-auto">
-                {opciones.map((sesion) => (
-                  <label key={sesion.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-primary"
-                      checked={elegidas.includes(sesion.id)}
-                      onChange={(e) =>
-                        setElegidas((prev) =>
-                          e.target.checked ? [...prev, sesion.id] : prev.filter((id) => id !== sesion.id),
-                        )
-                      }
-                    />
-                    <span>
-                      {sesion.numero_sesion ? `Sesión ${sesion.numero_sesion}` : "Sesión"} · {formatDateCL(sesion.fecha_hora_inicio)}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <SelectorSesiones
+                opciones={opciones}
+                elegidas={elegidas}
+                cobroId={cobro?.id}
+                onChange={setElegidas}
+              />
             )}
             <label
               className="flex items-start gap-2 text-sm"
@@ -301,7 +276,20 @@ export default function CobroDialog({
               </span>
             </label>
           </fieldset>
-
+          <div className="grid gap-4 sm:grid-cols-2">
+            {field("fecha_pago", "Fecha de pago", { type: "date", required: true })}
+            {field("monto_bruto", "Monto bruto (CLP)", { inputMode: "numeric", required: true, placeholder: "Ej: 35000" })}
+            {select("medio_pago", "Medio de pago", MEDIOS_PAGO)}
+            {select("estado_pago", "Estado del pago", { PAGADO: "Pagado", PENDIENTE: "Pendiente" })}
+            {select("bhe_modo", "Retención", MODOS_BOLETA)}
+            {field("glosa", "Glosa de la boleta", {
+              placeholder: editando ? "" : "Por defecto, la de tu perfil",
+              maxLength: 200,
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            La glosa no puede incluir diagnósticos ni términos clínicos: la boleta la ve el SII y quien la recibe.
+          </p>
           {editando && (
             <fieldset className="grid gap-4 rounded-xl border border-border/70 p-4 sm:grid-cols-2">
               <legend className="px-1 text-sm font-semibold">Receptor de la boleta</legend>

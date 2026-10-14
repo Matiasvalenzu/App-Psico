@@ -56,6 +56,7 @@ export default function BorradorBoleta({
   onEdit,
   onDeleted,
   onCompletarFicha,
+  onAsociar,
 }: {
   cobro: Cobro | null;
   delegacion: DelegacionBHE | null;
@@ -65,6 +66,7 @@ export default function BorradorBoleta({
   onEdit: (cobro: Cobro) => void;
   onDeleted: (id: number) => void;
   onCompletarFicha?: () => void;
+  onAsociar?: (cobro: Cobro) => void;
 }) {
   const [folio, setFolio] = useState("");
   const [fechaEmision, setFechaEmision] = useState(hoyISO());
@@ -161,6 +163,12 @@ export default function BorradorBoleta({
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
+          )}
+
+          {!soloLectura && onAsociar && (
+            <Button type="button" variant="outline" size="sm" onClick={() => onAsociar(actual)}>
+              Asociar sesión
+            </Button>
           )}
 
           <PagoCobro cobro={actual} soloLectura={soloLectura} onChanged={onChanged} />

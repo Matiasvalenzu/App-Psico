@@ -12,6 +12,7 @@ import SessionRecordingTips from "@/components/sesion/SessionRecordingTips";
 import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
 import RuedaCreenciasChart, { RuedaDimension } from "@/components/tests/RuedaCreenciasChart";
 import AvisoConsentimiento from "@/components/pacientes/AvisoConsentimiento";
+import { sugerirAsociarCobro } from "@/components/cobros/sugerirCobro";
 
 interface Sesion {
   id: number;
@@ -265,6 +266,16 @@ export default function SesionDetailPage() {
       loadSesion();
     }
   }, [lastUploadedSessionId, sesionId, loadSesion]);
+
+  const estadoPrevio = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sesion) return;
+    const previo = estadoPrevio.current;
+    estadoPrevio.current = sesion.estado;
+    if (previo && previo !== "COMPLETADO" && sesion.estado === "COMPLETADO") {
+      sugerirAsociarCobro(sesion.paciente, sesion.id, sesion.fecha_hora_inicio);
+    }
+  }, [sesion]);
 
   useEffect(() => {
     if (sesion?.segmentos) setTranscriptText(buildTranscriptText(sesion.segmentos));

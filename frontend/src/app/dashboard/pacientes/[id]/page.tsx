@@ -28,6 +28,8 @@ import PacienteHeader from "./_components/PacienteHeader";
 import PacienteLateral from "./_components/PacienteLateral";
 import PacienteResumen from "./_components/PacienteResumen";
 import { cambiarPago, MarcarPagadoDialog } from "./_components/PagoCobro";
+import { VincularCobroDialog } from "./_components/VinculoSesionDialogs";
+import { sugerirAsociarCobro } from "@/components/cobros/sugerirCobro";
 import type { Cobro } from "./_components/cobros";
 import CobrosBloqueados from "@/components/suscripcion/CobrosBloqueados";
 import SesionesLista from "./_components/SesionesLista";
@@ -85,6 +87,7 @@ export default function PacienteDetailPage() {
   // Cobros: visibles con Plus; si bajó de plan y tiene cobros, quedan en solo lectura.
   const [boletas, setBoletas] = useState<{ habilitadas: boolean; enPrueba: boolean }>({ habilitadas: false, enPrueba: false });
   const [sesionCobro, setSesionCobro] = useState<Sesion | null>(null);
+  const [sesionVincular, setSesionVincular] = useState<Sesion | null>(null);
   const [cobrosRefresh, setCobrosRefresh] = useState(0);
   const [cobroPorPagar, setCobroPorPagar] = useState<number | null>(null);
 
@@ -216,6 +219,7 @@ export default function PacienteDetailPage() {
       });
       if (!res.ok) throw new Error();
       const sesion = await res.json();
+      if (boletas.habilitadas) sugerirAsociarCobro(Number(id), sesion.id, sesion.fecha_hora_inicio);
       router.push(`/dashboard/pacientes/${id}/sesiones/${sesion.id}`);
     } catch (err) {
       console.error(err);
@@ -367,6 +371,7 @@ export default function PacienteDetailPage() {
               onNewRemote={() => setRemoteModalOpen(true)}
               onDelete={setSesionToDelete}
               onCobro={boletas.habilitadas ? setSesionCobro : undefined}
+              onVincularCobro={boletas.habilitadas ? setSesionVincular : undefined}
               mostrarCobro={boletas.habilitadas}
               onMarcarPagado={boletas.habilitadas ? (s) => setCobroPorPagar(s.cobro?.id ?? null) : undefined}
               onVolverPendiente={boletas.habilitadas ? volverAPendiente : undefined}
@@ -404,6 +409,7 @@ export default function PacienteDetailPage() {
       </div>
 
       {boletas.habilitadas && (
+        <>
         <CobroDialog
           open={Boolean(sesionCobro)}
           pacienteId={Number(id)}
@@ -418,6 +424,18 @@ export default function PacienteDetailPage() {
             changeTab("cobros");
           }}
         />
+        <VincularCobroDialog
+          open={Boolean(sesionVincular)}
+          pacienteId={Number(id)}
+          sesionId={sesionVincular?.id ?? null}
+          onOpenChange={(open) => !open && setSesionVincular(null)}
+          onSaved={(cobro) => {
+            actualizarCobroSesion(cobro);
+            setCobrosRefresh((n) => n + 1);
+            toast.success("Sesión vinculada al cobro.");
+          }}
+        />
+        </>
       )}
 
       <MarcarPagadoDialog
@@ -460,8 +478,9 @@ export default function PacienteDetailPage() {
         open={remoteModalOpen}
         onClose={() => setRemoteModalOpen(false)}
         paciente={paciente}
-        onSessionCreated={async () => {
+        onSessionCreated={async (sesion) => {
           await loadData();
+          if (boletas.habilitadas && sesion?.id) sugerirAsociarCobro(paciente.id, sesion.id, sesion.fecha_hora_inicio);
         }}
         onStartAssistant={(sesion, meetUrl) => {
           setActiveRemoteSession({ id: sesion.id, url_reunion: meetUrl });
@@ -474,8 +493,9 @@ export default function PacienteDetailPage() {
         open={psiconexModalOpen}
         onClose={() => setPsiconexModalOpen(false)}
         paciente={paciente}
-        onSessionCreated={() => {
+        onSessionCreated={(sesion) => {
           loadData();
+          if (boletas.habilitadas && sesion?.id) sugerirAsociarCobro(paciente.id, sesion.id, sesion.fecha_hora_inicio);
         }}
       />
 

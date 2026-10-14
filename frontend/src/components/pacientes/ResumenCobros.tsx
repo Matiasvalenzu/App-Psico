@@ -18,6 +18,8 @@ interface Resumen {
   retencion_mes: number;
   top_deudores: { paciente: number; nombre: string; total: number; cantidad: number }[];
   sesiones_sin_cobro: number;
+  cobros_sin_sesion?: number;
+  cobros_sin_sesion_paciente?: number | null;
 }
 
 // Resumen de cobros del inicio: solo para quien usa cobros (Plan Plus o cobros antiguos).
@@ -124,6 +126,23 @@ export default function ResumenCobros() {
           )}
         </div>
       </div>
+
+      {(resumen.cobros_sin_sesion ?? 0) > 0 && (
+        <p className="text-sm text-muted-foreground">
+          <Link
+            href={
+              resumen.cobros_sin_sesion_paciente
+                ? `/dashboard/pacientes/${resumen.cobros_sin_sesion_paciente}?tab=cobros&sin_sesion=1`
+                : "/dashboard"
+            }
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            {resumen.cobros_sin_sesion === 1
+              ? "1 cobro sin sesión asociada"
+              : `${resumen.cobros_sin_sesion} cobros sin sesión asociada`}
+          </Link>
+        </p>
+      )}
 
       {resumen.sesiones_sin_cobro > 0 && (
         <p className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">

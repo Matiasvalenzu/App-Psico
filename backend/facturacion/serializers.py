@@ -7,6 +7,7 @@ from sesiones.models import Sesion
 
 from .envio import datos_envio
 from .models import Cobro, DelegacionSII, EmisionBHE
+from .vinculos import cobro_de_sesion
 from .services import (
     anulable_hasta,
     calcular_retencion,
@@ -213,6 +214,9 @@ class CobroSerializer(serializers.ModelSerializer):
                 )
 
         sesiones = self._sesiones_a_vincular(attrs, instance)
+        excluir = instance.pk if instance else None
+        if any(cobro_de_sesion(sesion, excluir) for sesion in sesiones):
+            raise serializers.ValidationError({"sesiones": "Ya cobrada."})
         if sesiones:
             paciente = attrs.get("paciente") or (instance.paciente if instance else None)
             if paciente and any(s.paciente_id != paciente.id for s in sesiones):
