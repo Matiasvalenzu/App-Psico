@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { getCurrentUser, apiFetch } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
@@ -49,7 +49,7 @@ export default function SuscripcionPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [confirmCambio, setConfirmCambio] = useState(false);
   const [cambiando, setCambiando] = useState(false);
-  const [confirmPlusPrueba, setConfirmPlusPrueba] = useState(false);
+  const abrioActivarPlus = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -79,21 +79,15 @@ export default function SuscripcionPage() {
   }, []);
 
   useEffect(() => {
-    if (loading || searchParams.get("activar") !== "plus" || !subData?.plan_plus_disponible) return;
+    if (loading || abrioActivarPlus.current) return;
+    if (searchParams.get("activar") !== "plus" || !subData?.plan_plus_disponible) return;
+    const estadoActual = subData.estado || user?.suscripcion_estado;
+    const plan = subData.plan || "estandar";
+    if (estadoActual === "activa" && plan === "plus") return;
+    abrioActivarPlus.current = true;
     document.getElementById("plan-plus")?.scrollIntoView({ block: "center" });
-    const estado = subData.estado || user?.suscripcion_estado;
-    if (estado === "activa" && subData.plan === "estandar" && subData.mp_preapproval_id) {
-      setConfirmCambio(true);
-      return;
-    }
-    if (estado === "trial") {
-      setConfirmPlusPrueba(true);
-      return;
-    }
-    if (estado !== "activa") {
-      setPlanModal("plus");
-      setModalOpen(true);
-    }
+    setPlanModal("plus");
+    setModalOpen(true);
   }, [loading, searchParams, subData, user]);
 
   const handleCancelSubscription = async () => {
@@ -218,37 +212,12 @@ export default function SuscripcionPage() {
     if (isActive && planActual === "plus") {
       return <Button disabled className="w-full">Tu plan actual</Button>;
     }
-    if (isActive) {
-      if (!puedeCambiarPlan) return null;
-      return confirmCambio && planDestino === "plus" ? confirmacionCambio : (
-        <Button onClick={() => setConfirmCambio(true)} className="w-full font-semibold shadow-lg shadow-primary/20">
-          Cambiar a Plus ({pesos(montoPlus)}/mes)
-        </Button>
-      );
-    }
-    if (isTrial && diasRestantes > 0 && !confirmPlusPrueba) {
+    if (isActive && planActual === "estandar") {
       return (
-        <Button onClick={() => setConfirmPlusPrueba(true)} className="w-full font-semibold shadow-lg shadow-primary/20">
+        <Button onClick={() => abrirModal("plus")} className="w-full font-semibold shadow-lg shadow-primary/20">
           <CreditCard className="mr-2 h-4 w-4" />
-          Suscribirme a Plus
+          Pasarme a Plus
         </Button>
-      );
-    }
-    if (isTrial && diasRestantes > 0) {
-      return (
-        <div className="rounded-xl border border-border/70 bg-muted/40 p-3 space-y-2 text-left animate-in fade-in">
-          <p className="text-xs text-foreground font-medium">
-            El cobro de {pesos(montoPlus)} CLP parte de inmediato y {diasRestantes === 1 ? "el día de prueba que te queda se pierde" : `los ${diasRestantes} días de prueba que te quedan se pierden`}.
-          </p>
-          <div className="flex items-center gap-2">
-            <Button size="sm" className="text-xs h-8" onClick={() => abrirModal("plus")}>
-              Ir a pagar
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirmPlusPrueba(false)} className="text-xs h-8">
-              Volver
-            </Button>
-          </div>
-        </div>
       );
     }
     return (
@@ -466,6 +435,7 @@ export default function SuscripcionPage() {
         plan={planModal}
         monto={planes[planModal]?.monto ?? montoEstandar}
         nombre={planModal === "plus" ? "Plan Plus" : "Plan Estándar"}
+        enEstandarPagado={isActive && planActual === "estandar"}
       />
     </div>
   );

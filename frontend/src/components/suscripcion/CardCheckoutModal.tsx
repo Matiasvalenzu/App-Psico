@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
 import { formatDateCL } from "@/lib/utils";
 import { SUBSCRIBE_SESSION_KEY } from "@/lib/metaPixel";
+import { PlusCheckoutBanner, textoBotonPagoPlus } from "@/components/suscripcion/PlusCheckoutBanner";
 import {
   CreditCard,
   Lock,
@@ -43,6 +44,7 @@ interface CardCheckoutModalProps {
   plan?: string;
   monto?: number;
   nombre?: string;
+  enEstandarPagado?: boolean;
 }
 
 export default function CardCheckoutModal({
@@ -57,6 +59,7 @@ export default function CardCheckoutModal({
   plan = "estandar",
   monto = 4990,
   nombre = "Plan Psiconex Pro",
+  enEstandarPagado = false,
 }: CardCheckoutModalProps) {
   const precio = `$${monto.toLocaleString("es-CL")}`;
   const [mpReady, setMpReady] = useState(false);
@@ -362,6 +365,13 @@ export default function CardCheckoutModal({
               </p>
             </div>
 
+            <PlusCheckoutBanner
+              plan={plan}
+              isTrial={isTrial}
+              enEstandarPagado={enEstandarPagado}
+              monto={monto}
+            />
+
             {/* Resumen del Plan / Aviso de Cobro Diferido */}
             {difiereCobro ? (
               <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/5 via-primary/[0.02] to-transparent p-4 text-xs space-y-3">
@@ -641,7 +651,7 @@ export default function CardCheckoutModal({
                   ) : (
                     <span className="inline-flex items-center gap-2">
                       <Lock className="h-4 w-4" />
-                      {plan === "plus" ? `Pagar ${precio} CLP` : `Pagar ${precio} CLP y reactivar plan`}
+                      {plan === "plus" ? textoBotonPagoPlus(monto) : `Pagar ${precio} CLP y reactivar plan`}
                     </span>
                   )}
                 </Button>
