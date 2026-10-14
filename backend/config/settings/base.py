@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "cuentas",
     "feedback",
     "facturacion",
+    "seguimiento",
 ]
 
 MIDDLEWARE = [

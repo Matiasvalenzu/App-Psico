@@ -55,8 +55,8 @@ const FEATURES: Feature[] = [
   },
   {
     icon: ClipboardList,
-    title: "Tests psicológicos aplicados",
-    body: "Test de Creencias Ellis y Rueda de la Vida: envía el enlace al paciente, se puntúan automáticamente y quedan en la sesión.",
+    title: "Tests y escalas clínicas",
+    body: "Test de Creencias Ellis, Rueda de la Vida y escalas PHQ-9, GAD-7, DASS-21 y Rosenberg: se puntúan automáticamente y las escalas muestran su trayectoria.",
   },
   {
     icon: Calendar,

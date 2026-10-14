@@ -1,0 +1,9 @@
+Hola,
+
+Uno de tus pacientes registró información en Psiconex que podría requerir tu atención (indicador de riesgo en una escala o ánimo muy bajo sostenido).
+
+Revisar en Psiconex: {{ ficha_url }}
+
+Por privacidad, este correo no incluye datos clínicos ni el nombre del paciente. Evalúa según tu criterio clínico y tu protocolo.
+
+Equipo Psiconex

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Calendar, FileText, LayoutList, Receipt, RefreshCw, SearchX, Sparkles, WifiOff } from "lucide-react";
+import { Activity, ArrowLeft, Calendar, FileSignature, FileText, HeartPulse, LayoutList, Receipt, RefreshCw, SearchX, Sparkles, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, getCurrentUser } from "@/lib/api";
 import { RemoteSessionModal } from "@/components/sesion/RemoteSessionModal";
@@ -33,13 +33,16 @@ import { sugerirAsociarCobro } from "@/components/cobros/sugerirCobro";
 import type { Cobro } from "./_components/cobros";
 import CobrosBloqueados from "@/components/suscripcion/CobrosBloqueados";
 import SesionesLista from "./_components/SesionesLista";
+import EscalasPaciente from "./_components/seguimiento/EscalasPaciente";
+import SeguimientoPaciente from "./_components/seguimiento/SeguimientoPaciente";
+import BriefInformes from "./_components/seguimiento/BriefInformes";
 import TestDialog, { type TestMode } from "./_components/TestDialog";
 import { fetchAllPages, getDateTimeInputValue, tieneRiesgo, type InformeIA, type Paciente, type Sesion } from "./_components/utils";
 
 // Elemento oculto por ahora; se conserva por si se vuelve a habilitar
 const MOSTRAR_SESION_REMOTA = false;
 
-const TABS = ["resumen", "sesiones", "documentos", "asistente", "cobros"] as const;
+const TABS = ["resumen", "sesiones", "escalas", "seguimiento", "informes", "documentos", "asistente", "cobros"] as const;
 type Tab = (typeof TABS)[number];
 
 function FichaSkeleton() {
@@ -338,6 +341,19 @@ export default function PacienteDetailPage() {
               Sesiones
               <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">{sesionesClinicas.length}</span>
             </TabsTrigger>
+            <TabsTrigger value="escalas" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <Activity className="hidden sm:block" />
+              Escalas
+            </TabsTrigger>
+            <TabsTrigger value="seguimiento" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <HeartPulse className="hidden sm:block" />
+              Seguimiento
+            </TabsTrigger>
+            <TabsTrigger value="informes" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
+              <FileSignature className="hidden sm:block" />
+              <span className="hidden sm:inline">Brief e informes</span>
+              <span className="sm:hidden">Informes</span>
+            </TabsTrigger>
             <TabsTrigger value="documentos" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
               <FileText className="hidden sm:block" />
               Documentos
@@ -377,6 +393,18 @@ export default function PacienteDetailPage() {
               onMarcarPagado={boletas.habilitadas ? (s) => setCobroPorPagar(s.cobro?.id ?? null) : undefined}
               onVolverPendiente={boletas.habilitadas ? volverAPendiente : undefined}
             />
+          </TabsContent>
+
+          <TabsContent value="escalas">
+            {tab === "escalas" && <EscalasPaciente pacienteId={id} tieneTelefono={Boolean(paciente.telefono_whatsapp)} />}
+          </TabsContent>
+
+          <TabsContent value="seguimiento">
+            {tab === "seguimiento" && <SeguimientoPaciente pacienteId={id} />}
+          </TabsContent>
+
+          <TabsContent value="informes">
+            {tab === "informes" && <BriefInformes pacienteId={id} />}
           </TabsContent>
 
           <TabsContent value="documentos" className="space-y-4">

@@ -55,6 +55,22 @@ const FAQS = [
     a: "Sí. La anulas en tu SII siguiendo la guía de la app y la marcas como anulada en Psiconex, que actualiza su estado.",
   },
   {
+    q: "¿Qué escalas clínicas incluye?",
+    a: "PHQ-9 (depresión), GAD-7 (ansiedad), DASS-21 (depresión, ansiedad y estrés) y la Escala de Autoestima de Rosenberg, en versiones en español con puntos de corte publicados. Las aplicas en consulta o compartes un enlace para que el paciente responda desde su celular, y ves la evolución en un gráfico.",
+  },
+  {
+    q: "¿Qué pasa si un paciente marca ideación suicida en una escala?",
+    a: "Psiconex muestra una alerta en la ficha aunque el puntaje total sea bajo y, si respondió desde el enlace, te avisa por correo sin incluir datos clínicos. Al paciente se le muestran líneas de ayuda. La evaluación y las decisiones siguen siendo tuyas.",
+  },
+  {
+    q: "¿Los informes para colegio o tribunal reemplazan mi firma?",
+    a: "No. Son borradores que marcan con [COMPLETAR] lo que falta. Tú los revisas, los corriges, los marcas como finales y los exportas a PDF o Word para firmarlos.",
+  },
+  {
+    q: "¿Mi paciente ve mis notas si le doy el enlace de seguimiento?",
+    a: "No. Con ese enlace solo ve sus tareas y su registro de ánimo.",
+  },
+  {
     q: "¿Reemplaza al psicólogo?",
     a: "No. Psiconex es un asistente administrativo y de análisis. El juicio clínico, la relación terapéutica y las decisiones de tratamiento son tuyas, siempre.",
   },

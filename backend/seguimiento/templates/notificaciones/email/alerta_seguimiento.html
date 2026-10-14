@@ -1,0 +1,12 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Revisa un registro en Psiconex{% endblock %}
+{% block preheader %}Un paciente registró información que podría requerir tu atención.{% endblock %}
+{% block eyebrow %}Seguimiento clínico{% endblock %}
+{% block heading %}Revisa un registro reciente{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Uno de tus pacientes registró información que podría requerir tu atención (indicador de riesgo en una escala o ánimo muy bajo sostenido).</p>
+<p style="margin:0 0 22px;color:#475569;font-size:13px;line-height:1.65;">Por privacidad, este correo no incluye datos clínicos ni el nombre del paciente. Evalúa según tu criterio clínico y tu protocolo.</p>
+{% endblock %}
+{% block action %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{ ficha_url }}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Abrir la ficha</a></td></tr></table>
+{% endblock %}

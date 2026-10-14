@@ -6,6 +6,7 @@ import { TrustSection } from "@/components/sections/trust"
 import { ProblemSection } from "@/components/sections/problem"
 import { FeaturesBentoSection } from "@/components/sections/features-bento"
 import { HowItWorksSection } from "@/components/sections/how-it-works"
+import { ClinicalFollowupSection } from "@/components/sections/clinical-followup"
 import { BoletasSection } from "@/components/sections/boletas"
 import { VoiceBiometricsSection } from "@/components/sections/voice-biometrics"
 import { SecuritySection } from "@/components/sections/security"
@@ -23,6 +24,7 @@ export default function Home() {
         <TrustSection />
         <ProblemSection />
         <FeaturesBentoSection />
+        <ClinicalFollowupSection />
         <HowItWorksSection />
         <BoletasSection />
         <VoiceBiometricsSection />
