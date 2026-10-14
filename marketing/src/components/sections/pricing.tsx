@@ -5,7 +5,7 @@ import { motion } from "motion/react"
 import { Check, Clock, Receipt, Sparkles, Stethoscope } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SectionHeading } from "@/components/sections/section-heading"
-import { PLUS_URL, ROUTES } from "@/lib/config"
+import { ROUTES } from "@/lib/config"
 import { cn } from "@/lib/utils"
 
 const FUNCIONES_ESTANDAR = [
@@ -160,10 +160,10 @@ export function PricingSection() {
 
             <div className="mt-8">
               <Button asChild size="lg" className="w-full">
-                <a href={PLUS_URL || ROUTES.register} data-plan="plus">Suscribirme a Plus</a>
+                <a href={ROUTES.register} data-plan="plus">Suscribirme a Plus</a>
               </Button>
               <p className="mt-2.5 text-center text-[11px] text-muted-foreground leading-snug">
-                Pagas en Mercado Pago (primer cobro al suscribirte) y, al volver, inicias sesión o creas tu cuenta y Plus queda activo.
+                Entras a Psiconex e ingresas la tarjeta ahí. El primer cobro es al confirmar.
               </p>
               <p className="mt-2 text-center text-xs">
                 <Link href={ROUTES.register} className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" data-meta-lead>

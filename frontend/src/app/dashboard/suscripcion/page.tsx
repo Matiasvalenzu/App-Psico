@@ -17,7 +17,6 @@ import {
   RefreshCw,
   Stethoscope,
   Receipt,
-  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CardCheckoutModal from "@/components/suscripcion/CardCheckoutModal";
@@ -82,7 +81,19 @@ export default function SuscripcionPage() {
   useEffect(() => {
     if (loading || searchParams.get("activar") !== "plus" || !subData?.plan_plus_disponible) return;
     document.getElementById("plan-plus")?.scrollIntoView({ block: "center" });
-    if ((subData.estado || user?.suscripcion_estado) === "trial") setConfirmPlusPrueba(true);
+    const estado = subData.estado || user?.suscripcion_estado;
+    if (estado === "activa" && subData.plan === "estandar" && subData.mp_preapproval_id) {
+      setConfirmCambio(true);
+      return;
+    }
+    if (estado === "trial") {
+      setConfirmPlusPrueba(true);
+      return;
+    }
+    if (estado !== "activa") {
+      setPlanModal("plus");
+      setModalOpen(true);
+    }
   }, [loading, searchParams, subData, user]);
 
   const handleCancelSubscription = async () => {
@@ -144,7 +155,6 @@ export default function SuscripcionPage() {
   const isCancelled = estado === "cancelada";
 
   const plusDisponible = Boolean(subData?.plan_plus_disponible);
-  const plusUrl: string = subData?.plus_url || "";
   const planes: Record<string, { nombre: string; monto: number }> =
     subData?.planes || { estandar: { nombre: "Plan Estándar", monto: 4990 } };
   const planActual: string = subData?.plan || "estandar";
@@ -216,18 +226,10 @@ export default function SuscripcionPage() {
         </Button>
       );
     }
-    if (!plusUrl) {
-      return (
-        <Button onClick={() => abrirModal("plus")} className="w-full font-semibold shadow-lg shadow-primary/20">
-          <CreditCard className="mr-2 h-4 w-4" />
-          Suscribirme a Plus
-        </Button>
-      );
-    }
-    // El plan Plus de Mercado Pago no tiene prueba: cobra al suscribirse y la prueba en curso se pierde.
     if (isTrial && diasRestantes > 0 && !confirmPlusPrueba) {
       return (
         <Button onClick={() => setConfirmPlusPrueba(true)} className="w-full font-semibold shadow-lg shadow-primary/20">
+          <CreditCard className="mr-2 h-4 w-4" />
           Suscribirme a Plus
         </Button>
       );
@@ -239,8 +241,8 @@ export default function SuscripcionPage() {
             El cobro de {pesos(montoPlus)} CLP parte de inmediato y {diasRestantes === 1 ? "el día de prueba que te queda se pierde" : `los ${diasRestantes} días de prueba que te quedan se pierden`}.
           </p>
           <div className="flex items-center gap-2">
-            <Button asChild size="sm" className="text-xs h-8">
-              <a href={plusUrl} data-plan="plus">Ir a pagar</a>
+            <Button size="sm" className="text-xs h-8" onClick={() => abrirModal("plus")}>
+              Ir a pagar
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmPlusPrueba(false)} className="text-xs h-8">
               Volver
@@ -251,14 +253,12 @@ export default function SuscripcionPage() {
     }
     return (
       <div className="space-y-2">
-        <Button asChild className="w-full font-semibold shadow-lg shadow-primary/20">
-          <a href={plusUrl} data-plan="plus">
-            Suscribirme a Plus
-            <ExternalLink className="ml-2 h-4 w-4" />
-          </a>
+        <Button onClick={() => abrirModal("plus")} className="w-full font-semibold shadow-lg shadow-primary/20">
+          <CreditCard className="mr-2 h-4 w-4" />
+          Suscribirme a Plus
         </Button>
         <p className="text-[11px] text-center text-muted-foreground leading-tight">
-          Pagas en Mercado Pago (el primer cobro es al suscribirte) y, al volver, Plus queda activo en esta cuenta.
+          Ingresas la tarjeta aquí. El primer cobro es al confirmar y Plus queda activo en esta cuenta.
         </p>
       </div>
     );

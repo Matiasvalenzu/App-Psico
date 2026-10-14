@@ -35,6 +35,23 @@ def _asignar_plan(suscripcion, plan):
         suscripcion.plan = plan
 
 
+def _plan_mp_id(plan):
+    if plan == "plus":
+        return getattr(settings, "MERCADOPAGO_PLUS_PLAN_ID", "") or ""
+    return getattr(settings, "MERCADOPAGO_PLAN_ID", "") or ""
+
+
+def _cancelar_preapproval_anterior(sdk, suscripcion, nuevo_id):
+    """Si ya pagaba otra suscripción, se cancela para no cobrar las dos."""
+    anterior = suscripcion.mp_preapproval_id
+    if not anterior or anterior == nuevo_id or suscripcion.estado != "activa":
+        return
+    try:
+        sdk.preapproval().update(anterior, {"status": "cancelled"})
+    except Exception as e:
+        logger.warning(f"No se pudo cancelar el preapproval anterior de user={suscripcion.user_id}: {e}")
+
+
 class SuscripcionEstadoView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -121,9 +138,10 @@ class ContratarCardView(APIView):
             and suscripcion.fin_prueba > ahora
         )
 
-        if is_trial_vigente:
+        if is_trial_vigente and plan != "plus":
             # ISO 8601 con zona horaria UTC para Mercado Pago
             # Mercado Pago requiere formato YYYY-MM-DDTHH:MM:SS.000Z
+            # Plus no tiene prueba: el cobro parte de inmediato aunque el trial siga vigente.
             start_date_dt = suscripcion.fin_prueba
             start_date_str = start_date_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             proximo_cobro_dt = start_date_dt
@@ -151,9 +169,8 @@ class ContratarCardView(APIView):
             "status": "authorized",
         }
 
-        # Si existe un plan_id configurado, vincularlo opcionalmente (corresponde al Plan Estándar)
-        plan_id = getattr(settings, "MERCADOPAGO_PLAN_ID", "")
-        if plan_id and plan == "estandar":
+        plan_id = _plan_mp_id(plan)
+        if plan_id:
             preapproval_data["preapproval_plan_id"] = plan_id
 
         try:
@@ -173,6 +190,7 @@ class ContratarCardView(APIView):
 
         if resp_status in (200, 201):
             preapproval_id = resp_data.get("id")
+            _cancelar_preapproval_anterior(sdk, suscripcion, preapproval_id)
             suscripcion.estado = "activa"
             _asignar_plan(suscripcion, plan)
             suscripcion.mp_preapproval_id = preapproval_id
@@ -330,13 +348,7 @@ class VincularPreapprovalView(APIView):
             user=request.user,
             defaults={"estado": "trial", "fin_prueba": timezone.now() + timedelta(days=14)},
         )
-        anterior = suscripcion.mp_preapproval_id
-        if anterior and anterior != preapproval_id and suscripcion.estado == "activa":
-            # Ya pagaba con otra suscripción (p. ej. Estándar con tarjeta): se cancela para no cobrar dos veces.
-            try:
-                sdk.preapproval().update(anterior, {"status": "cancelled"})
-            except Exception as e:
-                logger.warning(f"No se pudo cancelar el preapproval anterior de user={request.user.id}: {e}")
+        _cancelar_preapproval_anterior(sdk, suscripcion, preapproval_id)
 
         if data.get("status") == "authorized":
             suscripcion.estado = "activa"

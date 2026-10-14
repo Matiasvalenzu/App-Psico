@@ -180,7 +180,7 @@ function DashboardInner({
   const [suscripcionEstado, setSuscripcionEstado] = useState<string | null>(null);
   const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
   const [fechaPurga, setFechaPurga] = useState<string | null>(null);
-  const [plusUrl, setPlusUrl] = useState("");
+  const [plusDisponible, setPlusUrl] = useState(false);
   const [boletasHabilitadas, setBoletasHabilitadas] = useState(false);
   const [upsellBoletas, setUpsellBoletas] = useState(false);
   const [usuario, setUsuario] = useState<{ nombre: string; email: string } | null>(null);
@@ -232,7 +232,7 @@ function DashboardInner({
 
         // Suscripción inactiva: la cuenta queda en solo lectura (el backend bloquea escrituras)
         setFechaPurga(user.solo_lectura ? user.fecha_purga || null : null);
-        setPlusUrl(user.plan_plus_disponible ? user.plus_url || "" : "");
+        setPlusUrl(Boolean(user.plan_plus_disponible));
         setBoletasHabilitadas(Boolean(user.boletas_habilitadas));
 
         setReady(true);
@@ -507,10 +507,10 @@ function DashboardInner({
               <Link href="/dashboard/suscripcion" className="underline underline-offset-2 hover:no-underline">
                 Reactivar plan
               </Link>
-              {plusUrl && (
-                <a href={plusUrl} className="underline underline-offset-2 hover:no-underline">
+              {plusDisponible && (
+                <Link href="/dashboard/suscripcion?activar=plus" className="underline underline-offset-2 hover:no-underline">
                   Suscribirme a Plus
-                </a>
+                </Link>
               )}
             </span>
           </div>

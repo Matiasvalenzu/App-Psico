@@ -241,6 +241,7 @@ export default function CardCheckoutModal({
   };
 
   const formattedFinPrueba = finPrueba ? formatDateCL(finPrueba) : null;
+  const difiereCobro = isTrial && plan !== "plus" && Boolean(formattedFinPrueba);
 
   return (
     <ClientPortal>
@@ -295,7 +296,7 @@ export default function CardCheckoutModal({
               ¡Suscripción Activada!
             </h2>
             <p className="mt-2 text-sm text-muted-foreground max-w-sm leading-relaxed">
-              {isTrial && formattedFinPrueba
+              {difiereCobro
                 ? `Tu tarjeta ha quedado respaldada con éxito. Tu periodo de prueba gratuito continúa activo y tu primer cobro de ${precio} CLP se efectuará el ${formattedFinPrueba}.`
                 : "Tu plan ha sido activado correctamente. Ya cuentas con acceso completo e ininterrumpido a todas las herramientas de Psiconex."}
             </p>
@@ -328,7 +329,7 @@ export default function CardCheckoutModal({
                     <span className="text-lg font-bold tracking-tight text-foreground">Psiconex</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
                       <Sparkles className="h-3 w-3" />
-                      Plan Pro
+                       {nombre}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">Pago procesado por Mercado Pago</p>
@@ -362,7 +363,7 @@ export default function CardCheckoutModal({
             </div>
 
             {/* Resumen del Plan / Aviso de Cobro Diferido */}
-            {isTrial && formattedFinPrueba ? (
+            {difiereCobro ? (
               <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/5 via-primary/[0.02] to-transparent p-4 text-xs space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
@@ -632,7 +633,7 @@ export default function CardCheckoutModal({
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Validando con Mercado Pago...
                     </span>
-                  ) : isTrial ? (
+                  ) : difiereCobro ? (
                     <span className="inline-flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4" />
                       Confirmar y asegurar mi plan ($0 hoy)
@@ -640,7 +641,7 @@ export default function CardCheckoutModal({
                   ) : (
                     <span className="inline-flex items-center gap-2">
                       <Lock className="h-4 w-4" />
-                      Pagar {precio} CLP y reactivar plan
+                      {plan === "plus" ? `Pagar ${precio} CLP` : `Pagar ${precio} CLP y reactivar plan`}
                     </span>
                   )}
                 </Button>
