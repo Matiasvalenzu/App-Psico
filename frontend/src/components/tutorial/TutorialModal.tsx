@@ -30,7 +30,6 @@ export default function TutorialModal() {
   const { view, openTutorial, dismissPrompt, rememberPrompt, closeOverlay } = useTutorial();
   const [mounted, setMounted] = useState(false);
   const [dontShow, setDontShow] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const promptSlug = view.kind === "prompt" ? view.slug : view.kind === "welcome" ? "bienvenida" : null;
 
@@ -54,17 +53,6 @@ export default function TutorialModal() {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [view, dontShow, dismissPrompt, closeOverlay]);
-
-  useEffect(() => {
-    if (view.kind !== "prompt") return;
-    const onPointer = (event: MouseEvent) => {
-      if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
-        dismissPrompt(dontShow);
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    return () => document.removeEventListener("mousedown", onPointer);
-  }, [view, dontShow, dismissPrompt]);
 
   if (!mounted || view.kind === "closed") return null;
 
@@ -124,14 +112,13 @@ export default function TutorialModal() {
   const video = tutorialPorSlug(view.kind === "player" || view.kind === "prompt" || view.kind === "welcome" ? view.kind === "welcome" ? "bienvenida" : view.slug : null);
   if (!video) return null;
 
-  if (view.kind === "prompt") {
+  if (view.kind === "prompt" || view.kind === "player") {
     return createPortal(
       <div
-        ref={cardRef}
         role="dialog"
         aria-modal="false"
         aria-labelledby="tutorial-prompt-titulo"
-        className="fixed bottom-4 right-4 z-[100000] w-[min(100%-2rem,22rem)] rounded-2xl border border-border/80 bg-card p-3 shadow-2xl"
+        className="fixed bottom-4 right-4 z-[40] w-[min(100%-2rem,22rem)] rounded-2xl border border-border/80 bg-card p-3 shadow-2xl"
       >
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>
@@ -142,7 +129,7 @@ export default function TutorialModal() {
           </div>
           <button
             type="button"
-            onClick={() => dismissPrompt(dontShow)}
+            onClick={() => (view.kind === "prompt" ? dismissPrompt(dontShow) : closeOverlay())}
             className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Cerrar tutorial"
           >
@@ -166,7 +153,7 @@ export default function TutorialModal() {
         <div className="mt-2 flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => dismissPrompt(dontShow)}
+            onClick={() => (view.kind === "prompt" ? dismissPrompt(dontShow) : closeOverlay())}
             className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             Ahora no

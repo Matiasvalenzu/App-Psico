@@ -127,7 +127,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   }, [persistSeen]);
 
   useEffect(() => {
-    if (!ready || view.kind === "welcome" || view.kind === "player" || view.kind === "catalog") return;
+    if (!ready || view.kind === "welcome" || view.kind === "player" || view.kind === "catalog" || view.kind === "prompt") return;
     const slug = sectionHint ?? tutorialForPath(pathname);
     if (view.kind === "prompt" && view.slug === slug) return;
     if (!slug || seen[slug] || skippedRef.current.has(slug)) {
