@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, type KeyboardEvent } from "react"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { Check, Clock, Receipt, Sparkles, Stethoscope } from "lucide-react"
@@ -16,7 +17,7 @@ const FUNCIONES_ESTANDAR = [
   "Chat IA independiente por paciente",
   "Agenda con Google Calendar",
   "Test de Creencias Ellis y Rueda de la Vida",
-  "Registro de sesiones online (Meet y Zoom)",
+  "Videollamada propia de Psiconex (también Meet y Zoom)",
   "Enlace privado para reserva de horas",
   "Recordatorios por correo a tus pacientes",
   "Exportación completa de tus datos",
@@ -68,7 +69,16 @@ function ListaFunciones({ items, destacada }: { items: string[]; destacada?: boo
   )
 }
 
+function seleccionarConTeclado(event: KeyboardEvent, elegir: () => void) {
+  if (event.target !== event.currentTarget) return
+  if (event.key !== "Enter" && event.key !== " ") return
+  event.preventDefault()
+  elegir()
+}
+
 export function PricingSection() {
+  const [seleccionado, setSeleccionado] = useState<"estandar" | "plus">("plus")
+
   return (
     <section
       id="precios"
@@ -91,11 +101,27 @@ export function PricingSection() {
           description="Sin permanencia. Prueba gratis 14 días sin tarjeta o suscríbete directo a Plus, y cancela cuando quieras."
         />
 
-        <div className="mx-auto mt-20 grid max-w-5xl gap-6 lg:grid-cols-2 lg:items-stretch">
-          {/* Estándar */}
-          <motion.div {...animacion(0)} className="card-premium relative flex flex-col overflow-hidden rounded-3xl p-8">
-            <h3 className="text-lg font-semibold tracking-tight text-foreground">Estándar</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Todo lo clínico de tu consulta.</p>
+        <div
+          role="radiogroup"
+          aria-label="Planes"
+          className="mx-auto mt-20 grid max-w-5xl items-stretch gap-6 lg:grid-cols-2"
+        >
+          <motion.div
+            {...animacion(0)}
+            role="radio"
+            aria-checked={seleccionado === "estandar"}
+            tabIndex={0}
+            onClick={() => setSeleccionado("estandar")}
+            onKeyDown={(event) => seleccionarConTeclado(event, () => setSeleccionado("estandar"))}
+            className={cn(
+              "relative flex h-full cursor-pointer flex-col rounded-3xl p-8 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              seleccionado === "estandar" ? "card-premium-featured" : "card-premium"
+            )}
+          >
+            <div className="min-h-[4.75rem]">
+              <h3 className="text-lg font-semibold tracking-tight text-foreground">Estándar</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Todo lo clínico de tu consulta.</p>
+            </div>
             <div className="mt-6 flex items-baseline gap-2">
               <span className="text-5xl font-bold tracking-tight text-foreground">$4.990</span>
               <span className="text-sm text-muted-foreground">CLP / mes</span>
@@ -111,28 +137,38 @@ export function PricingSection() {
               <Button asChild size="lg" variant="outline" className="w-full">
                 <Link href={ROUTES.register} data-meta-lead>Probar 14 días gratis</Link>
               </Button>
-              <p className="mt-2.5 text-center text-[11px] text-muted-foreground leading-snug">
-                14 días gratis sin tarjeta. Después de la prueba: $4.990/mes. Sin permanencia. Cancela cuando quieras.
-              </p>
+              <div className="mt-2.5 min-h-[4.75rem] text-center">
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  14 días gratis sin tarjeta. Después de la prueba: $4.990/mes. Sin permanencia. Cancela cuando quieras.
+                </p>
+              </div>
             </div>
           </motion.div>
 
-          {/* Plus */}
-          <motion.div {...animacion(1)} className="card-premium-featured relative flex flex-col rounded-3xl p-8 lg:-mt-6 lg:mb-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold tracking-tight text-foreground">Plus</h3>
-                <p className="mt-1 text-sm font-medium text-foreground/90">
-                  Tu consulta clínica y administrativa en un solo lugar
-                </p>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full gradient-primary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white shadow-lg shadow-primary/40">
-                <Sparkles className="h-3 w-3" aria-hidden="true" />
-                Recomendado
-              </span>
+          <motion.div
+            {...animacion(1)}
+            role="radio"
+            aria-checked={seleccionado === "plus"}
+            tabIndex={0}
+            onClick={() => setSeleccionado("plus")}
+            onKeyDown={(event) => seleccionarConTeclado(event, () => setSeleccionado("plus"))}
+            className={cn(
+              "relative flex h-full cursor-pointer flex-col rounded-3xl p-8 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              seleccionado === "plus" ? "card-premium-featured" : "card-premium"
+            )}
+          >
+            <span className="absolute right-8 top-8 inline-flex items-center gap-1 rounded-full gradient-primary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white shadow-lg shadow-primary/40">
+              <Sparkles className="h-3 w-3" aria-hidden="true" />
+              Recomendado
+            </span>
+            <div className="min-h-[4.75rem] pr-28">
+              <h3 className="text-lg font-semibold tracking-tight text-foreground">Plus</h3>
+              <p className="mt-1 text-sm font-medium text-foreground/90">
+                Tu consulta clínica y administrativa en un solo lugar
+              </p>
             </div>
             <div className="mt-6 flex items-baseline gap-2">
-              <span className="text-5xl font-bold tracking-tight gradient-primary-text">$9.990</span>
+              <span className={cn("text-5xl font-bold tracking-tight", seleccionado === "plus" && "gradient-primary-text")}>$9.990</span>
               <span className="text-sm text-muted-foreground">CLP / mes</span>
             </div>
 
@@ -151,8 +187,8 @@ export function PricingSection() {
                   <Receipt className="h-4 w-4 text-primary" aria-hidden="true" />
                   Administración y cobros
                 </h4>
-                <ListaFunciones items={FUNCIONES_PLUS_ADMINISTRACION} destacada />
-                <p className="mt-4 text-xs text-muted-foreground leading-snug">
+                <ListaFunciones items={FUNCIONES_PLUS_ADMINISTRACION} destacada={seleccionado === "plus"} />
+                <p className="mt-4 text-xs leading-snug text-muted-foreground">
                   Para emitir boletas autorizas a Psiconex en el SII; revisamos esa autorización antes de activar la emisión.
                 </p>
               </div>
@@ -162,14 +198,16 @@ export function PricingSection() {
               <Button asChild size="lg" className="w-full">
                 <a href={ROUTES.register} data-plan="plus">Suscribirme a Plus</a>
               </Button>
-              <p className="mt-2.5 text-center text-[11px] text-muted-foreground leading-snug">
-                Entras a Psiconex e ingresas la tarjeta ahí. El primer cobro es al confirmar.
-              </p>
-              <p className="mt-2 text-center text-xs">
-                <Link href={ROUTES.register} className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" data-meta-lead>
-                  ¿Prefieres probar primero? 14 días gratis
-                </Link>
-              </p>
+              <div className="mt-2.5 min-h-[4.75rem] text-center">
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Entras a Psiconex e ingresas la tarjeta ahí. El primer cobro es al confirmar.
+                </p>
+                <p className="mt-2 text-xs">
+                  <Link href={ROUTES.register} className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" data-meta-lead>
+                    ¿Prefieres probar primero? 14 días gratis
+                  </Link>
+                </p>
+              </div>
             </div>
           </motion.div>
         </div>

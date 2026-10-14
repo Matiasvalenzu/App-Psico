@@ -36,7 +36,7 @@ export function HeroSection() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
+        <div className="grid items-stretch gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
           {/* Left: copy + CTAs */}
           <div className="text-center lg:text-left">
             <motion.div
@@ -128,10 +128,9 @@ export function HeroSection() {
             initial={false}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative"
+            className="relative min-h-0 lg:h-full"
           >
-            <div className="absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-br from-primary/20 via-transparent to-[hsl(280_75%_64%)/0.15] blur-2xl" />
-            <HeroVideoPreview />
+            <HeroVideoPreview className="lg:absolute lg:inset-0" />
           </motion.div>
         </div>
       </div>

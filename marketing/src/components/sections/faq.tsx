@@ -27,8 +27,8 @@ const FAQS = [
     a: "Puedes subir documentos en PDF, Word o TXT a la ficha de cada paciente para que queden con su historial. Si necesitas ayuda con una migración, escríbenos y lo conversamos.",
   },
   {
-    q: "¿Funciona en sesiones por Meet o Zoom?",
-    a: "Sí, de dos formas. Desde el navegador puedes grabar el audio de tu videollamada compartiendo la pestaña o la pantalla (Chrome o Edge, en computador). O puedes usar la extensión de Chrome opcional, que capta los subtítulos de Meet o Zoom y los incorpora al historial del paciente. Recuerda informar al paciente y contar con su consentimiento.",
+    q: "¿Puedo hacer sesiones online?",
+    a: "Sí. La vía principal es la videollamada propia de Psiconex: creas la sala, compartes el enlace y el paciente se une desde el navegador, sin instalar nada. La llamada graba cada voz en una pista aparte y, al cerrarla, el audio se transcribe y queda en el historial. Si prefieres Meet o Zoom, puedes grabar el audio compartiendo la pestaña o la pantalla (Chrome o Edge, en computador) o usar la extensión de Chrome, que capta los subtítulos. Recuerda informar al paciente y contar con su consentimiento.",
   },
   {
     q: "¿Qué pasa si cancelo? ¿Me llevo mis datos?",
