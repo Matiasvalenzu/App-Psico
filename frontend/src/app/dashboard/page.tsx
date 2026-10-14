@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ImportarPacientes from "@/components/pacientes/ImportarPacientes";
 import ResumenCobros from "@/components/pacientes/ResumenCobros";
 import { useTutorial } from "@/context/TutorialContext";
 
@@ -562,6 +563,7 @@ export default function DashboardPage() {
             <PlayCircle className="h-4 w-4" />
             Tutorial
           </Button>
+          <ImportarPacientes onDone={loadPacientes} />
           <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
             <UserPlus className="h-4 w-4" />
             Nuevo paciente

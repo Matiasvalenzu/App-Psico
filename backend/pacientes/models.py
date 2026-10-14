@@ -95,6 +95,23 @@ class Paciente(models.Model):
         return f"{self.nombre} {self.apellido}"
 
 
+class ImportacionPacientes(models.Model):
+    """Registro de una importación. No guarda el archivo ni notas clínicas."""
+
+    psicologo = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="importaciones_pacientes"
+    )
+    creados = models.PositiveIntegerField(default=0)
+    actualizados = models.PositiveIntegerField(default=0)
+    omitidos = models.PositiveIntegerField(default=0)
+    snapshot = models.JSONField(default=dict)
+    deshecha_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class ConsentimientoInformado(models.Model):
     class Estado(models.TextChoices):
         BORRADOR = "BORRADOR", "Borrador"
