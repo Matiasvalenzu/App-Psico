@@ -94,22 +94,22 @@ export function PricingSection() {
           eyebrow="Precios"
           title={
             <>
-              Elige el plan{" "}
-              <span className="gradient-primary-text">para tu consulta</span>
+              Precio en pesos,{" "}
+              <span className="gradient-primary-text">sin sorpresas.</span>
             </>
           }
-          description="Sin permanencia. Prueba gratis 14 días sin tarjeta o suscríbete directo a Plus, y cancela cuando quieras."
+          description="Estándar a $4.990 y Plus a $9.990 al mes; Plus incluye tus boletas de honorarios. Sin cobro por paciente."
         />
 
         <div
-          role="radiogroup"
-          aria-label="Planes"
+          role="group"
+          aria-label="Elige un plan"
           className="mx-auto mt-20 grid max-w-5xl items-stretch gap-6 lg:grid-cols-2"
         >
           <motion.div
             {...animacion(0)}
-            role="radio"
-            aria-checked={seleccionado === "estandar"}
+            role="button"
+            aria-pressed={seleccionado === "estandar"}
             tabIndex={0}
             onClick={() => setSeleccionado("estandar")}
             onKeyDown={(event) => seleccionarConTeclado(event, () => setSeleccionado("estandar"))}
@@ -147,8 +147,8 @@ export function PricingSection() {
 
           <motion.div
             {...animacion(1)}
-            role="radio"
-            aria-checked={seleccionado === "plus"}
+            role="button"
+            aria-pressed={seleccionado === "plus"}
             tabIndex={0}
             onClick={() => setSeleccionado("plus")}
             onKeyDown={(event) => seleccionarConTeclado(event, () => setSeleccionado("plus"))}
@@ -157,11 +157,11 @@ export function PricingSection() {
               seleccionado === "plus" ? "card-premium-featured" : "card-premium"
             )}
           >
-            <span className="absolute right-8 top-8 inline-flex items-center gap-1 rounded-full gradient-primary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white shadow-lg shadow-primary/40">
+            <span className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 whitespace-nowrap items-center gap-1 rounded-full gradient-primary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white shadow-lg shadow-primary/40">
               <Sparkles className="h-3 w-3" aria-hidden="true" />
               Recomendado
             </span>
-            <div className="min-h-[4.75rem] pr-28">
+            <div className="min-h-[4.75rem]">
               <h3 className="text-lg font-semibold tracking-tight text-foreground">Plus</h3>
               <p className="mt-1 text-sm font-medium text-foreground/90">
                 Tu consulta clínica y administrativa en un solo lugar
