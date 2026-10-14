@@ -69,6 +69,12 @@ class ConsentimientoPapelTests(TestCase):
         self.paciente.refresh_from_db()
         self.assertIsNone(self.paciente.consentimiento_papel_fecha)
 
+    def test_lista_expone_el_papel(self):
+        self.client.post(self.url, {"fecha": "2026-01-15"}, format="json")
+        fila = self.client.get("/api/pacientes/").data["results"][0]
+        self.assertEqual(fila["consentimiento_papel_fecha"], "2026-01-15")
+        self.assertIsNone(fila["consentimiento_estado"])
+
     def test_paciente_ajeno_404(self):
         otro = User.objects.create_user(username="otro_cons", email="o@test.com", password="x")
         self.client.force_authenticate(user=otro)

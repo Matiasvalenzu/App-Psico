@@ -66,7 +66,17 @@ export interface Cobro {
   anulacion_solicitada_at: string | null;
   ultima_emision: EmisionBHE | null;
   receptor_desactualizado: boolean;
+  envio?: {
+    puede_pdf: boolean;
+    tiene_telefono: boolean;
+    email: string;
+    ultimo_correo: { enviado_at: string; usuario: string; destinatario: string } | null;
+  };
   notas: string;
+}
+
+export function etiquetaCobros(n: number) {
+  return n === 1 ? "1 cobro" : `${n} cobros`;
 }
 
 export const MEDIOS_PAGO = { EFECTIVO: "Efectivo", TRANSFERENCIA: "Transferencia", OTRO: "Otro" } as const;

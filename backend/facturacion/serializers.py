@@ -5,6 +5,7 @@ from pacientes.documentos import TIPO_RUT, formatear_documento, normalizar_docum
 from pacientes.models import Paciente
 from sesiones.models import Sesion
 
+from .envio import datos_envio
 from .models import Cobro, DelegacionSII, EmisionBHE
 from .services import anulable_hasta, calcular_retencion, hoy_chile, plazo_anulacion_vencido, validar_glosa
 
@@ -66,6 +67,7 @@ class CobroSerializer(serializers.ModelSerializer):
     ultima_emision = serializers.SerializerMethodField()
     receptor_desactualizado = serializers.SerializerMethodField()
     ultimo_cambio_pago = serializers.SerializerMethodField()
+    envio = serializers.SerializerMethodField()
 
     class Meta:
         model = Cobro
@@ -74,7 +76,8 @@ class CobroSerializer(serializers.ModelSerializer):
             "medio_pago", "estado_pago", "pagado_el", "ultimo_cambio_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulable_hasta",
-            "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "receptor_desactualizado", "notas",
+            "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "receptor_desactualizado",
+            "envio", "notas",
             "created_at", "updated_at",
         ]
         read_only_fields = [
@@ -99,6 +102,9 @@ class CobroSerializer(serializers.ModelSerializer):
 
     def get_receptor_desactualizado(self, obj):
         return bool(receptor_desde_ficha(obj))
+
+    def get_envio(self, obj):
+        return datos_envio(obj)
 
     def get_ultimo_cambio_pago(self, obj):
         # Lista precargada por la vista, de la más reciente a la más antigua.

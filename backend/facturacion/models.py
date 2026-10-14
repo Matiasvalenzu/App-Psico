@@ -119,6 +119,23 @@ class CambioEstadoPago(models.Model):
         return f"Cobro #{self.cobro_id}: {self.estado_anterior} → {self.estado_nuevo}"
 
 
+class EnvioBoleta(models.Model):
+    """Correo con el PDF de una boleta, disparado por el psicólogo. WhatsApp no pasa por aquí."""
+
+    cobro = models.ForeignKey(Cobro, on_delete=models.CASCADE, related_name="envios")
+    destinatario = models.EmailField()
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    enviado_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-enviado_at", "-id"]
+
+    def __str__(self):
+        return f"Cobro #{self.cobro_id} → {self.destinatario}"
+
+
 class DelegacionSII(models.Model):
     """Autorización que el psicólogo da en el SII a la cuenta de Psiconex para emitir sus boletas.
 

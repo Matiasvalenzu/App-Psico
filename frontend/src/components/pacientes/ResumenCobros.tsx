@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { apiFetch, getCurrentUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatCLP, hoyISO } from "@/app/dashboard/pacientes/[id]/_components/cobros";
+import { etiquetaCobros, formatCLP, hoyISO } from "@/app/dashboard/pacientes/[id]/_components/cobros";
 
 interface Resumen {
   mes: string;
@@ -88,12 +88,12 @@ export default function ResumenCobros() {
         <div className="rounded-lg bg-amber-50 px-4 py-3 dark:bg-amber-950/30">
           <p className="text-xs text-muted-foreground">Pendiente del mes</p>
           <p className="text-xl font-semibold tabular-nums">{formatCLP(resumen.pendiente_mes.total)}</p>
-          <p className="text-xs text-muted-foreground">{resumen.pendiente_mes.cantidad} cobros</p>
+          <p className="text-xs text-muted-foreground">{etiquetaCobros(resumen.pendiente_mes.cantidad)}</p>
         </div>
         <div className="rounded-lg bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
           <p className="text-xs text-muted-foreground">Pagado en el mes</p>
           <p className="text-xl font-semibold tabular-nums">{formatCLP(resumen.pagado_mes.total)}</p>
-          <p className="text-xs text-muted-foreground">{resumen.pagado_mes.cantidad} cobros</p>
+          <p className="text-xs text-muted-foreground">{etiquetaCobros(resumen.pagado_mes.cantidad)}</p>
         </div>
         <div className="rounded-lg bg-muted/50 px-4 py-3 lg:col-span-2">
           <p className="mb-1 text-xs text-muted-foreground">
@@ -109,7 +109,7 @@ export default function ResumenCobros() {
                     {d.nombre || "Paciente"}
                   </Link>
                   <span className="shrink-0 tabular-nums text-muted-foreground">
-                    {formatCLP(d.total)} ({d.cantidad})
+                    {formatCLP(d.total)} · {etiquetaCobros(d.cantidad)}
                   </span>
                 </li>
               ))}

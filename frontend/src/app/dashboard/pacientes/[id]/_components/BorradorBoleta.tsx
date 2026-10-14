@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ESTADOS_BOLETA, formatCLP, hoyISO, MODOS_BOLETA, receptorIncompleto, type Cobro, type DelegacionBHE } from "./cobros";
+import EnvioBoleta from "./EnvioBoleta";
 import EmisionSii, { emitidaPorPsiconex } from "./EmisionSii";
 import { getApiErrorMessage } from "./utils";
 import { PagoCobro } from "./PagoCobro";
@@ -54,6 +55,7 @@ export default function BorradorBoleta({
   onChanged,
   onEdit,
   onDeleted,
+  onCompletarFicha,
 }: {
   cobro: Cobro | null;
   delegacion: DelegacionBHE | null;
@@ -62,6 +64,7 @@ export default function BorradorBoleta({
   onChanged: (cobro: Cobro) => void;
   onEdit: (cobro: Cobro) => void;
   onDeleted: (id: number) => void;
+  onCompletarFicha?: () => void;
 }) {
   const [folio, setFolio] = useState("");
   const [fechaEmision, setFechaEmision] = useState(hoyISO());
@@ -169,7 +172,12 @@ export default function BorradorBoleta({
               soloLectura={soloLectura}
               onChanged={onChanged}
               onEdit={() => onEdit(actual)}
+              onCompletarFicha={onCompletarFicha}
             />
+          )}
+
+          {!porPsiconex && (
+            <EnvioBoleta cobro={actual} onChanged={onChanged} onCompletarFicha={onCompletarFicha} />
           )}
 
           {actual.estado_boleta === "PENDIENTE" && incompleto && (

@@ -11,7 +11,8 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import BorradorBoleta from "./BorradorBoleta";
 import CobroDialog from "./CobroDialog";
-import { chipBoleta, ESTADOS_PAGO, formatCLP, hoyISO, type Cobro, type DelegacionBHE } from "./cobros";
+import EnvioBoleta from "./EnvioBoleta";
+import { chipBoleta, ESTADOS_PAGO, etiquetaCobros, formatCLP, hoyISO, type Cobro, type DelegacionBHE } from "./cobros";
 import { MarcarPagadoDialog } from "./PagoCobro";
 import { fetchAllPages } from "./utils";
 
@@ -21,11 +22,13 @@ export default function CobrosPaciente({
   soloLectura,
   refreshKey = 0,
   onCobroChanged,
+  onCompletarFicha,
 }: {
   pacienteId: number;
   soloLectura: boolean;
   refreshKey?: number;
   onCobroChanged?: (cobro: Cobro) => void;
+  onCompletarFicha?: () => void;
 }) {
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +103,9 @@ export default function CobrosPaciente({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Cobros y boletas</h2>
-          <p className="text-sm text-muted-foreground">Registra el pago y prepara la boleta para emitirla en el SII.</p>
+          <p className="text-sm text-muted-foreground">
+            {loading ? "Registra el pago y prepara la boleta para emitirla en el SII." : `${etiquetaCobros(cobros.length)}. Registra el pago y prepara la boleta para emitirla en el SII.`}
+          </p>
         </div>
         {!soloLectura && (
           <Button onClick={abrirNuevo}>
@@ -230,9 +235,10 @@ export default function CobrosPaciente({
                             }}
                             onKeyDown={(e) => e.stopPropagation()}
                           >
-                            Marcar pagado
+                            Marcar como pagado
                           </Button>
                         )}
+                        <EnvioBoleta cobro={cobro} compact onChanged={reemplazar} onCompletarFicha={onCompletarFicha} />
                       </td>
                     )}
                   </tr>
@@ -261,6 +267,7 @@ export default function CobrosPaciente({
           setCobros((prev) => prev.filter((c) => c.id !== id));
           setSeleccionado(null);
         }}
+        onCompletarFicha={onCompletarFicha}
       />
 
       <MarcarPagadoDialog cobroId={marcarPagado} onClose={() => setMarcarPagado(null)} onDone={reemplazar} />

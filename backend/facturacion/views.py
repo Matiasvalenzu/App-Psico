@@ -23,7 +23,8 @@ from pacientes.models import Paciente
 from sesiones.models import Sesion
 
 from . import bhe
-from .models import CambioEstadoPago, Cobro, DelegacionSII
+from .envio import EnvioNoDisponible, enlace_whatsapp, enviar_boleta_correo
+from .models import CambioEstadoPago, Cobro, DelegacionSII, EnvioBoleta
 from .pagos import cambiar_estado_pago
 from .permissions import TienePlanPlus
 from .serializers import (
@@ -99,7 +100,11 @@ class CobroViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = (
             Cobro.objects.select_related("paciente")
-            .prefetch_related("emisiones", Prefetch("cambios_pago", CambioEstadoPago.objects.select_related("usuario")))
+            .prefetch_related(
+                "emisiones",
+                Prefetch("cambios_pago", CambioEstadoPago.objects.select_related("usuario")),
+                Prefetch("envios", EnvioBoleta.objects.select_related("enviado_por")),
+            )
             .filter(psicologo=self.request.user)
         )
         for param in ("paciente", "sesion", "estado_boleta", "estado_pago"):
@@ -302,6 +307,29 @@ class CobroViewSet(viewsets.ModelViewSet):
             bhe.cancelar_emision(cobro)
         except bhe.EmisionNoPermitida as exc:
             return _no_permitida(exc)
+        return self._cobro_actualizado(cobro)
+
+    @action(detail=True, methods=["get"], url_path="enlace-whatsapp")
+    def enlace_whatsapp_action(self, request, pk=None):
+        cobro = self.get_object()
+        try:
+            url = enlace_whatsapp(cobro, request)
+        except EnvioNoDisponible as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"url": url})
+
+    @action(detail=True, methods=["post"], url_path="enviar-correo")
+    def enviar_correo(self, request, pk=None):
+        if request.data.get("confirmado") is not True:
+            return Response(
+                {"detail": "Confirma el destinatario antes de enviar el correo.", "code": "confirmacion_requerida"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        cobro = self.get_object()
+        try:
+            enviar_boleta_correo(cobro, request.user)
+        except EnvioNoDisponible as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return self._cobro_actualizado(cobro)
 
     @action(detail=True, methods=["get"])

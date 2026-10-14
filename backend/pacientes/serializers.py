@@ -171,10 +171,11 @@ class PacienteListSerializer(serializers.ModelSerializer):
             "ultima_sesion",
             "proxima_cita",
             "consentimiento_estado",
+            "consentimiento_papel_fecha",
             "deuda_pendiente",
             "cobros_pendientes",
         ]
-        read_only_fields = ["id", "psicologo", "nombre_completo", "updated_at"]
+        read_only_fields = ["id", "psicologo", "nombre_completo", "updated_at", "consentimiento_papel_fecha"]
 
 
 class ConsentimientoInformadoSerializer(serializers.ModelSerializer):

@@ -1,0 +1,9 @@
+{% extends "notificaciones/email/base.html" %}
+{% block title %}Boleta de honorarios - Psiconex{% endblock %}
+{% block preheader %}{{ psychologist_name }} te envía la boleta N° {{ folio }} por {{ monto }}.{% endblock %}
+{% block eyebrow %}Boleta de honorarios{% endblock %}
+{% block heading %}Tu boleta N° {{ folio }}{% endblock %}
+{% block content %}
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Hola {{ patient_name }}, <strong>{{ psychologist_name }}</strong> te envía la boleta de honorarios N° <strong>{{ folio }}</strong> por <strong>{{ monto }}</strong>.</p>
+<p style="margin:0;color:#475569;font-size:14px;line-height:1.7;">El PDF va adjunto a este correo.</p>
+{% endblock %}

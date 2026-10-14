@@ -271,10 +271,18 @@ export default function PacienteDetailPage() {
   return (
     <div className="space-y-6">
       <div className="sticky top-14 z-[5] -mx-4 -mt-4 flex min-h-11 items-center justify-between gap-3 border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:top-16 md:-mx-6 md:-mt-6 md:px-6 lg:-mx-8 lg:-mt-8 lg:px-8">
-        <Breadcrumb
-          className="min-w-0"
-          items={[{ label: "Pacientes", href: "/dashboard" }, { label: paciente.nombre_completo }]}
-        />
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <Button variant="outline" size="sm" asChild className="shrink-0">
+            <Link href="/dashboard">
+              <ArrowLeft />
+              Volver a pacientes
+            </Link>
+          </Button>
+          <Breadcrumb
+            className="min-w-0"
+            items={[{ label: "Pacientes", href: "/dashboard" }, { label: paciente.nombre_completo }]}
+          />
+        </div>
         <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {paciente.edad ? <span className="hidden sm:inline">{paciente.edad} años</span> : null}
           {riesgo && <Badge variant="destructive">Riesgo</Badge>}
@@ -378,6 +386,7 @@ export default function PacienteDetailPage() {
             <TabsContent value="cobros">
               <CobrosPaciente pacienteId={Number(id)} soloLectura={!boletas.habilitadas} refreshKey={cobrosRefresh}
                 onCobroChanged={actualizarCobroSesion}
+                onCompletarFicha={() => setEditOpen(true)}
               />
             </TabsContent>
           )}

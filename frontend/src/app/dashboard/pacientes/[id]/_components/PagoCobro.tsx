@@ -78,7 +78,7 @@ function FechaPagoForm({
         </Button>
         <Button type="submit" size="sm" disabled={busy || !fecha}>
           {busy && <Loader2 className="animate-spin" />}
-          Marcar pagado
+          Marcar como pagado
         </Button>
       </div>
     </form>

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatCLP, MODOS_BOLETA, receptorListoParaSii, type Cobro, type DelegacionBHE, type EstadoEmision } from "./cobros";
 import { getApiErrorMessage } from "./utils";
+import EnvioBoleta from "./EnvioBoleta";
 
 const URL_SII = "https://www.sii.cl/servicios_online/";
 // Se consulta solo mientras la emisión está en cola o en curso; EMITIDA, FALLIDA, DESCONOCIDO o CANCELADA la cierran.
@@ -49,12 +50,14 @@ export default function EmisionSii({
   soloLectura,
   onChanged,
   onEdit,
+  onCompletarFicha,
 }: {
   cobro: Cobro;
   delegacion: DelegacionBHE | null;
   soloLectura: boolean;
   onChanged: (cobro: Cobro) => void;
   onEdit: () => void;
+  onCompletarFicha?: () => void;
 }) {
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -259,6 +262,7 @@ export default function EmisionSii({
                 Descargar PDF
               </Button>
             )}
+            <EnvioBoleta cobro={cobro} onChanged={onChanged} onCompletarFicha={onCompletarFicha} />
           </AlertDescription>
         </Alert>
 

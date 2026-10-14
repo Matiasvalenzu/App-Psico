@@ -35,7 +35,7 @@ def _common_context(context):
     }
 
 
-def send_branded_email(*, subject, recipient, template_name, context, reply_to=None):
+def send_branded_email(*, subject, recipient, template_name, context, reply_to=None, attachments=None):
     context = _common_context(context)
     text_body = render_to_string(
         f"notificaciones/email/{template_name}.txt", context
@@ -56,6 +56,8 @@ def send_branded_email(*, subject, recipient, template_name, context, reply_to=N
     logo.add_header("Content-Disposition", "inline", filename=LOGO_PATH.name)
     message.mixed_subtype = "related"
     message.attach(logo)
+    for adjunto in attachments or []:
+        message.attach(*adjunto)
     return message.send(fail_silently=False)
 
 

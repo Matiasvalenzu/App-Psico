@@ -81,6 +81,7 @@ interface Paciente {
   ultima_sesion?: string | null;
   proxima_cita?: string | null;
   consentimiento_estado?: string | null;
+  consentimiento_papel_fecha?: string | null;
   deuda_pendiente?: number;
   cobros_pendientes?: number;
 }
@@ -182,12 +183,13 @@ function getPatientStatus(value?: string) {
   );
 }
 
-const CONSENTIMIENTO_LABELS: Record<string, { label: string; className: string }> = {
-  FIRMADO: { label: "Firmado", className: "text-emerald-700 dark:text-emerald-400" },
-  ENVIADO: { label: "Pendiente de firma", className: "text-amber-700 dark:text-amber-400" },
-  BORRADOR: { label: "Borrador", className: "text-muted-foreground" },
-  RECHAZADO: { label: "Rechazado", className: "text-rose-700 dark:text-rose-400" },
-};
+function etiquetaConsentimiento(estado?: string | null, papel?: string | null) {
+  if (estado === "FIRMADO") return { label: "Firmado", className: "text-emerald-700 dark:text-emerald-400" };
+  if (papel) return { label: "En papel", className: "text-emerald-700 dark:text-emerald-400" };
+  if (estado === "ENVIADO") return { label: "Pendiente", className: "text-amber-700 dark:text-amber-400" };
+  if (estado === "RECHAZADO") return { label: "Rechazado", className: "text-rose-700 dark:text-rose-400" };
+  return { label: "No generado", className: "text-muted-foreground" };
+}
 
 function getEdad(p: Paciente) {
   return p.edad ?? calcularEdad(p.fecha_nacimiento);
@@ -218,7 +220,7 @@ function DeudaBadge({ paciente }: { paciente: Paciente }) {
   if (!paciente.deuda_pendiente) return null;
   return (
     <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-      Debe ${paciente.deuda_pendiente.toLocaleString("es-CL")} ({paciente.cobros_pendientes})
+      Debe ${paciente.deuda_pendiente.toLocaleString("es-CL")} · {paciente.cobros_pendientes === 1 ? "1 cobro" : `${paciente.cobros_pendientes} cobros`}
     </span>
   );
 }
@@ -245,9 +247,8 @@ function AlertChips({ paciente }: { paciente: Paciente }) {
   );
 }
 
-function ConsentimientoText({ estado }: { estado?: string | null }) {
-  const info = estado ? CONSENTIMIENTO_LABELS[estado] : null;
-  if (!info) return <span className="text-xs text-muted-foreground">Sin consentimiento</span>;
+function ConsentimientoText({ estado, papel }: { estado?: string | null; papel?: string | null }) {
+  const info = etiquetaConsentimiento(estado, papel);
   return <span className={`text-xs font-medium ${info.className}`}>{info.label}</span>;
 }
 
@@ -704,7 +705,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Consentimiento</dt>
-                    <dd className="mt-0.5"><ConsentimientoText estado={p.consentimiento_estado} /></dd>
+                    <dd className="mt-0.5"><ConsentimientoText estado={p.consentimiento_estado} papel={p.consentimiento_papel_fecha} /></dd>
                   </div>
                 </dl>
               </li>
@@ -752,7 +753,7 @@ export default function DashboardPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDateCL(p.ultima_sesion) || "—"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDateCL(p.proxima_cita, true) || "—"}</TableCell>
-                    <TableCell><ConsentimientoText estado={p.consentimiento_estado} /></TableCell>
+                    <TableCell><ConsentimientoText estado={p.consentimiento_estado} papel={p.consentimiento_papel_fecha} /></TableCell>
                     <TableCell><AlertChips paciente={p} /></TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
