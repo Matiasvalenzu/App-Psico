@@ -110,7 +110,10 @@ class CobroSerializer(serializers.ModelSerializer):
             self.fields["sesiones"].queryset = propias
 
     def get_sesiones_detalle(self, obj):
-        sesiones = sorted(obj.sesiones.all(), key=lambda s: (s.numero_sesion or 0, s.pk))
+        sesiones = list(obj.sesiones.all())
+        if not sesiones and obj.sesion_id:
+            sesiones = [obj.sesion]
+        sesiones = sorted(sesiones, key=lambda s: (s.numero_sesion or 0, s.pk))
         return [
             {
                 "id": s.id,

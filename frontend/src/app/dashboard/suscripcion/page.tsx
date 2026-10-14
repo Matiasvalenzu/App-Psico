@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { getCurrentUser, apiFetch } from "@/lib/api";
 import { cn, formatDateCL } from "@/lib/utils";
 import { FUNCIONES_ESTANDAR, FUNCIONES_PLUS_ADMINISTRACION, NOTA_PLUS, TITULO_PLUS } from "@/lib/planes";
@@ -37,6 +38,7 @@ function ListaFunciones({ items }: { items: string[] }) {
 }
 
 export default function SuscripcionPage() {
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [subData, setSubData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,12 @@ export default function SuscripcionPage() {
   useEffect(() => {
     flushUpsell();
   }, []);
+
+  useEffect(() => {
+    if (loading || searchParams.get("activar") !== "plus" || !subData?.plan_plus_disponible) return;
+    document.getElementById("plan-plus")?.scrollIntoView({ block: "center" });
+    if ((subData.estado || user?.suscripcion_estado) === "trial") setConfirmPlusPrueba(true);
+  }, [loading, searchParams, subData, user]);
 
   const handleCancelSubscription = async () => {
     setCancelling(true);
@@ -398,7 +406,7 @@ export default function SuscripcionPage() {
         </div>
 
         {plusDisponible && (
-          <div className="relative flex flex-col rounded-3xl border-2 border-primary bg-card p-6 sm:p-8 shadow-xl shadow-primary/10">
+          <div id="plan-plus" className="relative flex flex-col rounded-3xl border-2 border-primary bg-card p-6 sm:p-8 shadow-xl shadow-primary/10">
             <span className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">
               <Sparkles className="h-3.5 w-3.5" />
               Recomendado

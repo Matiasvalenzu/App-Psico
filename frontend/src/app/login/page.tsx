@@ -713,7 +713,7 @@ export default function LoginPage() {
                         onError={() => setError("Error en el acceso con Google")}
                         theme={theme === "dark" ? "filled_black" : "outline"}
                         size="large"
-                        width="100%"
+                        width="320"
                         text={activeTab === "register" ? "signup_with" : "signin_with"}
                       />
                     </div>

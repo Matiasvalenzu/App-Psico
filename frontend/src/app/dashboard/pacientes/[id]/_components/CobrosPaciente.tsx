@@ -19,12 +19,14 @@ import { fetchAllPages } from "./utils";
 // Cobros del paciente. `refreshKey` permite recargar cuando se crea un cobro desde una sesión.
 export default function CobrosPaciente({
   pacienteId,
+  sesiones = [],
   soloLectura,
   refreshKey = 0,
   onCobroChanged,
   onCompletarFicha,
 }: {
   pacienteId: number;
+  sesiones?: { id: number; numero_sesion: number | null; fecha_hora_inicio: string; origen: string }[];
   soloLectura: boolean;
   refreshKey?: number;
   onCobroChanged?: (cobro: Cobro) => void;
@@ -185,6 +187,7 @@ export default function CobrosPaciente({
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 font-medium">Fecha</th>
+                <th className="px-4 py-2 font-medium">Sesiones</th>
                 <th className="px-4 py-2 text-right font-medium">Monto</th>
                 <th className="px-4 py-2 font-medium">Pago</th>
                 <th className="px-4 py-2 font-medium">Boleta</th>
@@ -195,7 +198,7 @@ export default function CobrosPaciente({
             <tbody className="divide-y divide-border/60">
               {visibles.length === 0 && (
                 <tr>
-                  <td colSpan={soloLectura ? 5 : 6} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={soloLectura ? 6 : 7} className="px-4 py-6 text-center text-muted-foreground">
                     Ningún cobro coincide con los filtros.
                   </td>
                 </tr>
@@ -211,10 +214,8 @@ export default function CobrosPaciente({
                     tabIndex={0}
                     className="cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
                   >
-                    <td className="px-4 py-3">
-                      {formatDateCL(cobro.fecha_pago)}
-                      {textoSesiones(cobro) && <div className="text-xs text-muted-foreground">{textoSesiones(cobro)}</div>}
-                    </td>
+                    <td className="px-4 py-3">{formatDateCL(cobro.fecha_pago)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{textoSesiones(cobro) || "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCLP(cobro.monto_bruto)}</td>
                     <td className="px-4 py-3">
                       <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", pago.className)}>{pago.label}</span>
@@ -279,6 +280,7 @@ export default function CobrosPaciente({
         <CobroDialog
           open={dialogOpen}
           pacienteId={pacienteId}
+          sesiones={sesiones}
           cobro={editando}
           onOpenChange={setDialogOpen}
           onSaved={(cobro) => {

@@ -129,7 +129,7 @@ export default function PacienteDetailPage() {
     }
   }
 
-  const tab: Tab = tabSolicitada;
+  const [tab, setTab] = useState<Tab>(tabSolicitada);
 
   useEffect(() => {
     getCurrentUser()
@@ -178,11 +178,19 @@ export default function PacienteDetailPage() {
     router.replace(`/dashboard/pacientes/${id}`);
   }, [paciente, searchParams, router, id]);
 
+  useEffect(() => {
+    setTab(tabSolicitada);
+  }, [tabSolicitada]);
+
   function changeTab(value: unknown) {
+    if (typeof value !== "string" || !TABS.includes(value as Tab)) return;
     const next = value as Tab;
-    router.replace(next === "resumen" ? `/dashboard/pacientes/${id}` : `/dashboard/pacientes/${id}?tab=${next}`, {
-      scroll: false,
-    });
+    setTab(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "resumen") params.delete("tab");
+    else params.set("tab", next);
+    const qs = params.toString();
+    router.replace(qs ? `/dashboard/pacientes/${id}?${qs}` : `/dashboard/pacientes/${id}`, { scroll: false });
   }
 
   async function exportarPaciente() {
@@ -315,7 +323,7 @@ export default function PacienteDetailPage() {
         </aside>
 
         <Tabs value={tab} onValueChange={changeTab} className="min-w-0">
-          <TabsList aria-label="Secciones de la ficha">
+          <TabsList aria-label="Secciones de la ficha" className="sticky top-14 z-20 bg-background md:top-16">
             <TabsTrigger value="resumen" className="gap-1.5 px-2 sm:gap-2 sm:px-3">
               <LayoutList className="hidden sm:block" />
               Resumen
@@ -384,7 +392,7 @@ export default function PacienteDetailPage() {
 
           <TabsContent value="cobros">
             {boletas.habilitadas ? (
-              <CobrosPaciente pacienteId={Number(id)} soloLectura={false} refreshKey={cobrosRefresh}
+              <CobrosPaciente pacienteId={Number(id)} sesiones={sesionesClinicas} soloLectura={false} refreshKey={cobrosRefresh}
                 onCobroChanged={actualizarCobroSesion}
                 onCompletarFicha={() => setEditOpen(true)}
               />
@@ -399,6 +407,7 @@ export default function PacienteDetailPage() {
         <CobroDialog
           open={Boolean(sesionCobro)}
           pacienteId={Number(id)}
+          sesiones={sesionesClinicas}
           sesionId={sesionCobro?.id}
           fechaInicial={sesionCobro ? getDateTimeInputValue(new Date(sesionCobro.fecha_hora_inicio)).slice(0, 10) : undefined}
           onOpenChange={(open) => !open && setSesionCobro(null)}

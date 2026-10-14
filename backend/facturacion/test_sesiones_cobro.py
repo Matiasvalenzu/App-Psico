@@ -36,6 +36,8 @@ class CobroSesionesTests(CobroApiTests):
         cobro.sesion = sesion
         cobro.save(update_fields=["sesion"])
         self.assertEqual(list(cobro.sesiones.all()), [])
+        detalle = self.client.get(f"{URL}{cobro.id}/", secure=True).data["sesiones_detalle"]
+        self.assertEqual(detalle[0]["numero_sesion"], 2)
         fila = self.client.get(f"/api/sesiones/?paciente={self.paciente.id}", secure=True).data["results"][0]
         self.assertEqual(fila["cobro"]["id"], cobro.id)
 

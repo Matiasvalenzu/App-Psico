@@ -21,6 +21,7 @@ import {
   Settings,
   ShieldCheck,
   Lock,
+  Receipt,
   CreditCard,
   MessageSquarePlus,
   PlayCircle,
@@ -29,6 +30,7 @@ import {
 import Image from "next/image";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
+import UpsellPlusModal from "@/components/suscripcion/UpsellPlusModal";
 import BottomNav from "@/components/layout/bottom-nav";
 import MoreDrawer from "@/components/layout/more-drawer";
 import FloatingFeedbackButton from "@/components/feedback/FloatingFeedbackButton";
@@ -179,6 +181,8 @@ function DashboardInner({
   const [diasRestantes, setDiasRestantes] = useState<number | null>(null);
   const [fechaPurga, setFechaPurga] = useState<string | null>(null);
   const [plusUrl, setPlusUrl] = useState("");
+  const [boletasHabilitadas, setBoletasHabilitadas] = useState(false);
+  const [upsellBoletas, setUpsellBoletas] = useState(false);
   const [usuario, setUsuario] = useState<{ nombre: string; email: string } | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -192,9 +196,10 @@ function DashboardInner({
   }, []);
 
   useEffect(() => {
+    let activo = true;
     async function verifySession() {
       if (!getAccessToken()) {
-        router.replace("/login");
+        if (activo) router.replace("/login");
         return;
       }
 
@@ -203,11 +208,13 @@ function DashboardInner({
         const pendiente = leerPreapprovalPendiente();
         if (pendiente) {
           const mensaje = await vincularPreapproval(pendiente);
+          if (!activo) return;
           if (mensaje) toast.error(mensaje);
           else toast.success("El Plan Plus quedó activo en tu cuenta.");
         }
 
         const user = await getCurrentUser();
+        if (!activo) return;
         const isAdm = user.username === "Admin" || user.is_admin === true;
         const isSuper = user.is_superuser === true;
         setIsAdmin(isAdm);
@@ -226,15 +233,18 @@ function DashboardInner({
         // Suscripción inactiva: la cuenta queda en solo lectura (el backend bloquea escrituras)
         setFechaPurga(user.solo_lectura ? user.fecha_purga || null : null);
         setPlusUrl(user.plan_plus_disponible ? user.plus_url || "" : "");
+        setBoletasHabilitadas(Boolean(user.boletas_habilitadas));
 
         setReady(true);
       } catch {
-        localStorage.clear();
-        router.replace("/login");
+        if (activo && !getAccessToken()) router.replace("/login");
       }
     }
 
     verifySession();
+    return () => {
+      activo = false;
+    };
   }, [router, pathname]);
 
   // Close drawer when navigating
@@ -322,6 +332,27 @@ function DashboardInner({
           </NavGroup>
           <NavGroup label="Cuenta" isCollapsed={isCollapsed}>
             <NavItem href="/dashboard/suscripcion" icon={CreditCard} label="Mi Suscripción" {...navProps} />
+            {boletasHabilitadas ? (
+              <NavItem href="/dashboard/configuracion/boletas" icon={Receipt} label="Boletas de honorarios" {...navProps} />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setUpsellBoletas(true)}
+                title={isCollapsed ? "Boletas de honorarios" : undefined}
+                className={`group relative flex items-center gap-3 rounded-xl py-2 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-accent/80 hover:text-foreground ${
+                  isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
+                }`}
+              >
+                <Receipt className="h-4.5 w-4.5 shrink-0 text-muted-foreground/70 group-hover:text-foreground" />
+                {!isCollapsed && (
+                  <span className="flex items-center gap-2 tracking-tight">
+                    Boletas de honorarios
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">Plus</span>
+                  </span>
+                )}
+              </button>
+            )}
             <NavItem href="/dashboard/configuracion/perfil" icon={Settings} label="Mi perfil" {...navProps} />
             <NavItem href="/dashboard/configuracion/privacidad" icon={ShieldCheck} label="Privacidad y datos" {...navProps} />
             {isAdmin && (
@@ -503,6 +534,8 @@ function DashboardInner({
             onClose={() => setMoreOpen(false)}
             isAdmin={isAdmin}
             isSuperuser={isSuperuser}
+            boletasHabilitadas={boletasHabilitadas}
+            onBoletasPlus={() => setUpsellBoletas(true)}
           />
         </>
       )}
@@ -512,6 +545,12 @@ function DashboardInner({
 
       {/* ── Barra Flotante Global de Grabación Persistente ── */}
       <PersistentRecordingBar />
+      <UpsellPlusModal
+        open={upsellBoletas}
+        onOpenChange={setUpsellBoletas}
+        origen="menu"
+        enPrueba={suscripcionEstado === "trial"}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   UserCog,
   UserPlus,
   CreditCard,
+  Receipt,
   ShieldCheck,
   X,
   MessageSquarePlus,
@@ -23,6 +24,8 @@ interface MoreDrawerProps {
   onClose: () => void;
   isAdmin: boolean;
   isSuperuser: boolean;
+  boletasHabilitadas?: boolean;
+  onBoletasPlus?: () => void;
 }
 
 export default function MoreDrawer({
@@ -30,6 +33,8 @@ export default function MoreDrawer({
   onClose,
   isAdmin,
   isSuperuser,
+  boletasHabilitadas = false,
+  onBoletasPlus,
 }: MoreDrawerProps) {
   const router = useRouter();
   const { theme, toggle } = useTheme();
@@ -157,6 +162,11 @@ export default function MoreDrawer({
         {/* Menu items */}
         <div className="flex-1 overflow-y-auto px-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <div className="space-y-0.5">
+            {boletasHabilitadas ? (
+              <MenuItem href="/dashboard/configuracion/boletas" icon={Receipt} label="Boletas de honorarios" />
+            ) : (
+              <MenuItem icon={Receipt} label="Boletas de honorarios · Plus" onClick={onBoletasPlus} />
+            )}
             <MenuItem
               href="/dashboard/configuracion/perfil"
               icon={UserCog}

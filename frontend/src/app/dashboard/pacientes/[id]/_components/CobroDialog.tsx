@@ -71,6 +71,7 @@ export default function CobroDialog({
   open,
   pacienteId,
   sesionId,
+  sesiones,
   fechaInicial,
   cobro,
   onOpenChange,
@@ -79,6 +80,7 @@ export default function CobroDialog({
   open: boolean;
   pacienteId: number;
   sesionId?: number | null;
+  sesiones?: SesionOpcion[];
   fechaInicial?: string;
   cobro?: Cobro | null;
   onOpenChange: (open: boolean) => void;
@@ -90,21 +92,41 @@ export default function CobroDialog({
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [opciones, setOpciones] = useState<SesionOpcion[]>([]);
+  const [cargandoSesiones, setCargandoSesiones] = useState(false);
+  const [errorSesiones, setErrorSesiones] = useState("");
   const [elegidas, setElegidas] = useState<number[]>([]);
   const [incluirGlosa, setIncluirGlosa] = useState(false);
   const glosaBloqueada = cobro?.estado_boleta === "EMITIDA" || cobro?.estado_boleta === "EN_EMISION";
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !Number.isFinite(pacienteId)) return;
+    let activo = true;
+    const conocidas = (sesiones ?? []).filter((s) => s.origen !== "DOCUMENTO_EXTERNO");
     setForm(toForm(cobro ?? null, fechaInicial || hoyISO()));
     setElegidas(cobro?.sesiones ?? (sesionId ? [sesionId] : []));
     setIncluirGlosa(Boolean(cobro?.glosa_incluye_sesion));
     setError("");
     setFieldErrors({});
+    setErrorSesiones("");
+    setOpciones(conocidas);
+    setCargandoSesiones(true);
     fetchAllPages<SesionOpcion>(`/sesiones/?paciente=${pacienteId}`)
-      .then((lista) => setOpciones(lista.filter((s) => s.origen !== "DOCUMENTO_EXTERNO")))
-      .catch(() => setOpciones([]));
-  }, [open, cobro, fechaInicial, sesionId, pacienteId]);
+      .then((lista) => {
+        if (!activo) return;
+        const clinicas = lista.filter((s) => s.origen !== "DOCUMENTO_EXTERNO");
+        setOpciones(clinicas.length ? clinicas : conocidas);
+      })
+      .catch(() => {
+        if (!activo) return;
+        if (!conocidas.length) setErrorSesiones("No se pudieron cargar las sesiones de este paciente.");
+      })
+      .finally(() => {
+        if (activo) setCargandoSesiones(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [open, cobro, fechaInicial, sesionId, pacienteId, sesiones]);
 
   function set(key: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -233,7 +255,11 @@ export default function CobroDialog({
           </p>
           <fieldset className="space-y-2 rounded-xl border border-border/70 p-4">
             <legend className="px-1 text-sm font-semibold">Sesiones de este cobro</legend>
-            {opciones.length === 0 ? (
+            {cargandoSesiones && opciones.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Cargando sesiones...</p>
+            ) : errorSesiones ? (
+              <p className="text-sm text-destructive">{errorSesiones}</p>
+            ) : opciones.length === 0 ? (
               <p className="text-sm text-muted-foreground">Este paciente todavía no tiene sesiones.</p>
             ) : (
               <div className="max-h-40 space-y-1.5 overflow-y-auto">

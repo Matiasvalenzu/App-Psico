@@ -62,7 +62,7 @@ export default function UpsellPlusModal({
             onClick={() => {
               trackUpsell("upsell_plus_cta", origen);
               onOpenChange(false);
-              router.push("/dashboard/suscripcion");
+              router.push("/dashboard/suscripcion?activar=plus");
             }}
           >
             Pasarme a Plus

@@ -42,25 +42,37 @@ export function getAccessToken() {
   return accessToken;
 }
 
+let refreshInFlight: Promise<string | null> | null = null;
+
+function readRefreshToken() {
+  if (!refreshToken && typeof window !== "undefined") loadTokens();
+  return refreshToken;
+}
+
 async function refreshAccessToken(): Promise<string | null> {
-  if (!refreshToken) return null;
-  try {
-    const res = await fetch(`${API_URL}/auth/token/refresh/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh: refreshToken }),
-    });
-    if (!res.ok) {
-      clearTokens();
+  if (refreshInFlight) return refreshInFlight;
+  const current = readRefreshToken();
+  if (!current) return null;
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/token/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: current }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data?.access) return null;
+      const nextRefresh = typeof data.refresh === "string" && data.refresh ? data.refresh : current;
+      setTokens(data.access, nextRefresh);
+      return data.access as string;
+    } catch {
       return null;
+    } finally {
+      refreshInFlight = null;
     }
-    const data = await res.json();
-    setTokens(data.access, refreshToken);
-    return data.access;
-  } catch {
-    clearTokens();
-    return null;
-  }
+  })();
+  return refreshInFlight;
 }
 
 export async function apiFetch(
@@ -84,7 +96,7 @@ export async function apiFetch(
 
   let res = await fetch(url, { ...options, headers });
 
-  if (res.status === 401 && refreshToken) {
+  if (res.status === 401 && readRefreshToken()) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;

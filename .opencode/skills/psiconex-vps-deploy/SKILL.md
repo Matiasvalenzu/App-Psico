@@ -33,9 +33,10 @@ or use destructive Git commands to clean the worktree.
    deploying if they are caused by the requested change.
 2. Commit the intended files, push the commit to `origin/main`, then push the
    same commit to `vps/main`.
-3. Compare the SHA-256 hashes of local `.env.production` and the shared VPS
-   `.env`. If they differ, atomically replace the VPS file with the local
-   source using mode `600`. Do not use `rsync --delete` for environment files.
+3. Never replace the production `.env` with the local file. If one variable
+   must change, first copy the VPS file to `.env.bak-YYYYMMDD-HHMM` with mode
+   `600`, then add or edit only that key. Leave the file in mode `600`. Do not
+   print values.
 4. Over SSH, confirm the VPS checkout is on `main`, clean, and can fast-forward.
    Its `origin` is the VPS Git mirror; update it with
    `git pull --ff-only origin main`.

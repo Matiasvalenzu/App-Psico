@@ -99,7 +99,7 @@ class CobroViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = (
-            Cobro.objects.select_related("paciente")
+            Cobro.objects.select_related("paciente", "sesion")
             .prefetch_related(
                 "emisiones",
                 Prefetch("cambios_pago", CambioEstadoPago.objects.select_related("usuario")),

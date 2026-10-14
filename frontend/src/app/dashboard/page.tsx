@@ -598,7 +598,7 @@ export default function DashboardPage() {
       {plus !== null && (
         <button
           type="button"
-          onClick={() => (plus ? router.push("/dashboard/configuracion/perfil") : (setUpsellOrigen("dashboard"), setUpsell(true)))}
+          onClick={() => (plus ? router.push("/dashboard/configuracion/boletas") : (setUpsellOrigen("dashboard"), setUpsell(true)))}
           className="flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 text-left text-sm font-medium hover:border-primary"
         >
           <Receipt className="h-4 w-4 text-primary" />
