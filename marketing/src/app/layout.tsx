@@ -5,6 +5,7 @@ import { MetaPixel } from "@/components/analytics/meta-pixel";
 import { GoogleAdsTag } from "@/components/analytics/google-ads-tag";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
 import { LeadTracker } from "@/components/analytics/lead-tracker";
+import { AttributionCapture } from "@/components/analytics/attribution-capture";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -75,6 +76,7 @@ export default function RootLayout({
         <GoogleAdsTag />
         <ConsentBanner />
         <LeadTracker />
+        <AttributionCapture />
       </body>
     </html>
   );

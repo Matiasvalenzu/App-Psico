@@ -9,6 +9,7 @@ import {
   verifyRegistrationCode,
   resendRegistrationCode,
 } from "@/lib/api";
+import { leerAtribucion } from "@/lib/atribucion";
 import { isGoogleAdsEnabled, trackGoogleAdsConversion } from "@/lib/googleAds";
 import {
   isMetaPixelEnabled,
@@ -190,7 +191,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await verifyRegistrationCode(registerEmail, cleanCode);
+      await verifyRegistrationCode(registerEmail, cleanCode, leerAtribucion());
       // Registro por OTP = cuenta nueva (sin PII en el evento).
       trackCompleteRegistration();
       trackGoogleAdsConversion("registro_app");
@@ -229,7 +230,7 @@ export default function LoginPage() {
     setSuccessMessage("");
     setLoading(true);
     try {
-      const googleData = await loginWithGoogle(credentialResponse.credential);
+      const googleData = await loginWithGoogle(credentialResponse.credential, leerAtribucion());
       if (isMetaPixelEnabled || isGoogleAdsEnabled) {
         // /auth/google/login/ devuelve `is_new_user` (true solo si se creó la cuenta).
         if (googleData?.is_new_user === true) {

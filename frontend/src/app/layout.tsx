@@ -4,6 +4,7 @@ import "./globals.css";
 import { MetaPixel } from "@/components/analytics/meta-pixel";
 import { GoogleAdsTag } from "@/components/analytics/google-ads-tag";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
+import { AttributionCapture } from "@/components/analytics/AttributionCapture";
 
 export const metadata: Metadata = {
   title: "Psicólogo – Asistente de Sesiones",
@@ -28,6 +29,7 @@ export default function RootLayout({
         <MetaPixel />
         <GoogleAdsTag />
         <ConsentBanner />
+        <AttributionCapture />
       </body>
     </html>
   );
