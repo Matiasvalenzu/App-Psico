@@ -4,7 +4,7 @@ import Link from "next/link"
 import { motion } from "motion/react"
 import { ArrowRight, PlayCircle, Receipt, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { HeroVideoPreview } from "@/components/sections/hero-video-preview"
+import { AppSequence } from "@/components/sections/app-sequence"
 import { ROUTES } from "@/lib/config"
 
 export function HeroSection() {
@@ -123,14 +123,14 @@ export function HeroSection() {
             </motion.p>
           </div>
 
-          {/* Right: video preview */}
+          {/* Right: secuencia de pantallas de la app */}
           <motion.div
             initial={false}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="relative min-h-0 lg:h-full"
           >
-            <HeroVideoPreview className="lg:absolute lg:inset-0" />
+            <AppSequence className="lg:absolute lg:inset-0" />
           </motion.div>
         </div>
       </div>

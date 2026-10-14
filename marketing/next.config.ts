@@ -50,8 +50,6 @@ const nextConfig: NextConfig = {
         source: "/:path((?!_next/|api/|.*\\.[a-zA-Z0-9]+$).*)",
         headers: htmlCache,
       },
-      { source: "/hero-product-demo.mp4", headers: assetCache },
-      { source: "/hero-product-demo-poster.jpg", headers: assetCache },
       { source: "/og-image.png", headers: assetCache },
     ];
   },
