@@ -127,13 +127,9 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   }, [persistSeen]);
 
   useEffect(() => {
-    if (!ready || view.kind === "welcome" || view.kind === "player" || view.kind === "catalog" || view.kind === "prompt") return;
+    if (!ready || view.kind !== "closed") return;
     const slug = sectionHint ?? tutorialForPath(pathname);
-    if (view.kind === "prompt" && view.slug === slug) return;
-    if (!slug || seen[slug] || skippedRef.current.has(slug)) {
-      if (view.kind === "prompt") setView({ kind: "closed" });
-      return;
-    }
+    if (!slug || seen[slug] || skippedRef.current.has(slug)) return;
     const timer = window.setTimeout(() => {
       setView({ kind: "prompt", slug });
     }, 450);
