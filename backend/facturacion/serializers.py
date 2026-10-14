@@ -7,7 +7,15 @@ from sesiones.models import Sesion
 
 from .envio import datos_envio
 from .models import Cobro, DelegacionSII, EmisionBHE
-from .services import anulable_hasta, calcular_retencion, hoy_chile, plazo_anulacion_vencido, validar_glosa
+from .services import (
+    anulable_hasta,
+    calcular_retencion,
+    componer_glosa_sesiones,
+    hoy_chile,
+    plazo_anulacion_vencido,
+    quitar_sufijo_sesion,
+    validar_glosa,
+)
 
 GLOSA_POR_DEFECTO = "Atención psicológica"
 CAMPOS_RECEPTOR = (
@@ -15,7 +23,9 @@ CAMPOS_RECEPTOR = (
     "receptor_direccion", "receptor_comuna", "receptor_email",
 )
 # Una boleta emitida no se corrige: se anula en el SII y se emite otra.
-CAMPOS_BLOQUEADOS_SI_EMITIDA = ("fecha_pago", "monto_bruto", "glosa", "bhe_modo", *CAMPOS_RECEPTOR)
+CAMPOS_BLOQUEADOS_SI_EMITIDA = (
+    "fecha_pago", "monto_bruto", "glosa", "glosa_incluye_sesion", "bhe_modo", *CAMPOS_RECEPTOR
+)
 
 
 def snapshot_receptor(paciente):
@@ -60,6 +70,10 @@ class CobroSerializer(serializers.ModelSerializer):
     sesion = serializers.PrimaryKeyRelatedField(
         queryset=Sesion.objects.all(), required=False, allow_null=True
     )
+    sesiones = serializers.PrimaryKeyRelatedField(
+        queryset=Sesion.objects.all(), many=True, required=False
+    )
+    sesiones_detalle = serializers.SerializerMethodField()
     glosa = serializers.CharField(max_length=200, required=False)
     paciente_nombre = serializers.SerializerMethodField()
     anulable_hasta = serializers.SerializerMethodField()
@@ -72,8 +86,9 @@ class CobroSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cobro
         fields = [
-            "id", "paciente", "paciente_nombre", "sesion", "fecha_pago", "monto_bruto",
-            "medio_pago", "estado_pago", "pagado_el", "ultimo_cambio_pago", *CAMPOS_RECEPTOR, "glosa", "bhe_modo",
+            "id", "paciente", "paciente_nombre", "sesion", "sesiones", "sesiones_detalle", "fecha_pago", "monto_bruto",
+            "medio_pago", "estado_pago", "pagado_el", "ultimo_cambio_pago", *CAMPOS_RECEPTOR,
+            "glosa", "glosa_incluye_sesion", "bhe_modo",
             "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulable_hasta",
             "plazo_anulacion_vencido", "anulacion_solicitada_at", "ultima_emision", "receptor_desactualizado",
@@ -84,6 +99,25 @@ class CobroSerializer(serializers.ModelSerializer):
             "pagado_el", "tasa_retencion", "monto_retencion", "monto_liquido", "estado_boleta",
             "boleta_folio", "boleta_fecha_emision", "boleta_anulada_at", "anulacion_solicitada_at",
             "created_at", "updated_at",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request and getattr(request, "user", None) and request.user.is_authenticated:
+            propias = Sesion.objects.filter(paciente__psicologo=request.user)
+            self.fields["sesion"].queryset = propias
+            self.fields["sesiones"].queryset = propias
+
+    def get_sesiones_detalle(self, obj):
+        sesiones = sorted(obj.sesiones.all(), key=lambda s: (s.numero_sesion or 0, s.pk))
+        return [
+            {
+                "id": s.id,
+                "numero_sesion": s.numero_sesion,
+                "fecha": timezone.localtime(s.fecha_hora_inicio).date().isoformat(),
+            }
+            for s in sesiones
         ]
 
     def get_paciente_nombre(self, obj):
@@ -128,6 +162,26 @@ class CobroSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Sesión no encontrada.")
         return value
 
+    def validate_sesiones(self, value):
+        user_id = self.context["request"].user.id
+        if any(s.paciente.psicologo_id != user_id for s in value):
+            raise serializers.ValidationError("Sesión no encontrada.")
+        if len({s.paciente_id for s in value}) > 1:
+            raise serializers.ValidationError("Las sesiones deben ser del mismo paciente.")
+        return value
+
+    def _sesiones_a_vincular(self, attrs, instance):
+        if "sesiones" in attrs:
+            elegidas = attrs["sesiones"]
+            attrs["sesion"] = elegidas[0] if len(elegidas) == 1 else None
+            return elegidas
+        if attrs.get("sesion"):
+            attrs["sesiones"] = [attrs["sesion"]]
+            return attrs["sesiones"]
+        if instance:
+            return list(instance.sesiones.all())
+        return []
+
     def validate_glosa(self, value):
         return validar_glosa(value)
 
@@ -155,12 +209,35 @@ class CobroSerializer(serializers.ModelSerializer):
                     "La boleta ya está emitida. Para corregirla, anúlala en el SII y regístrala de nuevo."
                 )
 
-        sesion = attrs.get("sesion")
-        if sesion:
+        sesiones = self._sesiones_a_vincular(attrs, instance)
+        if sesiones:
             paciente = attrs.get("paciente") or (instance.paciente if instance else None)
-            if paciente and sesion.paciente_id != paciente.id:
-                raise serializers.ValidationError({"sesion": "La sesión no es de este paciente."})
-            attrs.setdefault("paciente", sesion.paciente)
+            if paciente and any(s.paciente_id != paciente.id for s in sesiones):
+                raise serializers.ValidationError({"sesiones": "La sesión no es de este paciente."})
+            attrs.setdefault("paciente", sesiones[0].paciente)
+        elif attrs.get("sesion"):
+            attrs.setdefault("paciente", attrs["sesion"].paciente)
+
+        bloqueada = instance and instance.estado_boleta in (
+            Cobro.EstadoBoleta.EMITIDA, Cobro.EstadoBoleta.EN_EMISION
+        )
+        incluir = attrs.get(
+            "glosa_incluye_sesion",
+            instance.glosa_incluye_sesion if instance else False,
+        )
+        if incluir and not bloqueada:
+            base = attrs.get("glosa")
+            if not base:
+                if instance and instance.glosa:
+                    base = instance.glosa
+                else:
+                    perfil = getattr(self.context["request"].user, "perfil_psicologo", None)
+                    base = getattr(perfil, "bhe_glosa_default", "") or GLOSA_POR_DEFECTO
+            attrs["glosa"] = componer_glosa_sesiones(base, sesiones)
+        elif not incluir and not bloqueada and (instance is None or instance.glosa_incluye_sesion or "glosa" in attrs):
+            glosa = attrs.get("glosa", instance.glosa if instance else "")
+            if glosa and instance and instance.glosa_incluye_sesion:
+                attrs["glosa"] = quitar_sufijo_sesion(glosa) or GLOSA_POR_DEFECTO
 
         if instance is None:
             if not attrs.get("paciente"):

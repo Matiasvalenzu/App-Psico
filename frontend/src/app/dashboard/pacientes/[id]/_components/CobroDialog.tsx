@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { formatRut } from "@/lib/rut";
+import { formatDateCL } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { hoyISO, MEDIOS_PAGO, MODOS_BOLETA, type Cobro } from "./cobros";
+import { fetchAllPages } from "./utils";
+
+type SesionOpcion = { id: number; numero_sesion: number | null; fecha_hora_inicio: string; origen: string };
 
 type FormState = {
   fecha_pago: string;
@@ -85,13 +89,22 @@ export default function CobroDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [opciones, setOpciones] = useState<SesionOpcion[]>([]);
+  const [elegidas, setElegidas] = useState<number[]>([]);
+  const [incluirGlosa, setIncluirGlosa] = useState(false);
+  const glosaBloqueada = cobro?.estado_boleta === "EMITIDA" || cobro?.estado_boleta === "EN_EMISION";
 
   useEffect(() => {
     if (!open) return;
     setForm(toForm(cobro ?? null, fechaInicial || hoyISO()));
+    setElegidas(cobro?.sesiones ?? (sesionId ? [sesionId] : []));
+    setIncluirGlosa(Boolean(cobro?.glosa_incluye_sesion));
     setError("");
     setFieldErrors({});
-  }, [open, cobro, fechaInicial]);
+    fetchAllPages<SesionOpcion>(`/sesiones/?paciente=${pacienteId}`)
+      .then((lista) => setOpciones(lista.filter((s) => s.origen !== "DOCUMENTO_EXTERNO")))
+      .catch(() => setOpciones([]));
+  }, [open, cobro, fechaInicial, sesionId, pacienteId]);
 
   function set(key: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -150,6 +163,8 @@ export default function CobroDialog({
     };
     // Glosa vacía al crear: el backend usa la glosa por defecto del perfil.
     if (form.glosa.trim() || editando) body.glosa = form.glosa.trim();
+    body.sesiones = elegidas;
+    if (!glosaBloqueada) body.glosa_incluye_sesion = incluirGlosa;
     if (editando) {
       for (const key of CAMPOS_RECEPTOR) body[key] = form[key].trim();
     } else {
@@ -216,6 +231,50 @@ export default function CobroDialog({
           <p className="text-xs text-muted-foreground">
             La glosa no puede incluir diagnósticos ni términos clínicos: la boleta la ve el SII y quien la recibe.
           </p>
+          <fieldset className="space-y-2 rounded-xl border border-border/70 p-4">
+            <legend className="px-1 text-sm font-semibold">Sesiones de este cobro</legend>
+            {opciones.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Este paciente todavía no tiene sesiones.</p>
+            ) : (
+              <div className="max-h-40 space-y-1.5 overflow-y-auto">
+                {opciones.map((sesion) => (
+                  <label key={sesion.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={elegidas.includes(sesion.id)}
+                      onChange={(e) =>
+                        setElegidas((prev) =>
+                          e.target.checked ? [...prev, sesion.id] : prev.filter((id) => id !== sesion.id),
+                        )
+                      }
+                    />
+                    <span>
+                      {sesion.numero_sesion ? `Sesión ${sesion.numero_sesion}` : "Sesión"} · {formatDateCL(sesion.fecha_hora_inicio)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <label
+              className="flex items-start gap-2 text-sm"
+              title="La boleta la puede ver un tercero: el SII y quien la recibe. No incluye el contenido de la sesión."
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-primary"
+                checked={incluirGlosa}
+                disabled={glosaBloqueada}
+                onChange={(e) => setIncluirGlosa(e.target.checked)}
+              />
+              <span>
+                Incluir número y fecha de sesión en la glosa
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Apagado por defecto. La boleta la puede ver un tercero. Máximo 100 caracteres del SII.
+                </span>
+              </span>
+            </label>
+          </fieldset>
 
           {editando && (
             <fieldset className="grid gap-4 rounded-xl border border-border/70 p-4 sm:grid-cols-2">

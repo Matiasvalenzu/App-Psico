@@ -54,6 +54,47 @@ def plazo_anulacion_vencido(fecha_emision):
     return hoy_chile() > anulable_hasta(fecha_emision)
 
 
+GLOSA_SII_MAX = 100
+_SUFIJO_SESION = re.compile(r", sesiones?\b.+$", re.IGNORECASE)
+
+
+def quitar_sufijo_sesion(glosa):
+    return _SUFIJO_SESION.sub("", glosa or "").strip()
+
+
+def componer_glosa_sesiones(base, sesiones):
+    """Arma la glosa con número y fecha. No recorta: si no cabe en el SII, rechaza."""
+    texto = quitar_sufijo_sesion(base) or "Atención psicológica"
+    ordenadas = sorted(sesiones, key=lambda s: (s.numero_sesion or 0, s.fecha_hora_inicio, s.pk or 0))
+    if not ordenadas:
+        raise serializers.ValidationError(
+            {"sesiones": "Elige al menos una sesión para incluirla en la glosa."}
+        )
+    partes = []
+    for sesion in ordenadas:
+        fecha = timezone.localtime(sesion.fecha_hora_inicio).strftime("%d/%m/%Y")
+        if len(ordenadas) == 1:
+            numero = sesion.numero_sesion or "—"
+            partes.append(f"sesión {numero}, {fecha}")
+        else:
+            numero = sesion.numero_sesion or fecha
+            partes.append(f"{numero} ({fecha})" if sesion.numero_sesion else fecha)
+    if len(ordenadas) == 1:
+        compuesta = f"{texto}, {partes[0]}"
+    else:
+        compuesta = f"{texto}, sesiones {', '.join(partes)}"
+    if len(compuesta) > GLOSA_SII_MAX:
+        raise serializers.ValidationError(
+            {
+                "glosa": (
+                    "Con el número y la fecha de las sesiones, la glosa supera los "
+                    f"{GLOSA_SII_MAX} caracteres del SII. Quita alguna sesión o acorta la glosa."
+                )
+            }
+        )
+    return validar_glosa(compuesta)
+
+
 def validar_glosa(glosa):
     glosa = (glosa or "").strip()
     if not glosa:

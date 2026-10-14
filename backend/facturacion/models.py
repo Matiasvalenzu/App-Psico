@@ -49,6 +49,8 @@ class Cobro(models.Model):
     sesion = models.ForeignKey(
         Sesion, null=True, blank=True, on_delete=models.SET_NULL, related_name="cobros"
     )
+    # Varias sesiones en una boleta. No reemplaza el FK viejo: los cobros ya guardados no se copian solos.
+    sesiones = models.ManyToManyField(Sesion, blank=True, related_name="cobros_vinculados")
     fecha_pago = models.DateField()
     monto_bruto = models.PositiveIntegerField()
     medio_pago = models.CharField(
@@ -68,6 +70,8 @@ class Cobro(models.Model):
     receptor_email = models.EmailField(blank=True, default="")
 
     glosa = models.CharField(max_length=200)
+    # Si está activo, la glosa incluye número y fecha de las sesiones vinculadas. Apagado por defecto.
+    glosa_incluye_sesion = models.BooleanField(default=False)
     bhe_modo = models.CharField(
         max_length=30, choices=ModoBoleta.choices, default=ModoBoleta.RETENCION_POR_EMISOR
     )

@@ -56,7 +56,7 @@ class SesionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(paciente_id=paciente_id)
         if self.action == "list":
             # Estado del cobro y la boleta en la lista, sin una consulta por sesión.
-            qs = qs.prefetch_related("cobros")
+            qs = qs.prefetch_related("cobros", "cobros_vinculados")
         return qs
 
     def retrieve(self, request, *args, **kwargs):

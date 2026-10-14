@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import BorradorBoleta from "./BorradorBoleta";
 import CobroDialog from "./CobroDialog";
 import EnvioBoleta from "./EnvioBoleta";
-import { chipBoleta, ESTADOS_PAGO, etiquetaCobros, formatCLP, hoyISO, type Cobro, type DelegacionBHE } from "./cobros";
+import { chipBoleta, ESTADOS_PAGO, etiquetaCobros, formatCLP, hoyISO, textoSesiones, type Cobro, type DelegacionBHE } from "./cobros";
 import { MarcarPagadoDialog } from "./PagoCobro";
 import { fetchAllPages } from "./utils";
 
@@ -211,7 +211,10 @@ export default function CobrosPaciente({
                     tabIndex={0}
                     className="cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
                   >
-                    <td className="px-4 py-3">{formatDateCL(cobro.fecha_pago)}</td>
+                    <td className="px-4 py-3">
+                      {formatDateCL(cobro.fecha_pago)}
+                      {textoSesiones(cobro) && <div className="text-xs text-muted-foreground">{textoSesiones(cobro)}</div>}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCLP(cobro.monto_bruto)}</td>
                     <td className="px-4 py-3">
                       <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", pago.className)}>{pago.label}</span>

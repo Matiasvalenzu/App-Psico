@@ -98,22 +98,22 @@ export default function PacienteDetailPage() {
   const tabSolicitada = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "resumen";
   // Refleja en la lista de sesiones un cobro creado o cambiado en otra parte de la ficha.
   const actualizarCobroSesion = useCallback((cobro: Cobro) => {
+    const ids = new Set(cobro.sesiones ?? []);
+    if (!ids.size && cobro.sesion) ids.add(cobro.sesion);
+    const chip = {
+      id: cobro.id,
+      monto_bruto: cobro.monto_bruto,
+      estado_pago: cobro.estado_pago,
+      pagado_el: cobro.pagado_el,
+      estado_boleta: cobro.estado_boleta,
+      boleta_folio: cobro.boleta_folio,
+    };
     setSesiones((prev) =>
-      prev.map((s) =>
-        s.cobro?.id === cobro.id || (!s.cobro && cobro.sesion === s.id)
-          ? {
-              ...s,
-              cobro: {
-                id: cobro.id,
-                monto_bruto: cobro.monto_bruto,
-                estado_pago: cobro.estado_pago,
-                pagado_el: cobro.pagado_el,
-                estado_boleta: cobro.estado_boleta,
-                boleta_folio: cobro.boleta_folio,
-              },
-            }
-          : s,
-      ),
+      prev.map((s) => {
+        if (ids.has(s.id)) return { ...s, cobro: chip };
+        if (s.cobro?.id === cobro.id) return { ...s, cobro: null };
+        return s;
+      }),
     );
   }, []);
 

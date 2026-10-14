@@ -4,7 +4,7 @@ import os
 from datetime import date
 
 from django.conf import settings
-from django.db.models import Count, Prefetch, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -104,13 +104,17 @@ class CobroViewSet(viewsets.ModelViewSet):
                 "emisiones",
                 Prefetch("cambios_pago", CambioEstadoPago.objects.select_related("usuario")),
                 Prefetch("envios", EnvioBoleta.objects.select_related("enviado_por")),
+                "sesiones",
             )
             .filter(psicologo=self.request.user)
         )
-        for param in ("paciente", "sesion", "estado_boleta", "estado_pago"):
+        for param in ("paciente", "estado_boleta", "estado_pago"):
             valor = self.request.query_params.get(param)
             if valor:
                 qs = qs.filter(**{param: valor})
+        sesion = self.request.query_params.get("sesion")
+        if sesion:
+            qs = qs.filter(Q(sesion=sesion) | Q(sesiones=sesion)).distinct()
         if self.request.query_params.get("mes"):
             anio, mes = _mes_pedido(self.request)
             qs = qs.filter(fecha_pago__year=anio, fecha_pago__month=mes)
@@ -210,14 +214,20 @@ class CobroViewSet(viewsets.ModelViewSet):
         retencion = del_mes.exclude(
             estado_boleta__in=[Cobro.EstadoBoleta.ANULADA, Cobro.EstadoBoleta.NO_APLICA]
         ).aggregate(total=Sum("monto_retencion"))["total"]
-        sin_cobro = Sesion.objects.filter(
-            paciente__psicologo=request.user,
-            estado=Sesion.Estado.COMPLETADO,
-            origen__in=[Sesion.Origen.AUDIO, Sesion.Origen.VIRTUAL],
-            fecha_hora_inicio__year=anio,
-            fecha_hora_inicio__month=mes,
-            cobros__isnull=True,
-        ).count()
+        vinculadas = Cobro.sesiones.through.objects.values("sesion_id")
+        con_fk = Cobro.objects.filter(sesion__isnull=False).values("sesion_id")
+        sin_cobro = (
+            Sesion.objects.filter(
+                paciente__psicologo=request.user,
+                estado=Sesion.Estado.COMPLETADO,
+                origen__in=[Sesion.Origen.AUDIO, Sesion.Origen.VIRTUAL],
+                fecha_hora_inicio__year=anio,
+                fecha_hora_inicio__month=mes,
+            )
+            .exclude(pk__in=vinculadas)
+            .exclude(pk__in=con_fk)
+            .count()
+        )
         return Response(
             {
                 "mes": f"{anio}-{mes:02d}",

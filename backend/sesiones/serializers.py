@@ -173,8 +173,8 @@ class SesionListSerializer(serializers.ModelSerializer):
         ]
 
     def get_cobro(self, obj):
-        # La vista precarga los cobros ordenados del más reciente al más antiguo.
-        cobros = list(obj.cobros.all())
+        # El vínculo nuevo manda. Si no hay, se usa el FK viejo para no dejar el chip en blanco.
+        cobros = list(obj.cobros_vinculados.all()) or list(obj.cobros.all())
         if not cobros:
             return None
         cobro = cobros[0]

@@ -40,6 +40,9 @@ export interface Cobro {
   paciente: number | null;
   paciente_nombre: string;
   sesion: number | null;
+  sesiones?: number[];
+  sesiones_detalle?: { id: number; numero_sesion: number | null; fecha: string }[];
+  glosa_incluye_sesion?: boolean;
   fecha_pago: string;
   monto_bruto: number;
   medio_pago: "EFECTIVO" | "TRANSFERENCIA" | "OTRO";
@@ -77,6 +80,12 @@ export interface Cobro {
 
 export function etiquetaCobros(n: number) {
   return n === 1 ? "1 cobro" : `${n} cobros`;
+}
+
+export function textoSesiones(cobro: { sesiones_detalle?: { numero_sesion: number | null }[] }) {
+  const numeros = (cobro.sesiones_detalle ?? []).map((s) => s.numero_sesion).filter((n): n is number => n != null);
+  if (!numeros.length) return "";
+  return numeros.length === 1 ? `Sesión: ${numeros[0]}` : `Sesiones: ${numeros.join(", ")}`;
 }
 
 export const MEDIOS_PAGO = { EFECTIVO: "Efectivo", TRANSFERENCIA: "Transferencia", OTRO: "Otro" } as const;
