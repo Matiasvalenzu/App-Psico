@@ -1,110 +1,144 @@
-export interface TutorialCapitulo {
-  modulo: number;
+export const TUTORIAL_SLUGS = [
+  "bienvenida",
+  "perfil",
+  "boletas-config",
+  "pacientes",
+  "ficha",
+  "consentimiento",
+  "cobros",
+  "sesion-presencial",
+  "sesion-virtual",
+  "tests",
+  "agenda",
+  "voz",
+  "privacidad",
+  "feedback",
+] as const;
+
+export type TutorialSlug = (typeof TUTORIAL_SLUGS)[number];
+
+export interface TutorialVideo {
+  slug: TutorialSlug;
   titulo: string;
   descripcion: string;
-  timestamp: string;
-  segundosInicio: number;
-  duracionSegundos: number;
-  pantallaAsociada: string;
-  icono?: string;
+  archivo: string;
 }
 
-export const TUTORIAL_METADATA = {
-  titulo: "Psiconex - Tutorial Maestro Completo",
-  duracionTotalSegundos: 676.34,
-  duracionTotalFormateada: "11:16",
-  videoUrl: "/videos/Psiconex_Tutorial_Completo.mp4",
-};
-
-export const TUTORIAL_CAPITULOS: TutorialCapitulo[] = [
+export const TUTORIALES: TutorialVideo[] = [
   {
-    modulo: 0,
-    titulo: "Bienvenida e Introducción a Psiconex",
-    descripcion: "Conoce la plataforma Psiconex y cómo optimizar tu práctica clínica con IA.",
-    timestamp: "00:00",
-    segundosInicio: 0.0,
-    duracionSegundos: 17.09,
-    pantallaAsociada: "Onboarding inicial",
+    slug: "bienvenida",
+    titulo: "Te damos la bienvenida a Psiconex",
+    descripcion: "Un minuto para ver qué puedes hacer en la ficha, la agenda, los tests y la voz.",
+    archivo: "/videos/tutoriales/bienvenida.mp4",
   },
   {
-    modulo: 1,
-    titulo: "Configuración de Perfil Profesional",
-    descripcion: "Configura tus datos de contacto, registro profesional y preferencias de atención.",
-    timestamp: "00:17",
-    segundosInicio: 17.09,
-    duracionSegundos: 31.09,
-    pantallaAsociada: "/dashboard/configuracion/perfil",
+    slug: "perfil",
+    titulo: "Completa tu perfil profesional",
+    descripcion: "Datos de contacto, registro profesional y preferencias de atención.",
+    archivo: "/videos/tutoriales/perfil.mp4",
   },
   {
-    modulo: 2,
-    titulo: "Registro y Gestión de Pacientes",
-    descripcion: "Crea expedientes de pacientes, administra estados terapéuticos y filtros.",
-    timestamp: "00:48",
-    segundosInicio: 48.17,
-    duracionSegundos: 63.98,
-    pantallaAsociada: "/dashboard",
+    slug: "boletas-config",
+    titulo: "Configura tus boletas de honorarios",
+    descripcion: "Deja lista la emisión de boletas de honorarios para el SII.",
+    archivo: "/videos/tutoriales/boletas-config.mp4",
   },
   {
-    modulo: 3,
-    titulo: "Ficha Clínica y Asistente IA",
-    descripcion: "Explora el expediente clínico y cómo interactuar con el copiloto IA para hipótesis clínicas.",
-    timestamp: "01:52",
-    segundosInicio: 112.16,
-    duracionSegundos: 73.88,
-    pantallaAsociada: "/dashboard/pacientes/[id]",
+    slug: "pacientes",
+    titulo: "Crea y gestiona pacientes",
+    descripcion: "Crea expedientes, filtra y abre la ficha de cada paciente.",
+    archivo: "/videos/tutoriales/pacientes.mp4",
   },
   {
-    modulo: 4,
-    titulo: "Enrolamiento y Muestra de Voz",
-    descripcion: "Entrena el modelo de diarización con tu voz para separar automáticamente tus intervenciones.",
-    timestamp: "03:06",
-    segundosInicio: 186.04,
-    duracionSegundos: 124.57,
-    pantallaAsociada: "/dashboard/voz",
+    slug: "ficha",
+    titulo: "La ficha del paciente",
+    descripcion: "Sesiones, documentos y el asistente, en la ficha de un paciente.",
+    archivo: "/videos/tutoriales/ficha.mp4",
   },
   {
-    modulo: 5,
-    titulo: "Registro de Sesión Presencial",
-    descripcion: "Graba sesiones presenciales en vivo con diarización y notas automáticas.",
-    timestamp: "05:11",
-    segundosInicio: 310.61,
-    duracionSegundos: 67.31,
-    pantallaAsociada: "/dashboard/pacientes/[id] (Nueva Sesión)",
+    slug: "consentimiento",
+    titulo: "Consentimiento informado",
+    descripcion: "Envía o registra el consentimiento informado desde la ficha.",
+    archivo: "/videos/tutoriales/consentimiento.mp4",
   },
   {
-    modulo: 6,
-    titulo: "Sesiones Online con Google Meet",
-    descripcion: "Graba y analiza consultas remotas de Meet usando la extensión de Chrome de Psiconex.",
-    timestamp: "06:18",
-    segundosInicio: 377.92,
-    duracionSegundos: 71.32,
-    pantallaAsociada: "/dashboard/pacientes/[id] (Sesión Online)",
+    slug: "cobros",
+    titulo: "Cobros y boletas por sesión",
+    descripcion: "Registra el pago de la sesión y prepara la boleta.",
+    archivo: "/videos/tutoriales/cobros.mp4",
   },
   {
-    modulo: 7,
-    titulo: "Sincronización con Google Calendar",
-    descripcion: "Conecta tu calendario de Google para sincronizar citas y disponibilidad en tiempo real.",
-    timestamp: "07:29",
-    segundosInicio: 449.24,
-    duracionSegundos: 69.44,
-    pantallaAsociada: "/dashboard/agenda",
+    slug: "sesion-presencial",
+    titulo: "Sesión presencial",
+    descripcion: "Graba una sesión presencial y revisa la transcripción.",
+    archivo: "/videos/tutoriales/sesion-presencial.mp4",
   },
   {
-    modulo: 8,
-    titulo: "Agenda Pública y Reserva de Citas",
-    descripcion: "Configura tu enlace público de reservas con verificación OTP y confirmación vía WhatsApp.",
-    timestamp: "08:39",
-    segundosInicio: 518.68,
-    duracionSegundos: 142.03,
-    pantallaAsociada: "/dashboard/agenda (Pública)",
+    slug: "sesion-virtual",
+    titulo: "Sesión virtual Psiconex",
+    descripcion: "Inicia una sesión remota y usa la sala de Psiconex.",
+    archivo: "/videos/tutoriales/sesion-virtual.mp4",
   },
   {
-    modulo: 9,
-    titulo: "Cierre y Próximos Pasos",
-    descripcion: "Recomendaciones finales para maximizar el provecho de todas las herramientas de Psiconex.",
-    timestamp: "11:01",
-    segundosInicio: 660.71,
-    duracionSegundos: 15.62,
-    pantallaAsociada: "Cierre del tutorial",
+    slug: "tests",
+    titulo: "Tests psicológicos",
+    descripcion: "Aplica evaluaciones como la Rueda de la Vida o el Test de Ellis.",
+    archivo: "/videos/tutoriales/tests.mp4",
+  },
+  {
+    slug: "agenda",
+    titulo: "Agenda",
+    descripcion: "Organiza citas, comparte tu enlace público y conecta Google Calendar.",
+    archivo: "/videos/tutoriales/agenda.mp4",
+  },
+  {
+    slug: "voz",
+    titulo: "Perfil de voz",
+    descripcion: "Registra tu voz para que Deepgram la distinga de la del paciente.",
+    archivo: "/videos/tutoriales/voz.mp4",
+  },
+  {
+    slug: "privacidad",
+    titulo: "Privacidad y datos",
+    descripcion: "Exporta o elimina tus datos y revisa los accesos.",
+    archivo: "/videos/tutoriales/privacidad.mp4",
+  },
+  {
+    slug: "feedback",
+    titulo: "Feedback y Ayuda",
+    descripcion: "Envía comentarios o pide ayuda desde esta sección.",
+    archivo: "/videos/tutoriales/feedback.mp4",
   },
 ];
+
+const POR_SLUG = new Map(TUTORIALES.map((video) => [video.slug, video]));
+
+export function esTutorialSlug(value: string): value is TutorialSlug {
+  return POR_SLUG.has(value as TutorialSlug);
+}
+
+export function tutorialPorSlug(slug: string | null | undefined): TutorialVideo | undefined {
+  if (!slug) return undefined;
+  return POR_SLUG.get(slug as TutorialSlug);
+}
+
+function normalizarRuta(pathname: string) {
+  if (pathname.length > 1 && pathname.endsWith("/")) return pathname.slice(0, -1);
+  return pathname;
+}
+
+export function tutorialForPath(pathname: string): TutorialSlug | null {
+  const path = normalizarRuta(pathname);
+  if (/^\/dashboard\/pacientes\/[^/]+\/sesiones\/[^/]+\/sala$/.test(path)) return "sesion-virtual";
+  if (/^\/dashboard\/pacientes\/[^/]+\/sesiones\/[^/]+$/.test(path)) return null;
+  if (/^\/dashboard\/pacientes\/[^/]+$/.test(path)) return "ficha";
+  if (path === "/dashboard" || path === "/dashboard/pacientes") return "pacientes";
+  if (path.startsWith("/dashboard/configuracion/perfil")) return "perfil";
+  if (path.startsWith("/dashboard/configuracion/boletas")) return "boletas-config";
+  if (path.startsWith("/dashboard/configuracion/privacidad")) return "privacidad";
+  if (path.startsWith("/dashboard/tests")) return "tests";
+  if (path.startsWith("/dashboard/agenda")) return "agenda";
+  if (path.startsWith("/dashboard/voz")) return "voz";
+  if (path.startsWith("/dashboard/feedback")) return "feedback";
+  return null;
+}

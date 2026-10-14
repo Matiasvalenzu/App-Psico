@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTutorial } from "@/context/TutorialContext";
+import { useTutorial, useTutorialSection } from "@/context/TutorialContext";
 import AlertaClinica from "./_components/AlertaClinica";
 import ChatIA from "./_components/ChatIA";
 import CobroDialog from "./_components/CobroDialog";
@@ -133,6 +133,7 @@ export default function PacienteDetailPage() {
   }
 
   const [tab, setTab] = useState<Tab>(tabSolicitada);
+  useTutorialSection(consentOpen ? "consentimiento" : tab === "cobros" ? "cobros" : null);
 
   useEffect(() => {
     getCurrentUser()
@@ -310,7 +311,7 @@ export default function PacienteDetailPage() {
         onTest={openTest}
         onEdit={() => setEditOpen(true)}
         onExport={exportarPaciente}
-        onTutorial={() => openTutorial(3)}
+        onTutorial={() => openTutorial("ficha")}
       />
 
       <AlertaClinica paciente={paciente} />

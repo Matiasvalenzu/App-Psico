@@ -181,6 +181,28 @@ class RegistrationFlowTests(TestCase):
         res_me_updated = client.get("/api/auth/me/")
         self.assertEqual(res_me_updated.status_code, 200)
         self.assertTrue(res_me_updated.data["tutorial_visto"])
+        self.assertTrue(res_me_updated.data["tutoriales_vistos"]["bienvenida"])
+
+        res_agenda = client.patch(
+            "/api/cuenta/perfil/",
+            {"tutoriales_vistos": {"agenda": True}},
+            format="json",
+        )
+        self.assertEqual(res_agenda.status_code, 200)
+        res_voz = client.patch(
+            "/api/cuenta/perfil/",
+            {"tutoriales_vistos": {"voz": True}},
+            format="json",
+        )
+        self.assertEqual(res_voz.status_code, 200)
+        self.assertTrue(res_voz.data["tutoriales_vistos"]["agenda"])
+        self.assertTrue(res_voz.data["tutoriales_vistos"]["voz"])
+        res_bad = client.patch(
+            "/api/cuenta/perfil/",
+            {"tutoriales_vistos": {"suscripcion": True}},
+            format="json",
+        )
+        self.assertEqual(res_bad.status_code, 400)
 
 
 @override_settings(

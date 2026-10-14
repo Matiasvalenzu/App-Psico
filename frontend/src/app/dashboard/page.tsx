@@ -583,7 +583,7 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">Busca, filtra y abre la ficha de tus pacientes.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => openTutorial(2)} className="gap-1.5 text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={() => openTutorial("pacientes")} className="gap-1.5 text-muted-foreground">
             <PlayCircle className="h-4 w-4" />
             Tutorial
           </Button>

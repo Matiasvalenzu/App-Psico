@@ -7,7 +7,7 @@ import { formatDate, formatTime, formatDuration, formatSeconds } from "@/lib/uti
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ArrowLeft, ChevronDown, ChevronUp, ClipboardList, Clock, Download, Edit3, ExternalLink, FileText, Loader2, MessageSquare, Mic, PlayCircle, Save, Search, ShieldCheck, Sparkles, Square, Trash2, User, UserCheck, Video, X } from "lucide-react";
 import { useAudioRecording } from "@/context/AudioRecordingContext";
-import { useTutorial } from "@/context/TutorialContext";
+import { useTutorial, useTutorialSection } from "@/context/TutorialContext";
 import SessionRecordingTips from "@/components/sesion/SessionRecordingTips";
 import { RemoteAudioAssistantModal } from "@/components/sesion/RemoteAudioAssistantModal";
 import RuedaCreenciasChart, { RuedaDimension } from "@/components/tests/RuedaCreenciasChart";
@@ -236,6 +236,14 @@ export default function SesionDetailPage() {
     startRecording: startGlobalRecording,
     stopRecording: stopGlobalRecording,
   } = useAudioRecording();
+
+  useTutorialSection(
+    sesion?.origen === "VIRTUAL"
+      ? "sesion-virtual"
+      : sesion && sesion.origen !== "DOCUMENTO_EXTERNO" && sesion.origen !== "TEST_PSICOLOGICO"
+        ? "sesion-presencial"
+        : null,
+  );
 
   const isCurrentSessionRecording =
     isGlobalRecording && String(recordingSessionId) === String(sesionId);
@@ -487,15 +495,15 @@ export default function SesionDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {!isExternalDoc && !isVirtual && !isTest && (
+          {!isExternalDoc && !isTest && (
             <button
               type="button"
-              onClick={() => openTutorial(5)}
+              onClick={() => openTutorial(isVirtual ? "sesion-virtual" : "sesion-presencial")}
               className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs"
-              title="Ver video tutorial de Registro de Sesión Presencial (Módulo 5)"
+              title={isVirtual ? "Ver tutorial de sesión virtual" : "Ver tutorial de sesión presencial"}
             >
               <PlayCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="hidden sm:inline">Tutorial sesión presencial</span>
+              <span className="hidden sm:inline">{isVirtual ? "Tutorial sesión virtual" : "Tutorial sesión presencial"}</span>
               <span className="sm:hidden">Tutorial</span>
             </button>
           )}

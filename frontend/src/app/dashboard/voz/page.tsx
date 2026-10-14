@@ -224,7 +224,7 @@ export default function VoiceEnrollmentPage() {
       setSamples([]);
       await loadProfile();
       setMessageType("success");
-      setMessage("¡Perfil de voz ECAPA-TDNN guardado correctamente! Ya está listo para identificar tu voz en las sesiones.");
+      setMessage("¡Perfil de voz guardado correctamente! Ya está listo para identificar tu voz en las sesiones.");
     } catch {
       setMessageType("error");
       setMessage("No se pudo guardar el perfil.");
@@ -246,17 +246,17 @@ export default function VoiceEnrollmentPage() {
             Perfil de voz del psicólogo
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Entrena la IA (ECAPA-TDNN) con tu voz para separar automáticamente tus intervenciones de las del paciente en sesiones clínicas y videollamadas.
+            Registra tu voz para que Deepgram separe automáticamente tus intervenciones de las del paciente en sesiones clínicas y videollamadas.
           </p>
         </div>
         <button
           type="button"
-          onClick={() => openTutorial(4)}
+          onClick={() => openTutorial("voz")}
           className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary transition-all hover:bg-primary/20 shadow-xs shrink-0 self-start sm:self-auto"
-          title="Ver tutorial de Enrolamiento de Voz (Módulo 4)"
+          title="Ver tutorial de perfil de voz"
         >
           <PlayCircle className="h-4 w-4" />
-          <span>Tutorial de Enrolamiento de Voz</span>
+          <span>Tutorial de perfil de voz</span>
         </button>
       </div>
 
@@ -303,7 +303,7 @@ export default function VoiceEnrollmentPage() {
                     }`}
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {profile.compatible ? "PERFIL ECAPA ACTIVO" : "PERFIL ANTIGUO NO COMPATIBLE"}
+                    {profile.compatible ? "PERFIL DE VOZ ACTIVO" : "PERFIL ANTIGUO NO COMPATIBLE"}
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground font-mono">{profile.embedding_model}</p>
@@ -349,7 +349,7 @@ export default function VoiceEnrollmentPage() {
           <span>¿Por qué es crucial un buen perfil de voz?</span>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Nuestra inteligencia artificial utiliza el modelo bioacústico <strong>ECAPA-TDNN</strong> para analizar las frecuencias de tu voz. Durante la sesión, este perfil ayuda a distinguir cuándo hablas tú y cuándo el paciente, para atribuir mejor cada intervención en la transcripción.
+          Deepgram usa este perfil para distinguir cuándo hablas tú y cuándo el paciente, y atribuir mejor cada intervención en la transcripción.
         </p>
 
         <div className="grid gap-2.5 sm:grid-cols-2 pt-1">
@@ -548,7 +548,7 @@ export default function VoiceEnrollmentPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Procesando embeddings ECAPA-TDNN..." : "Guardar perfil de voz"}
+            {saving ? "Guardando perfil de voz..." : "Guardar perfil de voz"}
           </button>
         </div>
 

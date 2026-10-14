@@ -38,7 +38,7 @@ export default function MoreDrawer({
 }: MoreDrawerProps) {
   const router = useRouter();
   const { theme, toggle } = useTheme();
-  const { openTutorial } = useTutorial();
+  const { openCatalog } = useTutorial();
   const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -205,9 +205,9 @@ export default function MoreDrawer({
 
             <MenuItem
               icon={PlayCircle}
-              label="Video Tutorial Maestro"
+              label="Video Tutorial"
               onClick={() => {
-                openTutorial(0);
+                openCatalog();
               }}
             />
 

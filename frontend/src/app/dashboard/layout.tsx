@@ -173,7 +173,7 @@ function DashboardInner({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { openTutorial } = useTutorial();
+  const { openTutorial, openCatalog } = useTutorial();
   const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -366,7 +366,7 @@ function DashboardInner({
             <NavItem href="/dashboard/feedback" icon={MessageSquarePlus} label="Feedback y Ayuda" {...navProps} />
             <button
               type="button"
-              onClick={() => openTutorial(0)}
+              onClick={() => openCatalog()}
               title={isCollapsed ? "Video Tutorial" : undefined}
               className={`group relative flex items-center gap-3 rounded-xl py-2 text-sm font-medium transition-colors duration-200 text-muted-foreground hover:bg-accent/80 hover:text-foreground ${
                 isCollapsed ? "justify-center px-0 mx-2" : "px-3.5"
@@ -407,9 +407,9 @@ function DashboardInner({
             </div>
             <button
               type="button"
-              onClick={() => openTutorial(0)}
+              onClick={() => openTutorial()}
               className="flex md:hidden items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
-              title="Ver tutorial guiado"
+              title="Ver tutorial de esta sección"
             >
               <PlayCircle className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Tutorial</span>
@@ -434,9 +434,9 @@ function DashboardInner({
             )}
             <button
               type="button"
-              onClick={() => openTutorial(0)}
+              onClick={() => openTutorial()}
               className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-accent hover:border-primary/40"
-              title="Ver video tutorial de Psiconex (11 min)"
+              title="Ver tutorial de esta sección"
             >
               <PlayCircle className="h-4 w-4 text-primary" />
               <span className="hidden lg:inline">Tutorial</span>

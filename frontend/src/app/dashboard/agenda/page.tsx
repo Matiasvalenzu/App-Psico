@@ -881,9 +881,9 @@ export default function AgendaPage() {
           )}
           <button
             type="button"
-            onClick={() => openTutorial(7)}
+            onClick={() => openTutorial("agenda")}
             className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary shadow-subtle transition-all hover:bg-primary/20"
-            title="Ver video tutorial sobre Calendar y Agenda"
+            title="Ver tutorial de Agenda"
           >
             <PlayCircle className="h-4 w-4" />
             <span>Ver tutorial de Agenda</span>

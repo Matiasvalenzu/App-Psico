@@ -31,6 +31,7 @@ class PerfilPsicologo(models.Model):
     comuna = models.CharField(max_length=100, blank=True, default="")
     direccion_consulta = models.CharField(max_length=255, blank=True, default="")
     tutorial_visto = models.BooleanField(default=False)
+    tutoriales_vistos = models.JSONField(default=dict, blank=True)
     recordatorios_paciente_activos = models.BooleanField(default=True)
     bhe_glosa_default = models.CharField(max_length=200, default="Atención psicológica")
     created_at = models.DateTimeField(auto_now_add=True)

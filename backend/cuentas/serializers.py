@@ -8,6 +8,23 @@ from facturacion.services import validar_glosa
 
 from .models import PerfilPsicologo
 
+TUTORIALES = {
+    "bienvenida",
+    "perfil",
+    "boletas-config",
+    "pacientes",
+    "ficha",
+    "consentimiento",
+    "cobros",
+    "sesion-presencial",
+    "sesion-virtual",
+    "tests",
+    "agenda",
+    "voz",
+    "privacidad",
+    "feedback",
+}
+
 
 class PerfilPsicologoSerializer(serializers.Serializer):
     login_email = serializers.EmailField(read_only=True)
@@ -28,6 +45,7 @@ class PerfilPsicologoSerializer(serializers.Serializer):
     comuna = serializers.CharField(max_length=100, allow_blank=True, required=False)
     direccion_consulta = serializers.CharField(max_length=255, allow_blank=True, required=False)
     tutorial_visto = serializers.BooleanField(required=False)
+    tutoriales_vistos = serializers.DictField(required=False)
     recordatorios_paciente_activos = serializers.BooleanField(required=False)
     bhe_glosa_default = serializers.CharField(max_length=200, required=False)
 
@@ -51,6 +69,7 @@ class PerfilPsicologoSerializer(serializers.Serializer):
             "comuna": instance.comuna,
             "direccion_consulta": instance.direccion_consulta,
             "tutorial_visto": instance.tutorial_visto,
+            "tutoriales_vistos": instance.tutoriales_vistos or {},
             "recordatorios_paciente_activos": instance.recordatorios_paciente_activos,
             "bhe_glosa_default": instance.bhe_glosa_default,
         }
@@ -70,14 +89,40 @@ class PerfilPsicologoSerializer(serializers.Serializer):
     def validate_bhe_glosa_default(self, value):
         return validar_glosa(value)
 
+    def validate_tutoriales_vistos(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Debe ser un objeto.")
+        clean = {}
+        for key, seen in value.items():
+            if key not in TUTORIALES:
+                raise serializers.ValidationError("Tutorial no reconocido.")
+            if not isinstance(seen, bool):
+                raise serializers.ValidationError("Cada valor debe ser verdadero o falso.")
+            clean[key] = seen
+        return clean
+
     @transaction.atomic
     def update(self, instance, validated_data):
         user = instance.user
         user.first_name = validated_data.pop("first_name", user.first_name).strip()
         user.last_name = validated_data.pop("last_name", user.last_name).strip()
         validated_data.pop("email_notificaciones", None)
+        vistos = validated_data.pop("tutoriales_vistos", None)
         user.save(update_fields=["first_name", "last_name"])
         for field, value in validated_data.items():
             setattr(instance, field, value.strip() if isinstance(value, str) else value)
+        if vistos is not None:
+            merged = dict(instance.tutoriales_vistos or {})
+            for key, seen in vistos.items():
+                if seen:
+                    merged[key] = True
+                else:
+                    merged.pop(key, None)
+            instance.tutoriales_vistos = merged
+        if validated_data.get("tutorial_visto") is True or (vistos or {}).get("bienvenida"):
+            merged = dict(instance.tutoriales_vistos or {})
+            merged["bienvenida"] = True
+            instance.tutoriales_vistos = merged
+            instance.tutorial_visto = True
         instance.save()
         return instance

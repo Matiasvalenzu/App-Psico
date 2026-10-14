@@ -63,11 +63,17 @@ def current_user(request):
             dias_para_purga = suscripcion.dias_para_purga
 
     tutorial_visto = False
+    tutoriales_vistos = {}
     if hasattr(request.user, "perfil_psicologo"):
-        tutorial_visto = request.user.perfil_psicologo.tutorial_visto
+        perfil = request.user.perfil_psicologo
+        tutorial_visto = perfil.tutorial_visto
+        tutoriales_vistos = dict(perfil.tutoriales_vistos or {})
+        if tutorial_visto:
+            tutoriales_vistos["bienvenida"] = True
 
     return Response(
         {
+            "id": request.user.id,
             "username": request.user.username,
             "email": request.user.email,
             "first_name": request.user.first_name,
@@ -94,6 +100,7 @@ def current_user(request):
             "fecha_purga": fecha_purga,
             "dias_para_purga": dias_para_purga,
             "tutorial_visto": tutorial_visto,
+            "tutoriales_vistos": tutoriales_vistos,
             "tiene_password": request.user.has_usable_password(),
         }
     )
