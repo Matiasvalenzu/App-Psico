@@ -11,6 +11,14 @@ import { SectionHeading } from "@/components/sections/section-heading"
 
 const FAQS = [
   {
+    q: "¿Sirve si atiendo solo, en consulta particular?",
+    a: "Sí, está pensado para eso. El plan Estándar ($4.990 al mes) trae lo clínico: transcripción, chat con IA para resúmenes e informes, agenda y videollamada propia. Si además quieres llevar tus cobros y emitir tus boletas de honorarios, el plan Plus ($9.990 al mes) los suma. No se cobra por paciente.",
+  },
+  {
+    q: "¿Necesito tarjeta para probar?",
+    a: "No. La prueba de 14 días del plan Estándar solo pide nombre, correo y contraseña. Si registras tu tarjeta durante la prueba, el primer cobro llega cuando termina. El plan Plus se cobra al suscribirte. Si la prueba termina y no te suscribes, tu cuenta queda en solo lectura.",
+  },
+  {
     q: "¿Necesito el consentimiento de mis pacientes?",
     a: "Sí. Grabar o transcribir una sesión requiere el consentimiento informado del paciente. Psiconex incluye una plantilla de consentimiento editable, que puedes ajustar a tu práctica y que el paciente firma de forma electrónica mediante un enlace. Si un paciente aún no tiene consentimiento registrado, te lo advertimos. Revisa con tu marco ético y legal que el texto sirva a tu caso.",
   },
@@ -19,12 +27,16 @@ const FAQS = [
     a: "Ninguna transcripción automática es perfecta. La precisión depende de la calidad del audio, el ruido, los acentos y la cantidad de voces. Por eso la transcripción es editable: la revisas y corriges antes de usarla. Separamos las voces cuando el audio y la configuración lo permiten.",
   },
   {
+    q: "¿Los textos que genera la IA quedan como definitivos?",
+    a: "No. La transcripción la revisas y corriges. Los resúmenes y borradores de informe que pides en el chat con IA son una propuesta: un informe solo queda guardado si tú lo guardas, y lo descargas en PDF o Word para editarlo y firmarlo.",
+  },
+  {
     q: "¿Qué servicios externos reciben mis datos?",
     a: "La transcripción la hace nuestro servidor, y el audio se elimina en cuanto termina. Para separar las voces, el audio se envía a Deepgram por una conexión cifrada, indicándole que no lo use para mejorar sus modelos. Cuando usas el chat, los informes o la observación de tests con IA, el texto se envía a DeepSeek sin el nombre del paciente. Los datos de Google Calendar nunca se envían a la IA. En la sección de seguridad detallamos cada proveedor y qué recibe.",
   },
   {
-    q: "¿Puedo migrar mis fichas actuales?",
-    a: "Puedes subir documentos en PDF, Word o TXT a la ficha de cada paciente para que queden con su historial. Si necesitas ayuda con una migración, escríbenos y lo conversamos.",
+    q: "¿Me puedo cambiar desde otra plataforma sin perder a mis pacientes?",
+    a: "Sí. Si tienes a tus pacientes en una planilla Excel o CSV, impórtala: Psiconex reconoce las columnas, te muestra lo que va a crear antes de confirmar y puedes deshacer la importación durante 24 horas. Se importan solo datos de contacto y administrativos. Tus documentos en PDF, Word o TXT los subes a la ficha de cada paciente. Si necesitas ayuda, escríbenos.",
   },
   {
     q: "¿Puedo hacer sesiones online?",
