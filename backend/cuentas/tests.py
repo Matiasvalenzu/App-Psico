@@ -506,6 +506,9 @@ class OnboardingTests(TestCase):
             format="json",
         )
         self.assertEqual(res.data["onboarding_pasos"], {"datos": "hecho", "voz": "hecho"})
+        self.assertTrue(res.data["onboarding_completado"])
+        # force_authenticate reutiliza el usuario y su perfil cacheado.
+        self.client.force_authenticate(user=get_user_model().objects.get(pk=self.user.pk))
         me = self.client.get("/api/auth/me/")
         self.assertTrue(me.data["onboarding_completado"])
 
