@@ -490,9 +490,9 @@ export function BoletasScreen() {
                 <span className="tabular-nums">$29.662</span>
               </div>
             </div>
-            <Boton className="w-full justify-center py-2 text-xs">Emitir en el SII</Boton>
+            <Boton className="w-full justify-center py-2 text-xs">Emitir boleta</Boton>
             <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-              <ShieldCheck className="size-3.5 text-emerald-600" aria-hidden /> Sin entregar tu clave del SII
+              <ShieldCheck className="size-3.5 text-emerald-600" aria-hidden /> Sin entregar tu clave del Servicio de Impuestos Internos
             </p>
           </div>
         </div>

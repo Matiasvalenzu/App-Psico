@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type TouchEvent } from "react"
+import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type TouchEvent } from "react"
 import { cn } from "@/lib/utils"
 import {
   AgendaScreen,
@@ -17,10 +17,10 @@ const SCREENS = [
   { id: "transcripcion", label: "Transcripción", caption: "La sesión transcrita, con tu voz y la del paciente separadas.", Screen: TranscripcionScreen },
   { id: "informe", label: "Informe", caption: "Un borrador del informe para que lo revises y lo edites antes de firmarlo.", Screen: InformeScreen },
   { id: "cobros", label: "Cobros", caption: "Revisa qué sesiones están pagadas y cuáles faltan.", Screen: CobrosScreen, plus: true },
-  { id: "boletas", label: "Boletas", caption: "Emite tu boleta en un clic, sin entregar tu clave del SII.", Screen: BoletasScreen, plus: true },
+  { id: "boletas", label: "Boletas", caption: "Emite tu boleta en un clic, sin entregar tu clave del Servicio de Impuestos Internos.", Screen: BoletasScreen, plus: true },
 ]
 
-const INTERVALO_MS = 4500
+const INTERVALO_MS = 2300
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)"
 
 function subscribeReducedMotion(callback: () => void) {
@@ -41,14 +41,7 @@ export function AppSequence({ className }: { className?: string }) {
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([])
   const touchX = useRef<number | null>(null)
 
-  // Reinicia el intervalo cada vez que cambia la pantalla (también tras un clic)
-  useEffect(() => {
-    if (hover || focus || reducedMotion) return
-    const id = window.setInterval(() => {
-      if (!document.hidden) setActive((i) => (i + 1) % SCREENS.length)
-    }, INTERVALO_MS)
-    return () => window.clearInterval(id)
-  }, [active, hover, focus, reducedMotion])
+  // El avance lo marca el fin de la barra de progreso de la pestaña activa (se pausa con hover/foco)
 
   const ir = (i: number, enfocar = false) => {
     const next = (i + SCREENS.length) % SCREENS.length
@@ -92,6 +85,7 @@ export function AppSequence({ className }: { className?: string }) {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocus(false)
       }}
     >
+      <style>{`@keyframes demo-progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}.demo-progress{animation-name:demo-progress;animation-timing-function:linear;animation-fill-mode:forwards}`}</style>
       <div
         role="tablist"
         aria-label="Pantallas de Psiconex"
@@ -112,13 +106,25 @@ export function AppSequence({ className }: { className?: string }) {
             onClick={() => ir(i)}
             onKeyDown={onTabKeyDown}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              "relative overflow-hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               i === active
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background/70 text-muted-foreground hover:border-primary/40 hover:text-foreground",
             )}
           >
-            {s.label}
+            <span className="relative z-10">{s.label}</span>
+            {i === active && !reducedMotion && (
+              <span
+                key={`p-${active}`}
+                aria-hidden="true"
+                className="demo-progress absolute inset-x-0 bottom-0 h-[3px] origin-left bg-white/70"
+                style={{
+                  animationDuration: `${INTERVALO_MS}ms`,
+                  animationPlayState: hover || focus ? "paused" : "running",
+                }}
+                onAnimationEnd={() => setActive((n) => (n + 1) % SCREENS.length)}
+              />
+            )}
           </button>
         ))}
       </div>
@@ -138,8 +144,12 @@ export function AppSequence({ className }: { className?: string }) {
             aria-hidden={i !== active}
             inert={i !== active}
             className={cn(
-              "absolute inset-0 transition-[opacity,transform] duration-500 ease-out motion-reduce:transition-none",
-              i === active ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
+              "absolute inset-0 transition-[opacity,transform,filter] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              i === active
+                ? "translate-x-0 scale-100 opacity-100 blur-0"
+                : i === (active - 1 + SCREENS.length) % SCREENS.length
+                  ? "pointer-events-none -translate-x-6 scale-[0.985] opacity-0 blur-[2px]"
+                  : "pointer-events-none translate-x-6 scale-[0.985] opacity-0 blur-[2px]",
             )}
           >
             <Screen />

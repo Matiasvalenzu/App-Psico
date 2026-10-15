@@ -21,6 +21,7 @@ const FUNCIONES_ESTANDAR = [
   "Videollamada propia de Psiconex",
   "Enlace privado para reserva de horas",
   "Recordatorios por correo a tus pacientes",
+  "Importación de pacientes desde Excel o CSV",
   "Exportación completa de tus datos",
 ]
 
@@ -30,7 +31,7 @@ const FUNCIONES_PLUS_CLINICO = [
 ]
 
 const FUNCIONES_PLUS_ADMINISTRACION = [
-  "Boletas de honorarios electrónicas en el SII con un clic desde cada cobro, sin entregar tu clave: Psiconex las emite como usuario autorizado",
+  "Boletas de honorarios electrónicas en el Servicio de Impuestos Internos con un clic desde cada cobro, sin entregar tu clave: Psiconex las emite como usuario autorizado",
   "Registro de pagos por paciente: fecha, monto, medio de pago y si está pagado o pendiente",
   "El PDF de cada boleta guardado y listo para descargar desde la ficha",
   "Cálculo automático de la retención: monto bruto, retención y lo que declaras en tu F29, según quién retiene",
@@ -196,7 +197,7 @@ export function PricingSection() {
                 </h4>
                 <ListaFunciones items={FUNCIONES_PLUS_ADMINISTRACION} destacada={seleccionado === "plus"} />
                 <p className="mt-4 text-xs leading-snug text-muted-foreground">
-                  Para emitir boletas autorizas a Psiconex en el SII; revisamos esa autorización antes de activar la emisión.
+                  Para emitir boletas autorizas a Psiconex en el Servicio de Impuestos Internos; revisamos esa autorización antes de activar la emisión.
                 </p>
               </div>
             </div>

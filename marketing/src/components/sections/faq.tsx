@@ -47,12 +47,12 @@ const FAQS = [
     a: "Tus datos son tuyos. Desde la sección Privacidad de la app descargas cuando quieras un ZIP con fichas, consentimientos, sesiones, transcripciones, tests, informes y agenda, en JSON y PDF. Si cancelas, tu cuenta queda 30 días en solo lectura para que exportes lo que necesites; te avisamos por correo 7 días y 1 día antes, y luego eliminamos tus datos. También puedes eliminar tu cuenta de inmediato desde la app.",
   },
   {
-    q: "¿Necesito entregar mi clave del SII?",
-    a: "No. Autorizas a Psiconex una vez desde tu propio SII y puedes revocar ese permiso cuando quieras. Psiconex nunca pide ni guarda tu clave.",
+    q: "¿Necesito entregar mi clave del Servicio de Impuestos Internos?",
+    a: "No. Autorizas a Psiconex una vez desde tu propio Servicio de Impuestos Internos y puedes revocar ese permiso cuando quieras. Psiconex nunca pide ni guarda tu clave.",
   },
   {
     q: "¿Puedo anular una boleta?",
-    a: "Sí. La anulas en tu SII siguiendo la guía de la app y la marcas como anulada en Psiconex, que actualiza su estado.",
+    a: "Sí. La anulas en tu Servicio de Impuestos Internos siguiendo la guía de la app y la marcas como anulada en Psiconex, que actualiza su estado.",
   },
   {
     q: "¿Qué escalas clínicas incluye?",

@@ -11,6 +11,9 @@ import {
   ShieldCheck,
   Lock,
   Download,
+  UserCheck,
+  Sparkles,
+  Trash2,
 } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 import { cn } from "@/lib/utils"
@@ -307,7 +310,7 @@ export function FeaturesBentoSection() {
           description="Todo el flujo clínico en un solo lugar, pensado para psicólogos, no para informáticos. Diseñado con clínicos chilenos en ejercicio."
         />
 
-        <div ref={timelineRef} className="relative mt-16 md:mt-24">
+        <div ref={timelineRef} id="como-funciona" className="relative mt-16 scroll-mt-24 md:mt-24">
           {/* Línea móvil: recta, a la izquierda */}
           <div aria-hidden="true" className="absolute bottom-0 left-[1.4rem] top-0 w-[3px] rounded-full bg-primary/10 md:hidden">
             <motion.div
@@ -424,6 +427,22 @@ export function FeaturesBentoSection() {
             <li className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-primary" aria-hidden />Viaja cifrada mediante HTTPS</li>
             <li className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-primary" aria-hidden />Datos clínicos sensibles guardados cifrados</li>
             <li className="flex items-center gap-1.5"><Download className="h-3.5 w-3.5 text-primary" aria-hidden />Exportas o eliminas tu cuenta cuando quieras</li>
+          </ul>
+        </motion.div>
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="mx-auto mt-3 flex max-w-4xl flex-col gap-3 rounded-full border border-primary/15 bg-gradient-to-r from-[hsl(280_75%_64%)]/5 via-background to-primary/5 px-6 py-4 max-md:rounded-3xl md:flex-row md:items-center md:justify-between md:px-8"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <UserCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            IA responsable
+          </p>
+          <ul className="flex flex-col gap-2 text-xs text-muted-foreground md:flex-row md:gap-6">
+            <li className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />La IA propone, tú decides: todo es editable</li>
+            <li className="flex items-center gap-1.5"><Trash2 className="h-3.5 w-3.5 text-primary" aria-hidden />El audio se elimina en cuanto termina la transcripción</li>
           </ul>
         </motion.div>
       </div>

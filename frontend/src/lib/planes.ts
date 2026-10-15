@@ -12,6 +12,7 @@ export const FUNCIONES_ESTANDAR = [
   "Registro de sesiones online (Meet y Zoom)",
   "Enlace privado para reserva de horas",
   "Recordatorios por correo a tus pacientes",
+  "Importación de pacientes desde Excel o CSV",
   "Exportación completa de tus datos",
 ];
 

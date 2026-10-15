@@ -1,8 +1,8 @@
 "use client"
 
-import { motion } from "motion/react"
-import { Fragment } from "react"
-import { ArrowDown, Clock, FileText, Brain, Receipt } from "lucide-react"
+import { useState } from "react"
+import { motion, useReducedMotion } from "motion/react"
+import { Check, Clock, FileText, Brain, Receipt } from "lucide-react"
 import { SectionHeading } from "@/components/sections/section-heading"
 
 const PAINS = [
@@ -28,23 +28,29 @@ const PAINS = [
     icon: Receipt,
     title: "Emitir boletas y perseguir pagos a fin de mes",
     body: "Horas de trámite que podrías dedicar a tus pacientes.",
-    solution: "Registra tus cobros, ve quién te debe y emite tu boleta en un clic, sin entregar tu clave del SII (Plan Plus).",
+    solution: "Registra tus cobros, ve quién te debe y emite tu boleta en un clic, sin entregar tu clave del Servicio de Impuestos Internos (Plan Plus).",
   },
 ]
 
 export function ProblemSection() {
+  const reduce = useReducedMotion()
+  const [vistos, setVistos] = useState<boolean[]>([])
   return (
     <section
       id="problema"
       aria-label="El problema"
-      className="section-perf relative py-20 md:py-28 lg:py-32"
+      className="section-perf relative overflow-hidden py-20 md:py-28 lg:py-32"
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-grid mask-radial-fade opacity-60"
-      />
+      <style>{`
+        .pb-strike { background-image: linear-gradient(hsl(var(--primary) / .55), hsl(var(--primary) / .55)); background-repeat: no-repeat; background-position: 0 58%; background-size: 0% 2px; transition: background-size .9s cubic-bezier(.22,1,.36,1) .25s, color .6s ease .25s }
+        .pb-row[data-on="true"] .pb-strike { background-size: 100% 2px; color: hsl(var(--muted-foreground)) }
+        .pb-sweep { transform: scaleX(0); transform-origin: left; transition: transform 1s cubic-bezier(.22,1,.36,1) .45s }
+        .pb-row[data-on="true"] .pb-sweep { transform: scaleX(1) }
+        @media (prefers-reduced-motion: reduce) { .pb-strike, .pb-sweep { transition: none } }
+      `}</style>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-grid mask-radial-fade opacity-60" />
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <SectionHeading
           eyebrow="El problema"
           title={
@@ -56,74 +62,54 @@ export function ProblemSection() {
           description="Cuatro situaciones que se repiten en la consulta de muchos psicólogos."
         />
 
-        <div className="mx-auto mt-16 grid max-w-xl lg:max-w-none lg:grid-flow-col lg:grid-cols-4 lg:grid-rows-[auto_auto_auto] lg:gap-x-6">
+        <div aria-hidden="true" className="mx-auto mt-14 hidden max-w-5xl grid-cols-[4.5rem_1fr_1fr] gap-8 px-2 text-xs font-semibold uppercase tracking-widest md:grid">
+          <span />
+          <span className="text-muted-foreground">Antes</span>
+          <span className="text-primary">Con Psiconex</span>
+        </div>
+
+        <ol className="mx-auto mt-6 max-w-5xl divide-y divide-primary/10 md:mt-3">
           {PAINS.map((pain, i) => {
             const Icon = pain.icon
             const num = String(i + 1).padStart(2, "0")
             return (
-              <Fragment key={pain.title}>
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-80px" }}
-                  transition={{
-                    duration: 0.6,
-                    delay: i * 0.1,
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                  className={`group card-premium relative overflow-hidden rounded-2xl p-7 ${i > 0 ? "mt-10 lg:mt-0" : ""}`}
-                >
-                  <span aria-hidden="true" className="number-watermark">
-                    {num}
-                  </span>
+              <motion.li
+                key={pain.title}
+                initial={reduce ? false : { opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-120px" }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                onViewportEnter={() => setVistos((v) => { const n = [...v]; n[i] = true; return n })}
+                data-on={reduce || vistos[i] ? "true" : "false"}
+                className="pb-row relative grid gap-4 py-9 md:grid-cols-[4.5rem_1fr_1fr] md:gap-8 md:py-10"
+              >
+                <div className="flex items-center gap-3 md:block">
+                  <span className="gradient-primary-text text-4xl font-bold leading-none tracking-tight md:text-5xl">{num}</span>
+                  <Icon className="h-5 w-5 text-primary/60 md:mt-3" aria-hidden="true" />
+                </div>
 
-                  <div className="relative">
-                    <div className="icon-tile h-12 w-12">
-                      <Icon className="h-6 w-6" aria-hidden="true" />
-                    </div>
+                <div>
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground md:hidden">Antes</span>
+                  <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                    <span className="pb-strike box-decoration-clone">{pain.title}</span>
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{pain.body}</p>
+                </div>
 
-                    <h3 className="mt-5 text-lg font-semibold tracking-tight text-foreground">
-                      {pain.title}
-                    </h3>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      {pain.body}
-                    </p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-80px" }}
-                  transition={{
-                    duration: 0.6,
-                    delay: i * 0.1 + 0.15,
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                  aria-hidden="true"
-                  className="mx-auto my-3 grid size-9 place-items-center rounded-full bg-primary text-white"
-                >
-                  <ArrowDown className="h-5 w-5" />
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-80px" }}
-                  transition={{
-                    duration: 0.6,
-                    delay: i * 0.1 + 0.25,
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                  className="rounded-2xl border border-violet-300 bg-violet-50 p-7 dark:border-violet-700 dark:bg-violet-950/40"
-                >
-                  <p className="text-sm font-bold text-violet-700 dark:text-violet-300">✓ Con Psiconex</p>
-                  <p className="mt-3 text-sm leading-relaxed text-foreground">{pain.solution}</p>
-                </motion.div>
-              </Fragment>
+                <div className="relative rounded-[1.75rem] px-5 py-4 md:-my-2">
+                  <span aria-hidden="true" className="pb-sweep absolute inset-0 -z-10 rounded-[1.75rem] bg-gradient-to-r from-primary/12 via-[hsl(280_75%_64%)]/10 to-transparent" />
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-primary md:hidden">Con Psiconex</span>
+                  <p className="flex items-start gap-3 text-sm leading-relaxed text-foreground md:text-base">
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[hsl(280_75%_64%)] text-white shadow-md shadow-primary/30">
+                      <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                    </span>
+                    <span>{pain.solution}</span>
+                  </p>
+                </div>
+              </motion.li>
             )
           })}
-        </div>
+        </ol>
       </div>
     </section>
   )
