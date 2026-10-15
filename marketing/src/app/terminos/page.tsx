@@ -72,7 +72,7 @@ export default function TermsPage() {
                 Psiconex ofrece el plan Estándar, a $4.990 CLP al mes, y el Plan Plus, a $9.990 CLP al mes. Los pagos de la suscripción se procesan con Mercado Pago.
               </p>
               <p className="mt-3">
-                La prueba gratuita de 14 días incluye las funciones del Plan Plus. Si te suscribes durante la prueba, a Estándar o a Plus, el primer cobro se realiza cuando la prueba termina.
+                La prueba gratuita de 14 días incluye las funciones del Plan Plus. Si te suscribes desde tu cuenta durante la prueba, a Estándar o a Plus, el primer cobro se realiza cuando la prueba termina. Si contratas Plus directamente con el enlace de pago, sin pasar por la prueba, el cobro se realiza al suscribirte.
               </p>
             </section>
 
