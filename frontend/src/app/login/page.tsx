@@ -10,7 +10,7 @@ import {
   resendRegistrationCode,
 } from "@/lib/api";
 import { leerAtribucion } from "@/lib/atribucion";
-import { isGoogleAdsEnabled, trackGoogleAdsConversion } from "@/lib/googleAds";
+import { isGoogleAdsEnabled, trackGoogleAdsConversionAndWait } from "@/lib/googleAds";
 import {
   isMetaPixelEnabled,
   trackCompleteRegistration,
@@ -194,7 +194,8 @@ export default function LoginPage() {
       await verifyRegistrationCode(registerEmail, cleanCode, leerAtribucion());
       // Registro por OTP = cuenta nueva (sin PII en el evento).
       trackCompleteRegistration();
-      trackGoogleAdsConversion("registro_app");
+      // Espera la confirmación de gtag (máx. 1,5 s) antes de salir de /login.
+      await trackGoogleAdsConversionAndWait("registro_app");
       goToDashboard();
     } catch (err: any) {
       setError(err.message || "Código inválido o expirado.");
@@ -235,7 +236,8 @@ export default function LoginPage() {
         // /auth/google/login/ devuelve `is_new_user` (true solo si se creó la cuenta).
         if (googleData?.is_new_user === true) {
           trackCompleteRegistration();
-          trackGoogleAdsConversion("registro_app");
+          // Espera la confirmación de gtag (máx. 1,5 s) antes de salir de /login.
+          await trackGoogleAdsConversionAndWait("registro_app");
         }
       }
       goToDashboard();

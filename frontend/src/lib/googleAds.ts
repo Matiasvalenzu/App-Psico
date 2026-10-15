@@ -125,6 +125,33 @@ export function trackGoogleAdsConversion(name: GoogleAdsConversionName): boolean
   return safeConversion(name)
 }
 
+/**
+ * Igual que `trackGoogleAdsConversion`, pero devuelve una promesa que se
+ * resuelve cuando gtag confirma el envío (`event_callback`) o tras `timeoutMs`.
+ * Úsala antes de una navegación completa: si gtag.js aún no terminó de cargar,
+ * el evento quedaba en dataLayer y se perdía al salir de la página.
+ */
+export function trackGoogleAdsConversionAndWait(
+  name: GoogleAdsConversionName,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  if (name === "suscripcion_pagada") return Promise.resolve(false)
+  return new Promise((resolve) => {
+    let done = false
+    const finish = (ok: boolean) => {
+      if (done) return
+      done = true
+      resolve(ok)
+    }
+    const sent = safeConversion(name, {
+      event_callback: () => finish(true),
+      event_timeout: timeoutMs,
+    })
+    if (!sent) return finish(false)
+    window.setTimeout(() => finish(true), timeoutMs + 100)
+  })
+}
+
 /** Plan Estándar mensual (CLP) — mismo monto que backend/suscripciones. */
 export const GOOGLE_ADS_SUBSCRIBE_VALUE_CLP = 4990
 
