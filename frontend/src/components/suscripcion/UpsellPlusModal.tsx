@@ -50,7 +50,7 @@ export default function UpsellPlusModal({
         <p className="text-lg font-semibold">$9.990/mes</p>
         {enPrueba && (
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            El cobro de $9.990 parte de inmediato y los días de prueba que te quedan se pierden.
+            El primer cobro de $9.990 llega al terminar la prueba. Hasta esa fecha sigues con el Plan Plus.
           </p>
         )}
         <DialogFooter>

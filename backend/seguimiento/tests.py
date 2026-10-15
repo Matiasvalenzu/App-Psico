@@ -236,6 +236,7 @@ class GatingPlanTests(TestCase):
     def setUp(self):
         self.psico = User.objects.create_user(username="estandar_demo", email="estandar@example.test", password="x")
         Suscripcion.objects.update_or_create(user=self.psico, defaults={"plan": "estandar", "estado": "activa"})
+        self.psico = User.objects.get(pk=self.psico.pk)
         self.paciente = Paciente.objects.create(psicologo=self.psico, nombre="Demo", apellido="Estandar")
         self.client = APIClient()
         self.client.force_authenticate(self.psico)
@@ -249,6 +250,22 @@ class GatingPlanTests(TestCase):
             self.assertEqual(r.data["code"], "requiere_plus")
         doc = DocumentoClinicoIA.objects.create(paciente=self.paciente, psicologo=self.psico, tipo="COLEGIO", estado="LISTO")
         self.assertEqual(self.client.get(f"/api/seguimiento/documentos/{doc.id}/exportar/pdf/").status_code, 403)
+
+    def test_trial_vigente_accede_a_brief_e_informes_y_el_vencido_no(self):
+        suscripcion = self.psico.suscripcion
+        suscripcion.estado = "trial"
+        suscripcion.plan = "estandar"
+        suscripcion.fin_prueba = timezone.now() + timedelta(days=3)
+        suscripcion.save()
+        for url in (f"{self.base}/brief/", f"{self.base}/informes/"):
+            r = self.client.get(url)
+            self.assertNotEqual(r.status_code, 403, url)
+        suscripcion.fin_prueba = timezone.now() - timedelta(hours=1)
+        suscripcion.save()
+        for url in (f"{self.base}/brief/", f"{self.base}/informes/"):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, 403, url)
+            self.assertEqual(r.data["code"], "requiere_plus")
 
     def test_estandar_si_accede_a_escalas_tareas_y_animo(self):
         r = self.client.post(f"{self.base}/escalas/", {"escala": "gad-7", "canal": "EN_CONSULTA", "respuestas": resp(GAD7, [0] * 7)}, format="json")

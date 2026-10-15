@@ -227,7 +227,9 @@ export default function SuscripcionPage() {
           Suscribirme a Plus
         </Button>
         <p className="text-[11px] text-center text-muted-foreground leading-tight">
-          Ingresas la tarjeta aquí. El primer cobro es al confirmar y Plus queda activo en esta cuenta.
+          {isTrial
+            ? "Registras tu tarjeta sin cobro hoy: el primer cobro es al terminar la prueba."
+            : "Ingresas la tarjeta aquí. El primer cobro es al confirmar y Plus queda activo en esta cuenta."}
         </p>
       </div>
     );
@@ -295,8 +297,8 @@ export default function SuscripcionPage() {
                 Período de prueba gratuito activo: {diasRestantes} {diasRestantes === 1 ? "día restante" : "días restantes"}
               </h3>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-                Disfrutas de todas las funcionalidades clínicas sin restricciones. Tu prueba finaliza el{" "}
-                <strong>{formattedFinPrueba || "próximamente"}</strong>. Elige tu plan para seguir sin interrupciones.
+                Esta prueba incluye todo el Plan Plus. Finaliza el{" "}
+                <strong>{formattedFinPrueba || "próximamente"}</strong>. Antes de que termine, elige Estándar o Plus.
               </p>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import math
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -17,9 +17,7 @@ PLANES = {
     "estandar": ("Plan Estándar - Psiconex", 4990),
     "plus": ("Plan Plus - Psiconex", 9990),
 }
-# Prueba con Plus, caso único. No se extiende sola después de esa fecha.
-EXCEPCION_PLUS_USUARIO = 22
-EXCEPCION_PLUS_HASTA = date(2026, 10, 25)
+
 
 
 class Suscripcion(models.Model):
@@ -75,18 +73,29 @@ class Suscripcion(models.Model):
         return False
 
     @property
-    def tiene_boletas(self):
+    def prueba_vigente(self):
+        return bool(self.fin_prueba) and timezone.now() < self.fin_prueba
+
+    @property
+    def cobro_diferido_pendiente(self):
+        """Ya dejó la tarjeta, pero el primer cobro sigue programado al fin de la prueba."""
+        if self.estado != "activa" or not self.prueba_vigente or not self.proximo_cobro or not self.fin_prueba:
+            return False
+        return abs((self.proximo_cobro - self.fin_prueba).total_seconds()) < 120
+
+    @property
+    def tiene_plus(self):
         if self.user.is_staff or self.user.is_superuser:
             return True
         if self.plan == "plus" and self.estado == "activa":
             return True
-        return (
-            self.user_id == EXCEPCION_PLUS_USUARIO
-            and self.estado == "trial"
-            and bool(self.fin_prueba)
-            and timezone.now() < self.fin_prueba
-            and timezone.localdate() <= EXCEPCION_PLUS_HASTA
-        )
+        if self.estado == "trial" and self.prueba_vigente:
+            return True
+        return self.cobro_diferido_pendiente
+
+    @property
+    def tiene_boletas(self):
+        return self.tiene_plus
 
     def expirar_si_vencida(self):
         """Pasa un trial vencido a 'expirada'; el plazo de purga corre desde fin_prueba."""

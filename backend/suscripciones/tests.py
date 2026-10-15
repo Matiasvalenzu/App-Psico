@@ -271,10 +271,10 @@ class PlanPlusTests(APITestCase):
         self.user = User.objects.create_user(username="plus@psiconex.cl", email="plus@psiconex.cl", password="x")
         self.client.force_authenticate(user=self.user)
 
-    def test_trial_estandar_sin_boletas(self):
+    def test_trial_vigente_habilita_boletas(self):
         response = self.client.get("/api/auth/me/", secure=True)
         self.assertEqual(response.data["plan"], "estandar")
-        self.assertFalse(response.data["boletas_habilitadas"])
+        self.assertTrue(response.data["boletas_habilitadas"])
         self.assertFalse(response.data["plan_plus_disponible"])
         self.assertFalse(response.data["tiene_cobros"])
 
@@ -287,13 +287,27 @@ class PlanPlusTests(APITestCase):
         )
         data = self.client.get("/api/auth/me/", secure=True).data
         self.assertTrue(data["tiene_cobros"])
-        self.assertFalse(data["boletas_habilitadas"])
+        self.assertTrue(data["boletas_habilitadas"])
 
-    def test_trial_plus_no_habilita_boletas(self):
+    def test_trial_vencido_sin_boletas(self):
+        suscripcion = self.user.suscripcion
+        suscripcion.fin_prueba = timezone.now() - timedelta(hours=1)
+        suscripcion.save()
+        self.assertFalse(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+
+    def test_activa_estandar_sin_boletas(self):
+        suscripcion = self.user.suscripcion
+        suscripcion.estado = "activa"
+        suscripcion.plan = "estandar"
+        suscripcion.save()
+        self.assertFalse(suscripcion.tiene_boletas)
+        self.assertFalse(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+
+    def test_trial_plus_habilita_boletas(self):
         self.user.suscripcion.plan = "plus"
         self.user.suscripcion.estado = "trial"
         self.user.suscripcion.save()
-        self.assertFalse(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
+        self.assertTrue(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
 
     def test_plus_vigente_habilita_boletas(self):
         self.user.suscripcion.plan = "plus"
@@ -325,10 +339,29 @@ class PlanPlusTests(APITestCase):
         self.assertEqual(datos["reason"], "Plan Plus - Psiconex")
         self.assertEqual(datos.get("preapproval_plan_id", ""), settings.MERCADOPAGO_PLUS_PLAN_ID)
         fin = self.user.suscripcion.fin_prueba.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        self.assertNotEqual(datos["auto_recurring"]["start_date"], fin)
+        self.assertEqual(datos["auto_recurring"]["start_date"], fin)
         self.user.suscripcion.refresh_from_db()
         self.assertEqual(self.user.suscripcion.plan, "plus")
         self.assertEqual(self.user.suscripcion.estado, "activa")
+        self.assertTrue(self.user.suscripcion.tiene_boletas)
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_contratar_estandar_en_trial_mantiene_plus_hasta_fin_prueba(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().create.return_value = {"status": 201, "response": {"id": "pre_est", "payer_id": 1}}
+        response = self.client.post("/api/suscripciones/contratar/", {"token": "tok"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        fin = self.user.suscripcion.fin_prueba
+        datos = mock_sdk.preapproval().create.call_args[0][0]
+        self.assertEqual(datos["auto_recurring"]["start_date"], fin.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+        self.user.suscripcion.refresh_from_db()
+        self.assertEqual(self.user.suscripcion.plan, "estandar")
+        self.assertEqual(self.user.suscripcion.estado, "activa")
+        self.assertTrue(self.user.suscripcion.tiene_boletas)
+        Suscripcion.objects.filter(pk=self.user.suscripcion.pk).update(fin_prueba=timezone.now() - timedelta(minutes=1))
+        self.user.suscripcion.refresh_from_db()
+        self.assertFalse(self.user.suscripcion.tiene_boletas)
 
     def test_admin_asigna_plus(self):
         admin = User.objects.create_superuser(username="Admin", email="admin@psiconex.cl", password="x")

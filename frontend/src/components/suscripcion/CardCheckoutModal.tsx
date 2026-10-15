@@ -244,7 +244,7 @@ export default function CardCheckoutModal({
   };
 
   const formattedFinPrueba = finPrueba ? formatDateCL(finPrueba) : null;
-  const difiereCobro = isTrial && plan !== "plus" && Boolean(formattedFinPrueba);
+  const difiereCobro = isTrial && Boolean(formattedFinPrueba);
 
   return (
     <ClientPortal>
@@ -385,7 +385,7 @@ export default function CardCheckoutModal({
                         Prueba gratuita activa
                       </span>
                       <span className="text-[11px] text-muted-foreground">
-                        Te quedan <strong>{diasRestantes ?? 14} días</strong> de acceso completo
+                        Te quedan <strong>{diasRestantes ?? 14} días</strong> del Plan Plus
                       </span>
                     </div>
                   </div>

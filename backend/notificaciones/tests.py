@@ -74,6 +74,7 @@ class NotificationEmailTests(TestCase):
             any(part.get("Content-ID") == "<psiconex-logo>" for part in message.attachments)
         )
         self.assertIn("Ana", message.body)
+        self.assertIn("Plan Plus", message.body)
 
     @patch("notificaciones.tasks.send_notification.delay")
     def test_booking_creates_and_sends_both_notifications(self, delay):

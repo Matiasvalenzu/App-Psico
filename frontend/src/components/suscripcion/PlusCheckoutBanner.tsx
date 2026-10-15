@@ -29,7 +29,7 @@ export function plusCheckoutBannerCopy({
   const precio = precioClp(monto);
   if (isTrial) {
     return {
-      texto: `Al confirmar, el cobro de ${precio} empieza hoy y se terminan tus días de prueba.`,
+      texto: `Al confirmar, el primer cobro de ${precio} llega al terminar la prueba. Hasta esa fecha sigues con el Plan Plus.`,
       nota: null as string | null,
     };
   }

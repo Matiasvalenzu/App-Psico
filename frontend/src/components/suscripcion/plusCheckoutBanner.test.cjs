@@ -9,10 +9,10 @@ function html(props) {
   return renderToStaticMarkup(React.createElement(PlusCheckoutBanner, props));
 }
 
-test("banner de prueba avisa cobro inmediato y fin de la prueba", () => {
+test("banner de prueba avisa cobro diferido y Plus hasta el fin", () => {
   const markup = html({ plan: "plus", isTrial: true, enEstandarPagado: false, monto: 9990 });
   assert.match(markup, /data-testid="plus-cobro-banner"/);
-  assert.match(markup, /Al confirmar, el cobro de \$9\.990 empieza hoy y se terminan tus días de prueba\./);
+  assert.match(markup, /Al confirmar, el primer cobro de \$9\.990 llega al terminar la prueba\. Hasta esa fecha sigues con el Plan Plus\./);
   assert.doesNotMatch(markup, /plus-cobro-nota/);
   assert.doesNotMatch(markup, /destructive/);
   assert.match(markup, /<svg/);

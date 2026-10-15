@@ -2,7 +2,7 @@ Hola {{ first_name }},
 
 Te damos la bienvenida a Psiconex, una plataforma creada para reducir el trabajo administrativo de tu consulta y ayudarte a dedicar más tiempo a la atención clínica.
 
-Tu prueba gratuita está activa hasta el {{ trial_end }}. No necesitas tarjeta y no se realizará ningún cobro automático.
+Tu prueba gratuita está activa hasta el {{ trial_end }} e incluye todo el Plan Plus. No necesitas tarjeta y no se realizará ningún cobro automático.
 
 Primeros pasos recomendados:
 1. Crea la ficha de tu primer paciente.

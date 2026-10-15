@@ -73,14 +73,9 @@ export default function SubscriptionSuccessPage({
           <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
             Tu suscripción al <strong className="text-foreground font-semibold">{nombrePlan}</strong> quedó registrada y ya tienes acceso inmediato a todas las herramientas de asistencia clínica e inteligencia artificial diseñadas para devolverle tiempo a tu consulta.
           </p>
-          {!preapprovalId && !esPlus && (
+          {!preapprovalId && (
             <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              Si estás en tu período de prueba de 14 días, no se te cobra hoy: el primer cobro de $4.990 CLP se realiza al terminar la prueba. Puedes ver la fecha en la sección Suscripción de tu cuenta.
-            </p>
-          )}
-          {!preapprovalId && esPlus && (
-            <p className="mt-3 text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              El cobro de $9.990 CLP parte de inmediato. Plus ya está activo en tu cuenta.
+              Si estás en tu período de prueba de 14 días, no se te cobra hoy: el primer cobro de {esPlus ? "$9.990" : "$4.990"} CLP se realiza al terminar la prueba. Hasta esa fecha sigues con el Plan Plus. Puedes ver la fecha en la sección Suscripción de tu cuenta.
             </p>
           )}
           {preapprovalId && <VincularPlus preapprovalId={preapprovalId} />}

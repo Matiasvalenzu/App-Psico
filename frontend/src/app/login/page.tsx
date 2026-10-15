@@ -348,7 +348,7 @@ export default function LoginPage() {
                   <div className="text-center">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                       <Gift className="h-3.5 w-3.5" />
-                      14 días de prueba gratis con acceso completo
+                      14 días de prueba gratis con todo el Plan Plus
                     </span>
                     <h2 className="mt-5 text-[1.75rem] font-bold leading-tight tracking-tight sm:text-3xl short:mt-4">
                       {activeTab === "login" ? "Ingresa a tu consulta" : "Crea tu cuenta"}

@@ -130,7 +130,7 @@ class ContratarCardView(APIView):
         )
 
         # Determinar fecha de inicio del cobro:
-        # Si está en trial vigente, diferir al fin del trial. Si no, cobrar de inmediato.
+        # Si está en trial vigente, diferir al fin del trial (Estándar y Plus). Si no, cobrar de inmediato.
         ahora = timezone.now()
         is_trial_vigente = (
             suscripcion.estado == "trial"
@@ -138,10 +138,9 @@ class ContratarCardView(APIView):
             and suscripcion.fin_prueba > ahora
         )
 
-        if is_trial_vigente and plan != "plus":
+        if is_trial_vigente:
             # ISO 8601 con zona horaria UTC para Mercado Pago
             # Mercado Pago requiere formato YYYY-MM-DDTHH:MM:SS.000Z
-            # Plus no tiene prueba: el cobro parte de inmediato aunque el trial siga vigente.
             start_date_dt = suscripcion.fin_prueba
             start_date_str = start_date_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             proximo_cobro_dt = start_date_dt
@@ -405,12 +404,13 @@ class CheckoutView(APIView):
             "status": "pending",
         }
 
-        # Si aún está en trial, diferir primer cobro
+        # Si aún está en trial, diferir primer cobro (Estándar y Plus)
         ahora = timezone.now()
         if suscripcion.estado == "trial" and suscripcion.fin_prueba and suscripcion.fin_prueba > ahora:
             preapproval_data["auto_recurring"]["start_date"] = suscripcion.fin_prueba.strftime(
                 "%Y-%m-%dT%H:%M:%S.000Z"
             )
+            suscripcion.proximo_cobro = suscripcion.fin_prueba
 
         preapproval_response = sdk.preapproval().create(preapproval_data)
 
