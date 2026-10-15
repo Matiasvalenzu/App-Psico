@@ -203,17 +203,14 @@ export function PricingSection() {
             </div>
 
             <div className="mt-8">
-              <Button asChild size="lg" className="w-full">
-                <a href={ROUTES.register} data-plan="plus">Suscribirme a Plus</a>
+              <Button asChild size="lg" variant="outline" className="w-full">
+                <Link href={ROUTES.register} data-meta-lead>Probar 14 días gratis</Link>
               </Button>
               <div className="mt-2.5 min-h-[4.75rem] text-center">
-                <p className="text-[11px] leading-snug text-muted-foreground">
-                  Entras a Psiconex e ingresas la tarjeta ahí. Si estás en la prueba, el primer cobro llega cuando termina.
-                </p>
-                <p className="mt-2 text-xs">
-                  <Link href={ROUTES.register} className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" data-meta-lead>
-                    ¿Prefieres probar primero? 14 días de Plus gratis
-                  </Link>
+                <p className="text-xs">
+                  <a href={ROUTES.register} data-plan="plus" className="font-medium text-primary underline underline-offset-4 hover:text-primary/80">
+                    O suscríbete a Plus directamente
+                  </a>
                 </p>
               </div>
             </div>
