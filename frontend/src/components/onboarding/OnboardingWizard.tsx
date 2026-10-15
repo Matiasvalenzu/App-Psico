@@ -10,6 +10,8 @@ import {
   FileText,
   Loader2,
   Mic,
+  MicOff,
+  RefreshCw,
   PlayCircle,
   Stethoscope,
   UserRound,
@@ -23,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ImportarPacientes from "@/components/pacientes/ImportarPacientes";
 import { useTutorial } from "@/context/TutorialContext";
+import { SAMPLE_TEXTS, useVoiceEnrollment } from "@/hooks/use-voice-enrollment";
 import {
   EVENTO_ONBOARDING,
   PASOS_ONBOARDING,
@@ -75,6 +78,8 @@ export default function OnboardingWizard() {
   const [vozLista, setVozLista] = useState(false);
   const [google, setGoogle] = useState<{ configured?: boolean; connected?: boolean } | null>(null);
   const [conectando, setConectando] = useState(false);
+  // Misma grabación y API que /dashboard/voz, pero sin salir del asistente.
+  const voz = useVoiceEnrollment({ onEnrolled: () => setVozLista(true) });
 
   const pasos: Paso[] = useMemo(() => {
     const base: Paso[] = ["datos", "voz", "calendario", "consulta", "pacientes"];
@@ -197,14 +202,13 @@ export default function OnboardingWizard() {
   async function conectarGoogle() {
     setConectando(true);
     try {
-      // Se guarda antes de salir: al volver de Google, el asistente sigue en el paso siguiente.
-      await guardar({ onboarding_pasos: { calendario: "hecho" } });
+      // No se marca el paso: al volver de Google el asistente se abre de nuevo en
+      // "Calendario" (primer paso sin responder), muestra la conexión y sigue.
       const res = await apiFetch("/agenda/google/connect/");
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.auth_url) throw new Error(data?.detail || "No pudimos abrir Google Calendar.");
       window.location.href = data.auth_url;
     } catch (err) {
-      await guardar({ onboarding_pasos: { calendario: "omitido" } }).catch(() => null);
       toast.error(err instanceof Error ? err.message : "No pudimos abrir Google Calendar.");
       setConectando(false);
     }
@@ -222,7 +226,10 @@ export default function OnboardingWizard() {
       <button
         type="button"
         disabled={guardando}
-        onClick={() => marcar(paso, "omitido")}
+        onClick={() => {
+          if (voz.recording) voz.stopRecording();
+          void marcar(paso, "omitido");
+        }}
         className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
       >
         Omitir, lo configuro después
@@ -275,32 +282,68 @@ export default function OnboardingWizard() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Graba unos segundos de tu voz para que, en las transcripciones de tus sesiones, Psiconex distinga lo que dices tú de lo que dice tu paciente. El reconocimiento de voz lo hace Deepgram.
+              Graba 3 muestras cortas leyendo el texto en voz alta. Así, en las transcripciones de tus sesiones, Psiconex distingue lo que dices tú de lo que dice tu paciente. El reconocimiento de voz lo hace Deepgram.
             </p>
             {vozLista ? (
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
-                <Check className="h-4 w-4" /> Ya tienes tu voz registrada.
-              </div>
-            ) : null}
-            <div className="flex flex-wrap justify-end gap-2">
-              {vozLista ? (
-                <Button onClick={() => marcar("voz", "hecho")} disabled={guardando}>Continuar</Button>
-              ) : (
-                <Button
-                  disabled={guardando}
-                  onClick={async () => {
-                    await guardar({ onboarding_pasos: { voz: "hecho" } }).catch(() => null);
-                    setEstados((p) => ({ ...p, voz: "hecho" }));
-                    setIndice((i) => i + 1);
-                    // Se oculta mientras graba; al volver a entrar retoma en el paso siguiente.
-                    setAbierto(false);
-                    router.push("/dashboard/voz");
-                  }}
-                >
-                  <Mic /> Grabar mi voz
-                </Button>
-              )}
-            </div>
+              <>
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
+                  <Check className="h-4 w-4" /> ¡Listo! Tu voz quedó registrada.
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={() => marcar("voz", "hecho")} disabled={guardando}>Continuar</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`rounded-xl border p-4 transition-colors ${voz.recording ? "border-sky-500 bg-sky-500/5" : "border-border bg-muted/30"}`}>
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="font-medium text-foreground">Muestra {Math.min(voz.samples.length + 1, 5)} · lee en voz alta:</span>
+                    <button type="button" onClick={voz.shuffleText} disabled={voz.recording} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground disabled:opacity-50">
+                      <RefreshCw className="h-3 w-3" /> Otro texto
+                    </button>
+                  </div>
+                  <p className="text-sm font-medium leading-relaxed text-foreground">&ldquo;{SAMPLE_TEXTS[voz.currentTextIndex]}&rdquo;</p>
+                  {voz.recording && (
+                    <div className="mt-3 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 font-semibold text-sky-600 dark:text-sky-400">
+                          <span className="h-2 w-2 animate-ping rounded-full bg-destructive" /> Grabando: {voz.recordingSeconds}s
+                        </span>
+                        <span className="text-muted-foreground">{voz.recordingSeconds >= 10 ? "Puedes detener" : `${10 - voz.recordingSeconds}s para lo ideal`}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className={`h-full transition-all duration-300 ${voz.recordingSeconds >= 10 ? "bg-emerald-500" : "bg-sky-600"}`} style={{ width: `${Math.min((voz.recordingSeconds / 10) * 100, 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5" aria-label={`${voz.samples.length} de 3 muestras`}>
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className={`h-1.5 flex-1 rounded-full ${i < voz.samples.length ? "bg-emerald-500" : "bg-muted"}`} />
+                  ))}
+                  <span className="ml-2 text-xs text-muted-foreground">{Math.min(voz.samples.length, 3)}/3 muestras</span>
+                </div>
+                {voz.message && voz.messageType === "error" && (
+                  <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{voz.message}</p>
+                )}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {voz.recording ? (
+                    <Button variant="destructive" onClick={voz.stopRecording}><MicOff /> Detener ({voz.recordingSeconds}s)</Button>
+                  ) : voz.samples.length >= 3 ? (
+                    <>
+                      {voz.samples.length < 5 && (
+                        <Button variant="outline" onClick={voz.startRecording} disabled={voz.saving}><Mic /> Grabar otra</Button>
+                      )}
+                      <Button onClick={voz.enroll} disabled={voz.saving}>
+                        {voz.saving ? <Loader2 className="animate-spin" /> : <Check />} {voz.saving ? "Guardando tu voz…" : "Guardar mi voz"}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button onClick={voz.startRecording}><Mic /> Grabar muestra {voz.samples.length + 1}</Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         );
       case "calendario":
