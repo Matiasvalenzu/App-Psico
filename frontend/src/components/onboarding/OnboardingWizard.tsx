@@ -33,6 +33,8 @@ import {
   type PasoOnboarding,
 } from "@/lib/onboarding";
 
+const OAUTH_ONBOARDING = "psiconex-onboarding-oauth";
+
 type Paso = PasoOnboarding | "listo";
 type Modalidad = "PRESENCIAL" | "ONLINE" | "HIBRIDA";
 
@@ -92,6 +94,16 @@ export default function OnboardingWizard() {
   useEffect(() => {
     setMounted(true);
     let activo = true;
+    // Volvimos de Google Calendar iniciado desde el onboarding: el backend
+    // regresa siempre a /dashboard/agenda; lo llevamos de vuelta a Pacientes.
+    try {
+      if (sessionStorage.getItem(OAUTH_ONBOARDING) && window.location.pathname.startsWith("/dashboard/agenda")) {
+        sessionStorage.removeItem(OAUTH_ONBOARDING);
+        router.replace("/dashboard");
+      }
+    } catch {
+      // Sin sessionStorage: se queda en Agenda, el asistente igual se abre.
+    }
     (async () => {
       try {
         const user = await getCurrentUser();
@@ -125,6 +137,7 @@ export default function OnboardingWizard() {
     return () => {
       activo = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
 
   useEffect(() => {
@@ -207,6 +220,9 @@ export default function OnboardingWizard() {
       const res = await apiFetch("/agenda/google/connect/");
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.auth_url) throw new Error(data?.detail || "No pudimos abrir Google Calendar.");
+      try {
+        sessionStorage.setItem(OAUTH_ONBOARDING, "1");
+      } catch {}
       window.location.href = data.auth_url;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No pudimos abrir Google Calendar.");
