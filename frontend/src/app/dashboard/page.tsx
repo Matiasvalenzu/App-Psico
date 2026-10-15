@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ImportarPacientes from "@/components/pacientes/ImportarPacientes";
+import CompletaConfiguracion from "@/components/onboarding/CompletaConfiguracion";
 import ResumenCobros from "@/components/pacientes/ResumenCobros";
 import UpsellPlusModal from "@/components/suscripcion/UpsellPlusModal";
 import type { OrigenUpsell } from "@/lib/upsell";
@@ -594,6 +595,8 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <CompletaConfiguracion onImportado={loadPacientes} />
 
       {plus !== null && (
         <button

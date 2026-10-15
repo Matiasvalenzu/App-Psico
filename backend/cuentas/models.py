@@ -32,6 +32,10 @@ class PerfilPsicologo(models.Model):
     direccion_consulta = models.CharField(max_length=255, blank=True, default="")
     tutorial_visto = models.BooleanField(default=False)
     tutoriales_vistos = models.JSONField(default=dict, blank=True)
+    # Onboarding guiado del primer ingreso. onboarding_pasos guarda
+    # {"paso": "hecho" | "omitido"} para armar la tarjeta del panel.
+    onboarding_completado = models.BooleanField(default=False)
+    onboarding_pasos = models.JSONField(default=dict, blank=True)
     ultima_actividad = models.DateTimeField(null=True, blank=True, db_index=True)
     es_interna = models.BooleanField(
         default=False,

@@ -65,10 +65,15 @@ def current_user(request):
 
     tutorial_visto = False
     tutoriales_vistos = {}
+    # Sin perfil (cuentas antiguas o admin) no se muestra el onboarding.
+    onboarding_completado = True
+    onboarding_pasos = {}
     if hasattr(request.user, "perfil_psicologo"):
         perfil = request.user.perfil_psicologo
         tutorial_visto = perfil.tutorial_visto
         tutoriales_vistos = dict(perfil.tutoriales_vistos or {})
+        onboarding_completado = perfil.onboarding_completado
+        onboarding_pasos = dict(perfil.onboarding_pasos or {})
         if tutorial_visto:
             tutoriales_vistos["bienvenida"] = True
 
@@ -102,6 +107,8 @@ def current_user(request):
             "dias_para_purga": dias_para_purga,
             "tutorial_visto": tutorial_visto,
             "tutoriales_vistos": tutoriales_vistos,
+            "onboarding_completado": onboarding_completado,
+            "onboarding_pasos": onboarding_pasos,
             "tiene_password": request.user.has_usable_password(),
         }
     )

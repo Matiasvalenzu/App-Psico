@@ -481,3 +481,36 @@ class RegistroAccesoTests(TestCase):
         RegistroAcceso.objects.create(usuario=self.user, accion=RegistroAcceso.Accion.EXPORTAR)
         self.assertEqual(purgar_registros_acceso(), 1)
         self.assertEqual(RegistroAcceso.objects.count(), 1)
+
+
+class OnboardingTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="nueva", email="nueva@example.com", password="Clave-segura-1"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_usuario_nuevo_ve_onboarding_y_guarda_pasos(self):
+        me = self.client.get("/api/auth/me/")
+        self.assertFalse(me.data["onboarding_completado"])
+        res = self.client.patch(
+            "/api/cuenta/perfil/",
+            {"onboarding_pasos": {"datos": "hecho", "voz": "omitido"}},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        res = self.client.patch(
+            "/api/cuenta/perfil/",
+            {"onboarding_pasos": {"voz": "hecho"}, "onboarding_completado": True},
+            format="json",
+        )
+        self.assertEqual(res.data["onboarding_pasos"], {"datos": "hecho", "voz": "hecho"})
+        me = self.client.get("/api/auth/me/")
+        self.assertTrue(me.data["onboarding_completado"])
+
+    def test_paso_desconocido_rechazado(self):
+        res = self.client.patch(
+            "/api/cuenta/perfil/", {"onboarding_pasos": {"otro": "hecho"}}, format="json"
+        )
+        self.assertEqual(res.status_code, 400)

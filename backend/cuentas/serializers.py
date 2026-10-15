@@ -26,6 +26,10 @@ TUTORIALES = {
 }
 
 
+ONBOARDING_PASOS = {"datos", "voz", "calendario", "consulta", "pacientes", "boletas"}
+ONBOARDING_ESTADOS = {"hecho", "omitido"}
+
+
 class PerfilPsicologoSerializer(serializers.Serializer):
     login_email = serializers.EmailField(read_only=True)
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
@@ -46,6 +50,8 @@ class PerfilPsicologoSerializer(serializers.Serializer):
     direccion_consulta = serializers.CharField(max_length=255, allow_blank=True, required=False)
     tutorial_visto = serializers.BooleanField(required=False)
     tutoriales_vistos = serializers.DictField(required=False)
+    onboarding_completado = serializers.BooleanField(required=False)
+    onboarding_pasos = serializers.DictField(required=False)
     recordatorios_paciente_activos = serializers.BooleanField(required=False)
     bhe_glosa_default = serializers.CharField(max_length=200, required=False)
 
@@ -70,6 +76,8 @@ class PerfilPsicologoSerializer(serializers.Serializer):
             "direccion_consulta": instance.direccion_consulta,
             "tutorial_visto": instance.tutorial_visto,
             "tutoriales_vistos": instance.tutoriales_vistos or {},
+            "onboarding_completado": instance.onboarding_completado,
+            "onboarding_pasos": instance.onboarding_pasos or {},
             "recordatorios_paciente_activos": instance.recordatorios_paciente_activos,
             "bhe_glosa_default": instance.bhe_glosa_default,
         }
@@ -101,6 +109,16 @@ class PerfilPsicologoSerializer(serializers.Serializer):
             clean[key] = seen
         return clean
 
+    def validate_onboarding_pasos(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Debe ser un objeto.")
+        for key, estado in value.items():
+            if key not in ONBOARDING_PASOS:
+                raise serializers.ValidationError("Paso no reconocido.")
+            if estado not in ONBOARDING_ESTADOS:
+                raise serializers.ValidationError("Estado no reconocido.")
+        return value
+
     @transaction.atomic
     def update(self, instance, validated_data):
         user = instance.user
@@ -108,6 +126,9 @@ class PerfilPsicologoSerializer(serializers.Serializer):
         user.last_name = validated_data.pop("last_name", user.last_name).strip()
         validated_data.pop("email_notificaciones", None)
         vistos = validated_data.pop("tutoriales_vistos", None)
+        pasos = validated_data.pop("onboarding_pasos", None)
+        if pasos is not None:
+            instance.onboarding_pasos = {**(instance.onboarding_pasos or {}), **pasos}
         user.save(update_fields=["first_name", "last_name"])
         for field, value in validated_data.items():
             setattr(instance, field, value.strip() if isinstance(value, str) else value)

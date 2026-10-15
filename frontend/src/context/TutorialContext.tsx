@@ -54,6 +54,8 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const [view, setView] = useState<TutorialView>({ kind: "closed" });
   const [seen, setSeen] = useState<Record<string, boolean>>({});
   const [ready, setReady] = useState(false);
+  // Mientras el onboarding del primer ingreso está abierto, no se muestran avisos de tutoriales.
+  const [onboardingPendiente, setOnboardingPendiente] = useState(false);
   const [sectionHint, setSectionHintState] = useState<TutorialSlug | null>(null);
   const seenRef = useRef<Record<string, boolean>>({});
   const userKeyRef = useRef<string | null>(null);
@@ -112,7 +114,9 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
         const merged = mergeSeen(remote, readLocal(userKey));
         seenRef.current = merged;
         setSeen(merged);
-        if (!merged.bienvenida) {
+        const pendiente = user.onboarding_completado === false;
+        setOnboardingPendiente(pendiente);
+        if (!merged.bienvenida && !pendiente) {
           setView({ kind: "welcome" });
           void persistSeen("bienvenida");
         }
@@ -127,14 +131,20 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   }, [persistSeen]);
 
   useEffect(() => {
-    if (!ready || view.kind !== "closed") return;
+    if (!ready || onboardingPendiente || view.kind !== "closed") return;
     const slug = sectionHint ?? tutorialForPath(pathname);
     if (!slug || seen[slug] || skippedRef.current.has(slug)) return;
     const timer = window.setTimeout(() => {
       setView({ kind: "prompt", slug });
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [ready, pathname, sectionHint, seen, view]);
+  }, [ready, onboardingPendiente, pathname, sectionHint, seen, view]);
+
+  useEffect(() => {
+    const listo = () => setOnboardingPendiente(false);
+    window.addEventListener("psiconex:onboarding-listo", listo);
+    return () => window.removeEventListener("psiconex:onboarding-listo", listo);
+  }, []);
 
   const resolveCurrent = useCallback((): TutorialSlug => {
     return hintRef.current ?? tutorialForPath(pathnameRef.current) ?? "bienvenida";

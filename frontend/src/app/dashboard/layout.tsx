@@ -39,6 +39,7 @@ import { AudioRecordingProvider } from "@/context/AudioRecordingContext";
 import PersistentRecordingBar from "@/components/recording/PersistentRecordingBar";
 import { TutorialProvider, useTutorial } from "@/context/TutorialContext";
 import TutorialModal from "@/components/tutorial/TutorialModal";
+import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -153,6 +154,7 @@ export default function DashboardLayout({
           <DashboardInner>{children}</DashboardInner>
         </div>
         <TutorialModal />
+        <OnboardingWizard />
         {/* Debajo del header (h-14 / md:h-16) para no tapar la etiqueta de la prueba. */}
         <Toaster
           richColors
