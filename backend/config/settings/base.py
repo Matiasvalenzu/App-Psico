@@ -350,3 +350,13 @@ SPEAKER_MAX_SECONDS_PER_LABEL = float(
 EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1024"))
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
 EMBEDDING_USE_MODEL = os.environ.get("EMBEDDING_USE_MODEL", "False").lower() == "true"
+
+
+# Los logs de la app (suscripciones, webhooks, etc.) van a stdout para verlos en `docker compose logs`.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO")},
+    "loggers": {"django": {"handlers": ["console"], "level": "INFO", "propagate": False}},
+}

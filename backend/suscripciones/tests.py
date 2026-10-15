@@ -59,9 +59,11 @@ class SuscripcionesApiTests(APITestCase):
         self.assertEqual(response.data["card_brand"], "visa")
         self.assertEqual(response.data["card_last_four"], "4242")
 
-        # Verificar que se llamó con start_date programado
+        # En prueba: free_trial con los días restantes, sin start_date ni plan de MP
         call_args = mock_sdk.preapproval().create.call_args[0][0]
-        self.assertIn("start_date", call_args["auto_recurring"])
+        self.assertNotIn("start_date", call_args["auto_recurring"])
+        self.assertEqual(call_args["auto_recurring"]["free_trial"], {"frequency": 14, "frequency_type": "days"})
+        self.assertNotIn("preapproval_plan_id", call_args)
         self.assertEqual(call_args["card_token_id"], "tok_visa_valid_123")
 
         # Verificar BD actualizada
@@ -318,6 +320,35 @@ class PlanPlusTests(APITestCase):
         self.user.suscripcion.save()
         self.assertFalse(self.client.get("/api/auth/me/", secure=True).data["boletas_habilitadas"])
 
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_contratar_guarda_next_payment_date_y_redondea_dias(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().create.return_value = {
+            "status": 201,
+            "response": {"id": "pre_np", "payer_id": 1, "next_payment_date": "2026-10-29T17:10:51.000-04:00"},
+        }
+        Suscripcion.objects.filter(user=self.user).update(fin_prueba=timezone.now() + timedelta(days=3, hours=2))
+        response = self.client.post("/api/suscripciones/contratar/", {"token": "tok"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        datos = mock_sdk.preapproval().create.call_args[0][0]
+        self.assertEqual(datos["auto_recurring"]["free_trial"], {"frequency": 4, "frequency_type": "days"})
+        self.user.suscripcion.refresh_from_db()
+        self.assertEqual(self.user.suscripcion.proximo_cobro.isoformat(), "2026-10-29T21:10:51+00:00")
+
+    @patch("suscripciones.views._get_mp_sdk")
+    def test_checkout_en_prueba_usa_free_trial_sin_plan(self, mock_sdk_fn):
+        mock_sdk = MagicMock()
+        mock_sdk_fn.return_value = mock_sdk
+        mock_sdk.preapproval().create.return_value = {"status": 201, "response": {"id": "pre_ck", "init_point": "https://mp/x"}}
+        with self.settings(PLAN_PLUS_DISPONIBLE=True, MERCADOPAGO_PLUS_PLAN_ID="planplus"):
+            response = self.client.post("/api/suscripciones/checkout/", {"plan": "plus"}, format="json", secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        datos = mock_sdk.preapproval().create.call_args[0][0]
+        self.assertEqual(datos["auto_recurring"]["free_trial"], {"frequency": 14, "frequency_type": "days"})
+        self.assertNotIn("start_date", datos["auto_recurring"])
+        self.assertNotIn("preapproval_plan_id", datos)
+
     def test_contratar_plus_bloqueado_sin_flag(self):
         response = self.client.post(
             "/api/suscripciones/contratar/", {"token": "tok", "plan": "plus"}, format="json", secure=True
@@ -337,9 +368,9 @@ class PlanPlusTests(APITestCase):
         datos = mock_sdk.preapproval().create.call_args[0][0]
         self.assertEqual(datos["auto_recurring"]["transaction_amount"], 9990)
         self.assertEqual(datos["reason"], "Plan Plus - Psiconex")
-        self.assertEqual(datos.get("preapproval_plan_id", ""), settings.MERCADOPAGO_PLUS_PLAN_ID)
-        fin = self.user.suscripcion.fin_prueba.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        self.assertEqual(datos["auto_recurring"]["start_date"], fin)
+        self.assertNotIn("preapproval_plan_id", datos)
+        self.assertNotIn("start_date", datos["auto_recurring"])
+        self.assertEqual(datos["auto_recurring"]["free_trial"], {"frequency": 14, "frequency_type": "days"})
         self.user.suscripcion.refresh_from_db()
         self.assertEqual(self.user.suscripcion.plan, "plus")
         self.assertEqual(self.user.suscripcion.estado, "activa")
@@ -354,7 +385,8 @@ class PlanPlusTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         fin = self.user.suscripcion.fin_prueba
         datos = mock_sdk.preapproval().create.call_args[0][0]
-        self.assertEqual(datos["auto_recurring"]["start_date"], fin.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+        self.assertEqual(datos["auto_recurring"]["free_trial"]["frequency_type"], "days")
+        self.assertNotIn("start_date", datos["auto_recurring"])
         self.user.suscripcion.refresh_from_db()
         self.assertEqual(self.user.suscripcion.plan, "estandar")
         self.assertEqual(self.user.suscripcion.estado, "activa")
@@ -421,7 +453,8 @@ class PlanPlusTests(APITestCase):
             )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         datos = mock_sdk.preapproval().create.call_args[0][0]
-        self.assertEqual(datos["preapproval_plan_id"], "3dc6b33c774d430d8960bca570457490")
+        self.assertNotIn("preapproval_plan_id", datos)
+        self.assertNotIn("free_trial", datos["auto_recurring"])
         self.assertEqual(datos["auto_recurring"]["transaction_amount"], 9990)
         mock_sdk.preapproval().update.assert_called_with("pre_9", {"status": "cancelled"})
         self.assertEqual(mock_sdk.preapproval().create.call_count, 1)

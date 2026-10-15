@@ -1,4 +1,5 @@
 import json
+import math
 import logging
 import mercadopago
 from datetime import timedelta
@@ -35,10 +36,16 @@ def _asignar_plan(suscripcion, plan):
         suscripcion.plan = plan
 
 
-def _plan_mp_id(plan):
-    if plan == "plus":
-        return getattr(settings, "MERCADOPAGO_PLUS_PLAN_ID", "") or ""
-    return getattr(settings, "MERCADOPAGO_PLAN_ID", "") or ""
+def _free_trial(fin_prueba, ahora):
+    """Días que quedan de prueba (redondeados hacia arriba) como free_trial de Mercado Pago."""
+    segundos = max((fin_prueba - ahora).total_seconds(), 0)
+    return {"frequency": max(math.ceil(segundos / 86400), 1), "frequency_type": "days"}
+
+
+def _proximo_cobro_mp(datos, por_defecto):
+    """Usa next_payment_date de Mercado Pago si viene; si no, la fecha calculada localmente."""
+    fecha = parse_datetime(str(datos.get("next_payment_date") or ""))
+    return fecha or por_defecto
 
 
 def _cancelar_preapproval_anterior(sdk, suscripcion, nuevo_id):
@@ -139,15 +146,9 @@ class ContratarCardView(APIView):
         )
 
         if is_trial_vigente:
-            # ISO 8601 con zona horaria UTC para Mercado Pago
-            # Mercado Pago requiere formato YYYY-MM-DDTHH:MM:SS.000Z
-            start_date_dt = suscripcion.fin_prueba
-            start_date_str = start_date_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            proximo_cobro_dt = start_date_dt
+            # Mercado Pago ignora start_date sin end_date: el período sin cobro se pide con free_trial.
+            proximo_cobro_dt = suscripcion.fin_prueba
         else:
-            # Inicio inmediato: Mercado Pago permite diferir 1 minuto o no enviar start_date
-            start_date_dt = ahora + timedelta(minutes=2)
-            start_date_str = start_date_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
             proximo_cobro_dt = ahora + timedelta(days=30)
 
         sdk = _get_mp_sdk()
@@ -162,19 +163,19 @@ class ContratarCardView(APIView):
                 "frequency_type": "months",
                 "transaction_amount": monto_plan,
                 "currency_id": "CLP",
-                "start_date": start_date_str,
             },
             "back_url": f"{settings.PUBLIC_APP_URL}/dashboard/suscripcion",
             "status": "authorized",
         }
-
-        plan_id = _plan_mp_id(plan)
-        if plan_id:
-            preapproval_data["preapproval_plan_id"] = plan_id
+        # Sin preapproval_plan_id: el plan de MP (sin free_trial) cobraría de inmediato. El plan
+        # se usa solo para reconocer las suscripciones del enlace público de Plus.
+        if is_trial_vigente:
+            preapproval_data["auto_recurring"]["free_trial"] = _free_trial(suscripcion.fin_prueba, ahora)
 
         try:
             logger.info(
-                f"Creando preapproval para user={request.user.id} con start_date={start_date_str}"
+                f"Creando preapproval {plan} para user={request.user.id} "
+                f"free_trial={preapproval_data['auto_recurring'].get('free_trial')}"
             )
             mp_response = sdk.preapproval().create(preapproval_data)
         except Exception as e:
@@ -196,9 +197,13 @@ class ContratarCardView(APIView):
             suscripcion.mp_payer_id = str(resp_data.get("payer_id", ""))
             suscripcion.card_brand = payment_method_id
             suscripcion.card_last_four = card_last_four
-            suscripcion.proximo_cobro = proximo_cobro_dt
+            suscripcion.proximo_cobro = _proximo_cobro_mp(resp_data, proximo_cobro_dt)
             suscripcion.cancelada_en = None
             suscripcion.save()
+            logger.info(
+                f"Preapproval {preapproval_id} creado para user={request.user.id} ({resp_data.get('status')}), "
+                f"próximo cobro {suscripcion.proximo_cobro}"
+            )
 
             return Response(
                 {
@@ -407,9 +412,7 @@ class CheckoutView(APIView):
         # Si aún está en trial, diferir primer cobro (Estándar y Plus)
         ahora = timezone.now()
         if suscripcion.estado == "trial" and suscripcion.fin_prueba and suscripcion.fin_prueba > ahora:
-            preapproval_data["auto_recurring"]["start_date"] = suscripcion.fin_prueba.strftime(
-                "%Y-%m-%dT%H:%M:%S.000Z"
-            )
+            preapproval_data["auto_recurring"]["free_trial"] = _free_trial(suscripcion.fin_prueba, ahora)
             suscripcion.proximo_cobro = suscripcion.fin_prueba
 
         preapproval_response = sdk.preapproval().create(preapproval_data)
@@ -417,10 +420,13 @@ class CheckoutView(APIView):
         if preapproval_response.get("status") == 201:
             init_point = preapproval_response["response"]["init_point"]
             suscripcion.mp_preapproval_id = preapproval_response["response"]["id"]
+            suscripcion.proximo_cobro = _proximo_cobro_mp(preapproval_response["response"], suscripcion.proximo_cobro)
             _asignar_plan(suscripcion, plan)
+            logger.info(f"Checkout {plan} creado para user={request.user.id}: {suscripcion.mp_preapproval_id}")
             suscripcion.save()
             return Response({"init_point": init_point})
         else:
+            logger.error(f"Error Mercado Pago checkout ({preapproval_response.get('status')}): {preapproval_response.get('response')}")
             return Response(
                 preapproval_response.get("response", {}),
                 status=status.HTTP_400_BAD_REQUEST,
@@ -438,6 +444,7 @@ class WebhookView(APIView):
         action = request.data.get("action")
         type_str = request.data.get("type")
 
+        logger.info(f"Webhook Mercado Pago: type={type_str} action={action} id={request.data.get('data', {}).get('id')}")
         if type_str == "subscription_preapproval":
             sdk = _get_mp_sdk()
             mp_id = request.data.get("data", {}).get("id")
@@ -468,7 +475,9 @@ class WebhookView(APIView):
                             if plan_plus and data.get("preapproval_plan_id") == plan_plus:
                                 suscripcion.plan = "plus"
 
+                            suscripcion.proximo_cobro = _proximo_cobro_mp(data, suscripcion.proximo_cobro)
                             suscripcion.mp_preapproval_id = mp_id
+                            logger.info(f"Webhook: preapproval {mp_id} {mp_status} -> user={suscripcion.user_id} {suscripcion.estado}")
                             suscripcion.save()
                         elif not suscripcion and settings.MERCADOPAGO_PLUS_PLAN_ID and data.get("preapproval_plan_id") == settings.MERCADOPAGO_PLUS_PLAN_ID:
                             # Pagó con el enlace de Plus y no volvió a /suscripcionok: queda pendiente de revisión.
