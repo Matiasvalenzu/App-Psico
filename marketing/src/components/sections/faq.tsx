@@ -16,7 +16,7 @@ const FAQS = [
   },
   {
     q: "¿Necesito tarjeta para probar?",
-    a: "No. La prueba de 14 días del plan Estándar solo pide nombre, correo y contraseña. Si registras tu tarjeta durante la prueba, el primer cobro llega cuando termina. El plan Plus se cobra al suscribirte. Si la prueba termina y no te suscribes, tu cuenta queda en solo lectura.",
+    a: "No. La prueba de 14 días incluye todo el Plan Plus y solo pide nombre, correo y contraseña. Antes de que termine eliges Estándar o Plus; si registras tu tarjeta durante la prueba, el primer cobro llega cuando termina. Para emitir boletas durante la prueba igual debes autorizar a Psiconex en el Servicio de Impuestos Internos. Si la prueba termina y no te suscribes, tu cuenta queda en solo lectura.",
   },
   {
     q: "¿Necesito el consentimiento de mis pacientes?",
