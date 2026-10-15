@@ -105,7 +105,7 @@ export function PricingSection() {
               <span className="gradient-primary-text">sin sorpresas.</span>
             </>
           }
-          description="Estándar a $4.990 y Plus a $9.990 al mes; Plus incluye tus boletas de honorarios. Sin cobro por paciente."
+          description="Estándar a $4.990 y Plus a $9.990 al mes; Plus incluye tus boletas de honorarios. Sin cobro por paciente. Los 14 días de prueba gratis son con todo el Plan Plus."
         />
 
         <div
@@ -146,7 +146,7 @@ export function PricingSection() {
               </Button>
               <div className="mt-2.5 min-h-[4.75rem] text-center">
                 <p className="text-[11px] leading-snug text-muted-foreground">
-                  14 días gratis sin tarjeta. Después de la prueba: $4.990/mes. Sin permanencia. Cancela cuando quieras.
+                  La prueba de 14 días es con todo el Plan Plus, sin tarjeta. Si después eliges Estándar: $4.990/mes. Sin permanencia. Cancela cuando quieras.
                 </p>
               </div>
             </div>
@@ -208,11 +208,11 @@ export function PricingSection() {
               </Button>
               <div className="mt-2.5 min-h-[4.75rem] text-center">
                 <p className="text-[11px] leading-snug text-muted-foreground">
-                  Entras a Psiconex e ingresas la tarjeta ahí. El primer cobro es al confirmar.
+                  Entras a Psiconex e ingresas la tarjeta ahí. Si estás en la prueba, el primer cobro llega cuando termina.
                 </p>
                 <p className="mt-2 text-xs">
                   <Link href={ROUTES.register} className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" data-meta-lead>
-                    ¿Prefieres probar primero? 14 días gratis
+                    ¿Prefieres probar primero? 14 días de Plus gratis
                   </Link>
                 </p>
               </div>

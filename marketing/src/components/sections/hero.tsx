@@ -95,7 +95,7 @@ export function HeroSection() {
             >
               <Button asChild size="xl" className="w-full sm:w-auto">
                 <Link href={ROUTES.register} data-meta-lead>
-                  Probar gratis 14 días
+                  Prueba Plus gratis 14 días
                   <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
@@ -118,7 +118,7 @@ export function HeroSection() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mt-6 text-xs text-muted-foreground"
             >
-              Sin tarjeta · Conexión cifrada · Cancela cuando quieras
+              14 días con todo el Plan Plus · Sin tarjeta · Cancela cuando quieras
             </motion.p>
           </div>
 

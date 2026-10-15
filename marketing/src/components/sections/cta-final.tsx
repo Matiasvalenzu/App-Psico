@@ -45,7 +45,7 @@ export function CTAFinalSection() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="mt-5 text-balance text-lg text-white/90"
             >
-              14 días gratis. Sin tarjeta de crédito. Cancela cuando quieras.
+              14 días gratis con todo el Plan Plus. Sin tarjeta de crédito. Cancela cuando quieras.
               Tus primeros 10 informes los hace Psiconex por ti.
             </motion.p>
             <motion.div
