@@ -86,8 +86,12 @@ const STEPS: Step[] = [
         body: "Pregunta '¿qué dijo en marzo sobre su madre?' y el chat busca en sus sesiones y te muestra los fragmentos de donde sale la respuesta.",
       },
       {
-        title: "Brief, informes y resúmenes",
-        body: "Resúmenes de sesión, evolución y borradores de informe generados con IA a partir del historial del paciente. Tú los revisas y editas.",
+        title: "Resúmenes de sesión y evolución",
+        body: "Resúmenes de sesión y de evolución generados con IA a partir del historial del paciente. Tú los revisas y editas.",
+      },
+      {
+        title: "Brief e informes con IA",
+        body: "Un brief antes de cada sesión y borradores de informe a partir del historial del paciente. Tú los revisas y editas.",
         badge: "Plus",
       },
     ],
