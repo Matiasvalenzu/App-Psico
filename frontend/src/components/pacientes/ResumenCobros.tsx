@@ -77,7 +77,7 @@ export default function ResumenCobros() {
     <section aria-label="Resumen de cobros" className="space-y-4 rounded-xl border border-border/70 bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Cobros</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="month"
             aria-label="Mes del resumen"

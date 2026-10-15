@@ -528,7 +528,7 @@ function DashboardInner({
         )}
 
         <main
-          className={`mx-auto w-full flex-1 p-4 md:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 ${
+          className={`mx-auto w-full min-w-0 flex-1 overflow-x-hidden p-4 md:p-6 lg:p-8 pb-20 md:pb-6 lg:pb-8 ${
             pathname === "/dashboard/agenda" ? "max-w-[1600px]" : "max-w-6xl"
           } animate-fade-in-up`}
         >

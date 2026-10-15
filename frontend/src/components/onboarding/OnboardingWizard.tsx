@@ -427,7 +427,7 @@ export default function OnboardingWizard() {
   })();
 
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="onboarding-titulo">
+    <div className="fixed inset-0 z-40 flex w-full max-w-[100dvw] items-end justify-center overflow-x-hidden bg-black/30 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="onboarding-titulo">
       <div className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-background p-6 shadow-2xl sm:rounded-2xl">
         <div className="mb-5">
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">

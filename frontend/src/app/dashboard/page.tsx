@@ -576,14 +576,14 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
       {/* ── Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pacientes</h1>
           <p className="mt-1 text-sm text-muted-foreground">Busca, filtra y abre la ficha de tus pacientes.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => openTutorial("pacientes")} className="gap-1.5 text-muted-foreground">
             <PlayCircle className="h-4 w-4" />
             Tutorial
@@ -660,7 +660,7 @@ export default function DashboardPage() {
               Con pagos pendientes {plus !== false && <span className="text-xs opacity-80">{conDeuda}</span>}
             </Button>
           )}
-          <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <Label htmlFor="orden-pacientes" className="shrink-0 text-sm text-muted-foreground">Ordenar por</Label>
             <NativeSelect id="orden-pacientes" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-44">
               <option value="nombre">Nombre</option>
