@@ -1,5 +1,5 @@
 // Tipos y utilidades del módulo de seguimiento clínico (escalas, brief, informes, tareas y ánimo).
-export const API_SEG = "/api/seguimiento";
+export const API_SEG = "/seguimiento";
 
 export type Opcion = { valor: number; texto: string };
 export type Pregunta = { id: number; texto: string; subescala?: string; inversa?: boolean };
