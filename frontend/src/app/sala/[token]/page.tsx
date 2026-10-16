@@ -6,6 +6,7 @@ import { Loader2, Mic, MicOff, PhoneOff, Video, VideoOff, AlertCircle, CheckCirc
 import { publicApiFetch } from "@/lib/api";
 import { Logo } from "@/components/brand/logo";
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { FondoPicker } from "@/components/sesion/FondoPicker";
 import { ControlButton, MicMeter, VideoView } from "@/components/sesion/SalaMedia";
 
 interface SalaInfo {
@@ -168,7 +169,7 @@ export default function SalaPacientePage() {
           </div>
           <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
             {rtc.localStream && rtc.camEnabled ? (
-              <VideoView stream={rtc.localStream} muted mirrored />
+              <VideoView stream={rtc.previewStream} muted mirrored />
             ) : (
               <div className="flex h-full items-center justify-center text-slate-500">
                 <VideoOff className="h-10 w-10" />
@@ -181,6 +182,14 @@ export default function SalaPacientePage() {
               <ControlButton onClick={rtc.toggleCam} active={rtc.camEnabled} title="Cámara" disabled={!rtc.localStream}>
                 {rtc.camEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </ControlButton>
+              <FondoPicker
+                fondo={rtc.fondo}
+                cargando={rtc.fondoCargando}
+                aviso={rtc.fondoAviso}
+                disabled={!rtc.localStream || !rtc.localStream.getVideoTracks().length}
+                onElegir={(id) => void rtc.aplicarFondo(id)}
+                onCerrarAviso={rtc.cerrarAvisoFondo}
+              />
             </div>
           </div>
           <div className="space-y-1">
@@ -240,7 +249,7 @@ export default function SalaPacientePage() {
 
       <div className="absolute right-3 top-3 h-28 w-20 overflow-hidden rounded-xl border border-white/20 bg-black shadow-xl sm:h-36 sm:w-52">
         {rtc.camEnabled ? (
-          <VideoView stream={rtc.localStream} muted mirrored />
+          <VideoView stream={rtc.previewStream} muted mirrored />
         ) : (
           <div className="flex h-full items-center justify-center text-slate-500">
             <VideoOff className="h-6 w-6" />
@@ -261,6 +270,14 @@ export default function SalaPacientePage() {
         <ControlButton onClick={rtc.toggleCam} active={rtc.camEnabled} title="Cámara">
           {rtc.camEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
         </ControlButton>
+              <FondoPicker
+                fondo={rtc.fondo}
+                cargando={rtc.fondoCargando}
+                aviso={rtc.fondoAviso}
+                disabled={!rtc.localStream || !rtc.localStream.getVideoTracks().length}
+                onElegir={(id) => void rtc.aplicarFondo(id)}
+                onCerrarAviso={rtc.cerrarAvisoFondo}
+              />
         <ControlButton onClick={handleLeave} danger title="Salir de la sesión">
           <PhoneOff className="h-5 w-5" />
         </ControlButton>

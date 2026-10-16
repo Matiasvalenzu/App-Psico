@@ -23,6 +23,7 @@ import { apiFetch } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { FondoPicker } from "@/components/sesion/FondoPicker";
 import { useDualTrackRecorder } from "@/hooks/useDualTrackRecorder";
 import { ControlButton, MicMeter, VideoView, formatElapsed } from "@/components/sesion/SalaMedia";
 
@@ -298,7 +299,7 @@ export default function SalaPsicologoPage() {
           </div>
           <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
             {rtc.localStream && rtc.camEnabled ? (
-              <VideoView stream={rtc.localStream} muted mirrored />
+              <VideoView stream={rtc.previewStream} muted mirrored />
             ) : (
               <div className="flex h-full items-center justify-center text-slate-500">
                 <VideoOff className="h-10 w-10" />
@@ -311,6 +312,14 @@ export default function SalaPsicologoPage() {
               <ControlButton onClick={rtc.toggleCam} active={rtc.camEnabled} title="Cámara" disabled={!rtc.localStream}>
                 {rtc.camEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </ControlButton>
+              <FondoPicker
+                fondo={rtc.fondo}
+                cargando={rtc.fondoCargando}
+                aviso={rtc.fondoAviso}
+                disabled={!rtc.localStream || !rtc.localStream.getVideoTracks().length}
+                onElegir={(id) => void rtc.aplicarFondo(id)}
+                onCerrarAviso={rtc.cerrarAvisoFondo}
+              />
             </div>
           </div>
           <MicMeter stream={rtc.localStream} />
@@ -416,7 +425,7 @@ export default function SalaPsicologoPage() {
           )}
         >
           {rtc.camEnabled || rtc.sharingScreen ? (
-            <VideoView stream={rtc.localStream} muted mirrored={!rtc.sharingScreen} />
+            <VideoView stream={rtc.previewStream} muted mirrored={!rtc.sharingScreen} />
           ) : (
             <div className="flex h-full items-center justify-center text-slate-500">
               <VideoOff className="h-6 w-6" />
@@ -438,6 +447,14 @@ export default function SalaPsicologoPage() {
           <ControlButton onClick={rtc.toggleCam} active={rtc.camEnabled} title="Cámara">
             {rtc.camEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
           </ControlButton>
+              <FondoPicker
+                fondo={rtc.fondo}
+                cargando={rtc.fondoCargando}
+                aviso={rtc.fondoAviso}
+                disabled={!rtc.localStream || !rtc.localStream.getVideoTracks().length}
+                onElegir={(id) => void rtc.aplicarFondo(id)}
+                onCerrarAviso={rtc.cerrarAvisoFondo}
+              />
           <ControlButton
             onClick={rtc.sharingScreen ? rtc.stopScreenShare : rtc.startScreenShare}
             active={!rtc.sharingScreen}

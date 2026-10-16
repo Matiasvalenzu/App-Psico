@@ -6,7 +6,7 @@ const googleAds = Boolean((process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "").trim());
 const cspReportOnly = [
   "default-src 'self'",
   [
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'", // wasm de MediaPipe (efectos de fondo)
     isDev ? "'unsafe-eval'" : "",
     "https://sdk.mercadopago.com",
     "https://http2.mlstatic.com",
