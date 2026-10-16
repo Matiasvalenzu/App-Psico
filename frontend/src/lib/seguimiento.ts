@@ -145,3 +145,10 @@ export function fechaCorta(iso?: string | null) {
 }
 export const LINEAS_AYUDA =
   "Si estás pasando por un momento difícil o tienes pensamientos de hacerte daño, no estás solo/a. Puedes llamar gratis las 24 horas a la Línea de Prevención del Suicidio *4141 o a Salud Responde 600 360 7777. En una emergencia, llama al 131 o acude al servicio de urgencia más cercano.";
+
+/** El backend responde el GET del brief con cuerpo vacío cuando aún no existe; json() lo deja en {}. */
+export function normalizarDocumento(d: unknown): DocumentoIA | null {
+  if (!d || typeof d !== "object" || typeof (d as { id?: unknown }).id !== "number") return null;
+  const doc = d as DocumentoIA;
+  return { ...doc, advertencias: Array.isArray(doc.advertencias) ? doc.advertencias : [], contenido: doc.contenido ?? "" };
+}

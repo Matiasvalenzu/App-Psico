@@ -184,6 +184,13 @@ class ApiTests(TestCase):
         self.client.put(f"{self.base}/diagnostico/", {"codigo": "F41.1", "presuntivo": True}, format="json")
         self.assertEqual(self.client.get(f"{self.base}/diagnostico/").data["descripcion"], "Trastorno de ansiedad generalizada")
 
+    def test_brief_get_sin_documento_responde_vacio(self):
+        # El frontend debe tratar este cuerpo vacío como "sin brief" (fix/brief-informes-tab).
+        r = self.client.get(f"{self.base}/brief/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(r.data)
+        self.assertEqual(r.content, b"")
+
     @override_settings(DEEPSEEK_API_KEY="test-key")
     @patch("seguimiento.ia.llamar_deepseek", return_value=("DÓNDE QUEDAMOS: [Paciente] habló de su trabajo.", "deepseek-chat"))
     def test_brief_seudonimiza_y_desseudonimiza(self, mock_llm):

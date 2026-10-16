@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import UpsellPlusModal from "@/components/suscripcion/UpsellPlusModal";
-import { API_SEG, TIPOS_INFORME, fechaCorta, type DocumentoIA } from "@/lib/seguimiento";
+import { API_SEG, TIPOS_INFORME, fechaCorta, normalizarDocumento, type DocumentoIA } from "@/lib/seguimiento";
 
 async function json<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
@@ -54,14 +54,14 @@ function Brief({ pacienteId }: { pacienteId: string }) {
   const poll = usePolling();
 
   useEffect(() => {
-    apiFetch(`${API_SEG}/pacientes/${pacienteId}/brief/`).then((r) => json<DocumentoIA | null>(r)).then(setBrief).catch(() => {});
+    apiFetch(`${API_SEG}/pacientes/${pacienteId}/brief/`).then((r) => json<unknown>(r)).then((d) => setBrief(normalizarDocumento(d))).catch(() => {});
   }, [pacienteId]);
 
   async function generar() {
     setGenerando(true);
     try {
       const d = await json<DocumentoIA>(await apiFetch(`${API_SEG}/pacientes/${pacienteId}/brief/`, { method: "POST" }));
-      setBrief(await poll(d.id));
+      setBrief(normalizarDocumento(await poll(d.id)));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo solicitar el brief.");
     } finally {
@@ -86,7 +86,7 @@ function Brief({ pacienteId }: { pacienteId: string }) {
           ) : (
             <>
               <Alert><Sparkles /><AlertTitle>Borrador generado por IA</AlertTitle><AlertDescription>Revísalo antes de usarlo. Es un apoyo para preparar la sesión, no una valoración clínica.</AlertDescription></Alert>
-              {brief.advertencias.length > 0 && <ul className="list-disc pl-5 text-xs text-muted-foreground">{brief.advertencias.map((a) => <li key={a}>{a}</li>)}</ul>}
+              {(brief.advertencias ?? []).length > 0 && <ul className="list-disc pl-5 text-xs text-muted-foreground">{brief.advertencias.map((a) => <li key={a}>{a}</li>)}</ul>}
               <div className="whitespace-pre-wrap rounded-xl bg-muted/50 p-4 text-sm leading-relaxed">{brief.contenido}</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 Generado el {fechaCorta(brief.updated_at)}
@@ -155,7 +155,7 @@ function GeneradorInformes({ pacienteId }: { pacienteId: string }) {
   const poll = usePolling();
 
   const cargar = useCallback(() => {
-    apiFetch(`${API_SEG}/pacientes/${pacienteId}/informes/`).then((r) => json<DocumentoIA[]>(r)).then(setInformes).catch(() => {});
+    apiFetch(`${API_SEG}/pacientes/${pacienteId}/informes/`).then((r) => json<unknown>(r)).then((l) => setInformes(Array.isArray(l) ? l.map(normalizarDocumento).filter((d): d is DocumentoIA => d !== null) : [])).catch(() => {});
   }, [pacienteId]);
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => { setTexto(actual?.contenido ?? ""); }, [actual]);
@@ -167,7 +167,7 @@ function GeneradorInformes({ pacienteId }: { pacienteId: string }) {
         ? await json<DocumentoIA>(await apiFetch(`${API_SEG}/documentos/${regenerarId}/regenerar/`, { method: "POST" }))
         : await json<DocumentoIA>(await apiFetch(`${API_SEG}/pacientes/${pacienteId}/informes/`, { method: "POST", body: JSON.stringify({ tipo, destinatario, contexto_adicional: contexto }) }));
       setActual(d);
-      setActual(await poll(d.id));
+      setActual(normalizarDocumento(await poll(d.id)));
       cargar();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo generar el borrador.");
@@ -237,7 +237,7 @@ function GeneradorInformes({ pacienteId }: { pacienteId: string }) {
                 <AlertTitle>{actual.es_borrador ? "Borrador generado por IA — revísalo antes de usarlo" : `Informe final (${fechaCorta(actual.finalizado_en)})`}</AlertTitle>
                 <AlertDescription>
                   {actual.es_borrador && <p>No es un documento terminado. Verifica cada dato clínico, completa lo marcado como [COMPLETAR] y corrige lo que corresponda: la responsabilidad profesional del informe es tuya.</p>}
-                  {actual.advertencias.length > 0 && <ul className="mt-1 list-disc pl-5">{actual.advertencias.map((a) => <li key={a}>{a}</li>)}</ul>}
+                  {(actual.advertencias ?? []).length > 0 && <ul className="mt-1 list-disc pl-5">{actual.advertencias.map((a) => <li key={a}>{a}</li>)}</ul>}
                 </AlertDescription>
               </Alert>
               <div className="text-xs text-muted-foreground">{actual.tipo_label}{actual.destinatario ? ` · ${actual.destinatario}` : ""} · {pendientesCompletar} campos por completar</div>

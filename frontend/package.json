@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node -r sucrase/register --test src/lib/tutorial-data.test.cjs src/components/suscripcion/plusCheckoutBanner.test.cjs"
+    "test": "node -r sucrase/register --test src/lib/tutorial-data.test.cjs src/components/suscripcion/plusCheckoutBanner.test.cjs src/lib/seguimiento-normalizar.test.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
