@@ -21,6 +21,7 @@ from voz.services import (
 
 from .audio import borrar_audio_sesion, purgar_audios
 from .models import Sesion, SpeakerIdentificationResult, TranscripcionSegmento
+from .videollamada import es_videollamada_psiconex, marcar_finalizada_si_corresponde
 
 logger = logging.getLogger(__name__)
 
@@ -634,7 +635,14 @@ def procesar_audio_sesion(self, sesion_id):
             )
 
         sesion.estado = Sesion.Estado.COMPLETADO
-        sesion.save(update_fields=["estado", "updated_at"])
+        update_fields = ["estado", "updated_at"]
+        if es_videollamada_psiconex(sesion):
+            update_fields.extend(
+                field
+                for field in marcar_finalizada_si_corresponde(sesion, sesion.audio_path)
+                if field not in update_fields
+            )
+        sesion.save(update_fields=update_fields)
         logger.info("Sesión %s procesada exitosamente", sesion_id)
         _borrar_audio_procesado(sesion)
         _notify_session_ready(sesion)
@@ -744,13 +752,11 @@ def procesar_audio_dual_track(
 
         update_fields = ["estado", "updated_at"]
         ref_audio = audio_path_stereo or audio_path_psicologo
-        if not sesion.duracion_segundos and ref_audio:
-            try:
-                if os.path.exists(ref_audio) and os.path.getsize(ref_audio) > 100:
-                    sesion.duracion_segundos = int(get_audio_duration_seconds(ref_audio))
-                    update_fields.append("duracion_segundos")
-            except Exception as exc:
-                logger.warning("No se pudo calcular la duración de la sesión %s: %s", sesion_id, exc)
+        update_fields.extend(
+            field
+            for field in marcar_finalizada_si_corresponde(sesion, ref_audio)
+            if field not in update_fields
+        )
         sesion.estado = Sesion.Estado.COMPLETADO
         sesion.save(update_fields=update_fields)
         logger.info("Sesión dual-track %s procesada exitosamente (%s segmentos)", sesion_id, len(merged_segments))

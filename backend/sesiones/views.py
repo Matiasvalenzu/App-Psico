@@ -20,6 +20,11 @@ from cuentas.models import RegistroAcceso
 from pacientes.services import consentimiento_vigente
 
 from .audio import borrar_archivos_audio
+from .videollamada import (
+    es_videollamada_psiconex,
+    marcar_finalizada_si_corresponde,
+    registrar_inicio_videollamada,
+)
 from .documentos import (
     DocumentTextExtractionError,
     UnsupportedDocumentType,
@@ -111,8 +116,12 @@ class SesionViewSet(viewsets.ModelViewSet):
 
         sesion.audio_path = filepath
         sesion.audio_eliminado_en = None
-        sesion.duracion_segundos = duracion
         sesion.estado = Sesion.Estado.PROCESANDO
+        if es_videollamada_psiconex(sesion):
+            sesion.duracion_segundos = duracion or None
+            marcar_finalizada_si_corresponde(sesion, filepath, duracion or None)
+        else:
+            sesion.duracion_segundos = duracion
         if sesion.psicologo_id is None:
             sesion.psicologo = request.user
         sesion.procesada_sin_consentimiento = not consentimiento_vigente(sesion.paciente)
@@ -356,9 +365,9 @@ class SesionViewSet(viewsets.ModelViewSet):
             f"{sesion.token_sala}:psicologo:{exp}".encode(),
             hashlib.sha256,
         ).hexdigest()
-        if sesion.estado_videollamada != Sesion.EstadoVideollamada.EN_CURSO:
-            sesion.estado_videollamada = Sesion.EstadoVideollamada.EN_CURSO
-            sesion.save(update_fields=["estado_videollamada", "updated_at"])
+        inicio_fields = registrar_inicio_videollamada(sesion)
+        if inicio_fields:
+            sesion.save(update_fields=[*inicio_fields, "updated_at"])
         return Response({"token_sala": sesion.token_sala, "ticket": f"{exp}.{firma}"})
 
     @action(detail=True, methods=["post"], url_path="finalizar_videollamada")
@@ -406,6 +415,11 @@ class SesionViewSet(viewsets.ModelViewSet):
         sesion.audio_path = path_stereo or path_psi
         sesion.audio_eliminado_en = None
         sesion.procesada_sin_consentimiento = not consentimiento_vigente(sesion.paciente)
+        for field in marcar_finalizada_si_corresponde(
+            sesion, sesion.audio_path, request.data.get("duracion_segundos")
+        ):
+            if field not in update_fields:
+                update_fields.append(field)
         sesion.save(update_fields=update_fields)
 
         from .tasks import procesar_audio_dual_track

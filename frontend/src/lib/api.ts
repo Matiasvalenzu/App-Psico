@@ -9,6 +9,7 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || localApiUrl;
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
+let refreshBlocked = false;
 
 export function setTokens(access: string, refresh: string) {
   accessToken = access;
@@ -20,6 +21,7 @@ export function setTokens(access: string, refresh: string) {
 }
 
 export function loadTokens() {
+  refreshBlocked = false;
   if (typeof window !== "undefined") {
     accessToken = localStorage.getItem("access_token");
     refreshToken = localStorage.getItem("refresh_token");
@@ -43,13 +45,43 @@ export function getAccessToken() {
 }
 
 let refreshInFlight: Promise<string | null> | null = null;
+let authExpiredHandler: (() => void) | null = null;
+
+export const RELOGIN_MESSAGE = "psiconex-relogin";
+const REFRESH_EVERY_MS = 10 * 60 * 1000;
+const REFRESH_MARGIN_MS = 60 * 1000;
+
+export function setAuthExpiredHandler(handler: (() => void) | null) {
+  authExpiredHandler = handler;
+}
 
 function readRefreshToken() {
   if (!refreshToken && typeof window !== "undefined") loadTokens();
   return refreshToken;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+export function accessTokenExpiryMs(token: string | null): number | null {
+  if (!token) return null;
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const json = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof json.exp === "number" ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+export function msUntilProactiveRefresh(expMs: number | null, now = Date.now()): number {
+  if (expMs == null) return REFRESH_EVERY_MS;
+  const until = expMs - REFRESH_MARGIN_MS - now;
+  if (until <= 0) return 0;
+  return Math.min(until, REFRESH_EVERY_MS);
+}
+
+async function refreshAccessToken(force = false): Promise<string | null> {
+  if (force) refreshBlocked = false;
+  if (refreshBlocked) return null;
   if (refreshInFlight) return refreshInFlight;
   const current = readRefreshToken();
   if (!current) return null;
@@ -60,11 +92,18 @@ async function refreshAccessToken(): Promise<string | null> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh: current }),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        refreshBlocked = true;
+        return null;
+      }
       const data = await res.json();
-      if (!data?.access) return null;
+      if (!data?.access) {
+        refreshBlocked = true;
+        return null;
+      }
       const nextRefresh = typeof data.refresh === "string" && data.refresh ? data.refresh : current;
       setTokens(data.access, nextRefresh);
+      refreshBlocked = false;
       return data.access as string;
     } catch {
       return null;
@@ -73,6 +112,59 @@ async function refreshAccessToken(): Promise<string | null> {
     }
   })();
   return refreshInFlight;
+}
+
+export function refreshSession(force = false) {
+  return refreshAccessToken(force);
+}
+
+export function startAccessKeepAlive(onExpired: () => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+
+  const schedule = () => {
+    if (stopped) return;
+    const wait = msUntilProactiveRefresh(accessTokenExpiryMs(getAccessToken()));
+    timer = setTimeout(run, wait);
+  };
+
+  const run = async () => {
+    if (stopped) return;
+    const token = await refreshAccessToken(true);
+    if (!token) {
+      onExpired();
+      if (!stopped) timer = setTimeout(run, REFRESH_EVERY_MS);
+      return;
+    }
+    schedule();
+  };
+
+  const onVisible = () => {
+    if (document.visibilityState !== "visible" || stopped) return;
+    if (msUntilProactiveRefresh(accessTokenExpiryMs(getAccessToken())) !== 0) return;
+    if (timer) clearTimeout(timer);
+    void run();
+  };
+
+  schedule();
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+  };
+}
+
+export function esVentanaRelogin() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("relogin") === "1";
+}
+
+export function cerrarVentanaRelogin() {
+  if (!esVentanaRelogin() || !window.opener || window.opener.closed) return false;
+  window.opener.postMessage({ type: RELOGIN_MESSAGE }, window.location.origin);
+  window.close();
+  return true;
 }
 
 export async function apiFetch(
@@ -96,7 +188,7 @@ export async function apiFetch(
 
   let res = await fetch(url, { ...options, headers });
 
-  if (res.status === 401 && readRefreshToken()) {
+  if (res.status === 401 && readRefreshToken() && !refreshBlocked) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;
@@ -105,9 +197,13 @@ export async function apiFetch(
   }
 
   if (res.status === 401) {
-    clearTokens();
-    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-      window.location.replace("/login");
+    if (authExpiredHandler) {
+      authExpiredHandler();
+    } else {
+      clearTokens();
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
     }
   }
 

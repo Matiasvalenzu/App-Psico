@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import AvisoConsentimiento from "@/components/pacientes/AvisoConsentimiento";
 import { sugerirAsociarCobro } from "@/components/cobros/sugerirCobro";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, loadTokens, RELOGIN_MESSAGE, setAuthExpiredHandler, startAccessKeepAlive } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useWebRTC } from "@/hooks/useWebRTC";
@@ -77,11 +77,18 @@ export default function SalaPsicologoPage() {
   const [elapsed, setElapsed] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  const [reloginOpen, setReloginOpen] = useState(false);
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
   const rtc = useWebRTC({ token, role: "psicologo", ticket });
   const recorder = useDualTrackRecorder();
   // Guarda las pistas ya detenidas para poder reintentar el envío si falla la subida
   const resultRef = useRef<Awaited<ReturnType<typeof recorder.stop>>>(null);
+  const finishRef = useRef<() => Promise<void>>(async () => {});
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
+  setAuthExpiredHandler(() => setReloginOpen(true));
 
   // --- Carga inicial: sesión, ticket y ficha del paciente
   useEffect(() => {
@@ -94,6 +101,7 @@ export default function SalaPsicologoPage() {
           apiFetch(`/pacientes/${pacienteId}/`),
         ]);
         if (cancelled) return;
+        if (sRes.status === 401 || tRes.status === 401) return;
         if (!sRes.ok) throw new Error("No se encontró la sesión.");
         if (tRes.status === 410) throw new Error("Esta videollamada ya fue finalizada.");
         if (!tRes.ok) throw new Error("No se pudo obtener el acceso a la sala.");
@@ -168,6 +176,63 @@ export default function SalaPsicologoPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [recorder.recording]);
 
+  useEffect(() => {
+    setAuthExpiredHandler(() => setReloginOpen(true));
+    const stop = startAccessKeepAlive(() => setReloginOpen(true));
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== RELOGIN_MESSAGE) return;
+      loadTokens();
+      setReloginOpen(false);
+      setPopupBlocked(false);
+      setFinishError(null);
+      if (resultRef.current) void finishRef.current();
+      else if (phaseRef.current === "loading") window.location.reload();
+    };
+    window.addEventListener("message", onMessage);
+    return () => {
+      setAuthExpiredHandler(null);
+      stop();
+      window.removeEventListener("message", onMessage);
+    };
+  }, []);
+
+  function abrirRelogin() {
+    const popup = window.open("/login?relogin=1", "psiconex-relogin", "popup,width=520,height=760");
+    setPopupBlocked(!popup);
+  }
+
+  const reloginModal = reloginOpen ? (
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 text-white shadow-xl">
+        <h2 className="text-lg font-semibold">Tu sesión expiró</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+          La videollamada sigue abierta y la grabación no se pierde. Inicia sesión en una ventana nueva y el envío se reintentará solo.
+        </p>
+        {popupBlocked && (
+          <p className="mt-3 text-sm text-amber-300">El navegador bloqueó la ventana. Permite emergentes y vuelve a intentar.</p>
+        )}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          {phase !== "loading" && (
+            <button
+              type="button"
+              onClick={() => setReloginOpen(false)}
+              className="rounded-xl px-4 py-2 text-sm text-slate-300 hover:bg-white/10"
+            >
+              Seguir en la llamada
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={abrirRelogin}
+            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-400"
+          >
+            Iniciar sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // Autosave de notas (debounce 1,5 s)
   const saveNotas = useCallback(
     async (value: string) => {
@@ -224,7 +289,13 @@ export default function SalaPsicologoPage() {
         }
       }
       form.append("notas_sesion", notas);
+      form.append("duracion_segundos", String(elapsed));
       const res = await apiFetch(`/sesiones/${sesionId}/finalizar_videollamada/`, { method: "POST", body: form });
+      if (res.status === 401) {
+        setConfirmOpen(false);
+        setPhase("call");
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error || "No se pudo finalizar la videollamada.");
@@ -239,6 +310,8 @@ export default function SalaPsicologoPage() {
       setPhase("call");
     }
   }
+
+  finishRef.current = handleFinish;
 
   // --- PiP arrastrable
   const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null);
@@ -269,6 +342,7 @@ export default function SalaPsicologoPage() {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 text-white">
         <Loader2 className="h-8 w-8 animate-spin" />
+        {reloginModal}
       </div>
     );
   }
@@ -285,6 +359,7 @@ export default function SalaPsicologoPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Volver a la sesión
         </button>
+        {reloginModal}
       </div>
     );
   }
@@ -323,6 +398,7 @@ export default function SalaPsicologoPage() {
             </div>
           </div>
           <MicMeter stream={rtc.localStream} />
+          {reloginModal}
           <p className="text-xs text-slate-400">
             Al entrar comenzará la grabación del audio en dos pistas separadas (tu voz y la del paciente).
           </p>
@@ -544,8 +620,8 @@ export default function SalaPsicologoPage() {
                 ) : (
                   <div className="space-y-2">
                     {previas.map((p) => (
-                      <div key={p.id} className="rounded-xl border border-white/10 bg-slate-950 p-3">
-                        <p className="text-xs text-slate-400">
+                        <div key={p.id} className="rounded-xl border border-white/10 bg-slate-950 p-3">
+                          <p className="text-xs text-slate-400">
                           {p.numero_sesion ? `Sesión ${p.numero_sesion} · ` : ""}
                           {formatDate(p.fecha_hora_inicio)}
                         </p>
@@ -562,6 +638,7 @@ export default function SalaPsicologoPage() {
         </aside>
       )}
 
+      {reloginModal}
       <ConfirmDialog
         open={confirmOpen}
         title="Finalizar sesión"

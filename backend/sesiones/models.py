@@ -69,6 +69,7 @@ class Sesion(models.Model):
         choices=EstadoVideollamada.choices,
         default=EstadoVideollamada.CREADA,
     )
+    videollamada_inicio = models.DateTimeField(null=True, blank=True)
     captions_buffer = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

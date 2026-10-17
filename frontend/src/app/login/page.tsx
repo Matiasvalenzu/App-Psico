@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  cerrarVentanaRelogin,
   login,
   loginWithGoogle,
   registerUser,
@@ -71,6 +72,7 @@ export default function LoginPage() {
 
   // Modo: 'login' | 'register'
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const [reloginVentana, setReloginVentana] = useState(false);
 
   // Estado Login
   const [loginIdentifier, setLoginIdentifier] = useState("");
@@ -97,6 +99,10 @@ export default function LoginPage() {
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
+  useEffect(() => {
+    setReloginVentana(new URLSearchParams(window.location.search).get("relogin") === "1");
+  }, []);
+
   // Temporizador para reenvío de OTP
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -109,6 +115,7 @@ export default function LoginPage() {
   // Navegación completa (no SPA) para que Meta Pixel y Google Ads nunca sobrevivan en /dashboard.
   // Pequeña espera para que salgan los eventos de registro.
   function goToDashboard() {
+    if (cerrarVentanaRelogin()) return;
     window.setTimeout(
       () => window.location.assign("/dashboard"),
       isMetaPixelEnabled || isGoogleAdsEnabled ? 300 : 0,
@@ -401,6 +408,12 @@ export default function LoginPage() {
                       </p>
                     </div>
                   </div>
+                )}
+
+                {reloginVentana && (
+                  <p className="rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-sm text-foreground">
+                    Al entrar, esta ventana se cierra y vuelves a la videollamada sin perderla.
+                  </p>
                 )}
 
                 {error && (
